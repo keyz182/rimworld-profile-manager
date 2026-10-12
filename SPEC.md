@@ -258,7 +258,7 @@ T66|x|payload+core+gui: `RWPM_LOG_DIR` channel (hook redirects log iff set); Way
 T67|.|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows)|V64,V65,V66
 T68|.|e2e Linux + Windows 1.7: app/Steam/RimSort × LIVE/OFFLINE, Restart, helpers unbroken, 1.6 + 1.7 side by side via builds|V50,V51,V64,V65,V66,V67
 T69|.|docs + help: 1.7 support, B9 warning (Steam Play on 1.7 w/o rwpm resets Default mod list)|-
-T70|.|`rwpm run` Waylith restart wait: find replacement by `-WaitForExitingPid=<child pid>`, hold `run.lock` + last-run until it exits; fixture test|V68
+T70|x|`rwpm run` Waylith restart wait: find replacement by `-WaitForExitingPid=<child pid>`, hold `run.lock` + last-run until it exits; fixture test|V68
 
 ## §B BUGS
 id|date|cause|fix

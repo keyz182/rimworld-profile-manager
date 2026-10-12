@@ -3,8 +3,8 @@
 //! T43: real macOS launch coverage is T48's e2e, against the actual Steam install, not a
 //! fake-binary port of this harness.
 //!
-//! The process-scan scenarios share global state (any `RimWorldLinux` process counts),
-//! so they run serially inside one test. They fail if a real RimWorld is open.
+//! The process-scan scenarios share global state (any `RimWorldLinux` or `RimWorld` process
+//! counts), so they run serially inside one test. They fail if a real RimWorld is open.
 #![cfg(target_os = "linux")]
 
 use std::os::unix::fs::PermissionsExt;
@@ -138,6 +138,7 @@ fn run_cli_contract_serial() {
     exit_code_is_first_game_process();
     passes_savedatafolder_and_logfile_to_game();
     waits_for_restart_child();
+    waits_for_waylith_restart_replacement();
     refuses_while_any_game_runs();
     refuses_while_another_run_holds_lock();
     guard_cancel_does_not_launch();
@@ -283,6 +284,73 @@ fn waits_for_restart_child() {
     assert!(
         elapsed >= Duration::from_millis(1900),
         "returned after {elapsed:?}, before the restart child ended"
+    );
+}
+
+/// V68 / R40: on 1.7 the in-game Restart starts a detached replacement (`setsid`, same exe,
+/// `-WaitForExitingPid=<old pid>`), then the first process exits 0. `rwpm run` must keep
+/// `run.lock` and hold back last-run's `exit` until the replacement is gone too.
+fn waits_for_waylith_restart_replacement() {
+    let sb = Sandbox::new();
+    let id = sb.create_profile("Run");
+    let game_dir = sb.path().join("game17");
+    std::fs::create_dir_all(&game_dir).expect("game dir");
+    std::fs::write(game_dir.join("Waylith.dll"), "").expect("marker");
+    // The replacement: `sleep` started through a link named like the 1.7 game process.
+    let bin = sb.path().join("bin17");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    let replacement = bin.join("RimWorld");
+    std::os::unix::fs::symlink(which_sleep(), &replacement).expect("symlink");
+    let game = game_dir.join("RimWorld");
+    std::fs::write(
+        &game,
+        format!(
+            "#!/bin/sh
+setsid '{}' 2 </dev/null >/dev/null 2>&1 &
+exit 0
+",
+            replacement.display()
+        ),
+    )
+    .expect("game");
+    std::fs::set_permissions(&game, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+    let start = Instant::now();
+    let first = sb
+        .rwpm()
+        .arg("run")
+        .arg(&id)
+        .arg("--")
+        .arg(&game)
+        .spawn()
+        .expect("rwpm");
+    std::thread::sleep(Duration::from_millis(700));
+    let second = sb
+        .rwpm()
+        .arg("run")
+        .arg(&id)
+        .arg("--")
+        .arg(&game)
+        .output()
+        .expect("second rwpm");
+    let status = first.wait_with_output().expect("first rwpm").status;
+    let elapsed = start.elapsed();
+    assert_eq!(
+        second.status.code(),
+        Some(EX_TEMPFAIL),
+        "second run started while the replacement ran: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    assert_eq!(status.code(), Some(0), "first process's exit code");
+    assert!(
+        elapsed >= Duration::from_millis(1900),
+        "returned after {elapsed:?}, before the replacement ended"
+    );
+    let run = sb.last_run(&id);
+    assert_eq!(
+        (run.outcome, run.exit),
+        (RunOutcome::Ok, Some(0)),
+        "{run:?}"
     );
 }
 
