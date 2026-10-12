@@ -146,6 +146,7 @@ fn run_cli_contract_serial() {
     wrapped_launch_runs_rwpm_inside_wrapper();
     records_who_started_each_run();
     records_a_failed_start();
+    run_uses_moved_root();
 }
 
 fn records_who_started_each_run() {
@@ -682,7 +683,7 @@ fn inner_marker_without_restart_env_is_refused() {
 }
 
 /// T14: after a Move, settings.toml names the profiles folder; rwpm run must use it.
-#[test]
+/// A full launch: it scans for running games, so it runs inside the serial test.
 fn run_uses_moved_root() {
     let sb = Sandbox::new();
     let moved = sb.path().join("elsewhere/profiles");
