@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Stands in for a .NET helper the game starts (eg a net8 tool): it inherits the env. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>FakeHelper</AssemblyName>
+  </PropertyGroup>
+</Project>

@@ -125,6 +125,10 @@ fi
 
 dotnet build "$ROOT/payload/Rwpm.Payload" -c Release -o "$ROOT/target/dist/payload-build" -nologo >/dev/null
 cp "$ROOT/target/dist/payload-build/Rwpm.Payload.dll" "$bin_dir/payload/"
+# T64: the RimWorld 1.7 startup hook ships in every bundle. The launcher copy needs it
+# (flatpak::sync_launcher), so a bundle without it could not launch any profile.
+dotnet build "$ROOT/payload/Rwpm.Payload.Hook" -c Release -o "$ROOT/target/dist/hook-build" -nologo >/dev/null
+cp "$ROOT/target/dist/hook-build/Rwpm.Payload.Hook.dll" "$bin_dir/payload/"
 
 (cd "$VENDOR" && sha256_check SHA256SUMS)
 cp "$VENDOR/$loader" "$bin_dir/doorstop/"

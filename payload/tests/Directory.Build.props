@@ -1,0 +1,8 @@
+<Project>
+  <!-- Test fixtures for scripts/test-hook.sh only. Never shipped. -->
+  <PropertyGroup>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

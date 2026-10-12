@@ -68,6 +68,7 @@ VIAddVersionKey "LegalCopyright" "keyz182"
       StrCpy $R8 0
       !insertmacro CheckFree "$INSTDIR\${EXE}"
       !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.dll"
+      !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.Hook.dll"
       StrCmp $R8 0 done
       MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Close RimWorld and ${APP}, then press Retry." /SD IDCANCEL IDRETRY retry
       SetErrorLevel 2

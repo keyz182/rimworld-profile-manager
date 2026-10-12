@@ -1,7 +1,7 @@
 using System;
-using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Rwpm.Shared;
 
 namespace Doorstop
 {
@@ -12,10 +12,6 @@ namespace Doorstop
     /// </summary>
     public static class Entrypoint
     {
-        const string ModsDirEnv = "RWPM_MODS_DIR";
-        const string LogEnv = "RWPM_PAYLOAD_LOG";
-        const string TargetType = "Verse.GenFilePaths";
-        const string TargetField = "modsFolderPath";
         const string EnabledEnv = "DOORSTOP_ENABLED";
         const string RestartEnv = "RWPM_RESTART";
         const string ChainEnv = "RWPM_CHAIN_TARGET";
@@ -30,14 +26,14 @@ namespace Doorstop
         {
             try
             {
-                logPath = Environment.GetEnvironmentVariable(LogEnv);
-                modsDir = Environment.GetEnvironmentVariable(ModsDirEnv);
+                logPath = Environment.GetEnvironmentVariable(ModsRedirect.LogEnv);
+                modsDir = Environment.GetEnvironmentVariable(ModsRedirect.ModsDirEnv);
                 Log("start pid=" + System.Diagnostics.Process.GetCurrentProcess().Id
                     + " argv=" + string.Join(" ", Environment.GetCommandLineArgs()));
 
                 if (string.IsNullOrEmpty(modsDir))
                 {
-                    Log("no " + ModsDirEnv + "; nothing to do");
+                    Log("no " + ModsRedirect.ModsDirEnv + "; nothing to do");
                     return;
                 }
 
@@ -150,9 +146,8 @@ namespace Doorstop
                 return;
             }
 #endif
-            if (!Directory.Exists(modsDir))
+            if (ModsRedirect.EnsureDir(modsDir))
             {
-                Directory.CreateDirectory(modsDir);
                 Log("created " + modsDir);
             }
         }
@@ -172,37 +167,22 @@ namespace Doorstop
         /// <summary>V2: patch every copy of GenFilePaths, incl. Prepatcher's in-process reload.</summary>
         static void TryPatch(Assembly asm)
         {
-            if (asm.IsDynamic)
-            {
-                return;
-            }
-            Type type = asm.GetType(TargetType, false);
-            if (type == null)
+            if (!ModsRedirect.HoldsTarget(asm))
             {
                 return;
             }
 #if RWPM_SPIKE
             if (patchedOnce && Environment.GetEnvironmentVariable("RWPM_SPIKE_NO_RELOAD_HOOK") == "1")
             {
-                Log("spike: NO_RELOAD_HOOK set, skipped " + Describe(asm));
+                Log("spike: NO_RELOAD_HOOK set, skipped " + ModsRedirect.Describe(asm));
                 return;
             }
 #endif
-            FieldInfo field = type.GetField(TargetField, BindingFlags.Static | BindingFlags.NonPublic);
-            if (field == null || field.FieldType != typeof(string))
-            {
-                throw new MissingFieldException(TargetType, TargetField);
-            }
-            field.SetValue(null, modsDir);
+            ModsRedirect.Patch(asm, modsDir);
 #if RWPM_SPIKE
             patchedOnce = true;
 #endif
-            Log("patched " + Describe(asm) + " -> " + modsDir);
-        }
-
-        static string Describe(Assembly asm)
-        {
-            return asm.GetName().Name + "#" + asm.GetHashCode();
+            Log("patched " + ModsRedirect.Describe(asm) + " -> " + modsDir);
         }
 
         static void Fail(string what, Exception ex)
@@ -213,18 +193,7 @@ namespace Doorstop
 
         static void Log(string line)
         {
-            if (string.IsNullOrEmpty(logPath))
-            {
-                return;
-            }
-            try
-            {
-                File.AppendAllText(logPath, DateTime.UtcNow.ToString("o") + " " + line + Environment.NewLine);
-            }
-            catch (IOException)
-            {
-                // Logging must never break the redirect itself.
-            }
+            ModsRedirect.Log(logPath, line);
         }
     }
 }

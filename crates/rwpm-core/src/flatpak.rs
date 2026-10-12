@@ -14,12 +14,14 @@ use std::process::Command;
 
 pub const STEAM_APP: &str = "com.valvesoftware.Steam";
 
-/// Files rwpm needs beside it: the payload and Doorstop (`payload_files` in `rwpm run`).
+/// Files rwpm needs beside it: both payloads and Doorstop (`payload_files` in `rwpm run`).
+/// `Rwpm.Payload.Hook.dll` is the RimWorld 1.7 startup hook (V64).
 /// macOS's loader is `libdoorstop.dylib`, not `.so` (R26).
-fn launcher_files() -> [&'static str; 3] {
+fn launcher_files() -> [&'static str; 4] {
     [
         "rwpm",
         "payload/Rwpm.Payload.dll",
+        "payload/Rwpm.Payload.Hook.dll",
         if cfg!(target_os = "macos") {
             "doorstop/libdoorstop.dylib"
         } else {
@@ -118,6 +120,15 @@ mod tests {
             .modified()
             .expect("mtime");
         assert_eq!(before, after, "unchanged file rewritten");
+    }
+
+    #[test]
+    fn sync_copies_the_startup_hook() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (app, copy) = (tmp.path().join("app"), tmp.path().join("copy"));
+        bundle(&app, "v1");
+        sync_launcher(&app, &copy).expect("sync");
+        assert!(copy.join("payload/Rwpm.Payload.Hook.dll").is_file());
     }
 
     #[cfg(unix)]

@@ -249,7 +249,7 @@ T60|.|core: effective-game resolver; route go OFFLINE/Refresh, mod list, guard, 
 T61|.|`rwpm run` engine detect: Waylith ∧ OFFLINE → refuse w/ plain reason; fixture test|V62
 T62|x|grill 1.7 Waylith support — done 2026-10-12: full parity Linux + Windows, startup hooks fallback refuse, macOS parked; decompile → R38; spike + build = T63-T69|R37,R38
 T63|x|spike Linux (captured 1.7 build): minimal startup hook → runs before `ModLister` cctor? sets `modsFolderPath`? (?startup_hooks_waylith); Restart re-launch + env carry (?waylith_restart); net8 helper w/ env (V65); Prepatcher/Harmony on 1.7 (?prepatcher_17) — W1-W4 pass 2026-10-12 (R39); restart detaches (R40 → V68); log ignores `-savedatafolder` (R41 → V67)|V64,V65,V66
-T64|.|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
+T64|x|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
 T65|.|core: engine detect + Waylith launch branch (⊥ `-logFile`, ⊥ Doorstop, `DOTNET_STARTUP_HOOKS` + `RWPM_*`, `SteamAppId`, `-savedatafolder`); lift V62 refusal when shipped|V62,V64,V67
 T66|.|core+gui: per-engine log path for Open/Copy log, health, last-run; LIVE 1.7 log per ?live_log_17|V67
 T67|.|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows)|V64,V65,V66
