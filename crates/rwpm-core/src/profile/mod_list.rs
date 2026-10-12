@@ -51,10 +51,10 @@ pub fn mod_list(profile: &Profile, game: &GameInstall) -> Result<Vec<ModRow>, St
     let offline = profile.mode == Mode::Offline && !profile.is_default();
     let local = match (offline, profile.mods_dir()) {
         (true, Some(dir)) => dir,
-        _ => game.game_dir.join("Mods"),
+        _ => game.mods_dir(),
     };
     let workshop = game.steam.as_ref().map(|s| s.workshop_dir.as_path());
-    let index = ModIndex::scan(&game.game_dir.join("Data"), &local, workshop);
+    let index = ModIndex::scan(&game.data_dir(), &local, workshop);
     let twice: Vec<String> = index
         .resolve(&active)
         .ambiguous

@@ -47,6 +47,33 @@ FROM_REPO = {
             "winit",
         )
     },
+    # macOS-only transitive deps (T46), pulled in by iced's Cocoa backend (winit/wgpu).
+    "block": "SSheldon_rust-block",
+    "dispatch": "SSheldon_rust-dispatch",
+    "malloc_buf": "SSheldon_malloc_buf",
+    **{
+        n: "madsmtm_objc2"
+        for n in (
+            "block2",
+            "dispatch2",
+            "objc-sys",
+            "objc2",
+            "objc2-app-kit",
+            "objc2-cloud-kit",
+            "objc2-core-data",
+            "objc2-core-foundation",
+            "objc2-core-graphics",
+            "objc2-core-image",
+            "objc2-core-text",
+            "objc2-core-video",
+            "objc2-encode",
+            "objc2-foundation",
+            "objc2-io-kit",
+            "objc2-io-surface",
+            "objc2-metal",
+            "objc2-quartz-core",
+        )
+    },
 }
 
 

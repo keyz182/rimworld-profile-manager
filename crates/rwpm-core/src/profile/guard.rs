@@ -69,9 +69,9 @@ pub fn check_offline<T: Trash>(
     }
     let active = read_active_mods(&config).map_err(mods_error)?;
     let workshop = game.steam.as_ref().map(|s| s.workshop_dir.as_path());
-    let view = ModIndex::scan(&game.game_dir.join("Data"), &dir.join(MODS), workshop);
+    let view = ModIndex::scan(&game.data_dir(), &dir.join(MODS), workshop);
     // `<install>/Mods` only, to offer a copy of mods the OFFLINE game cannot see.
-    let install = ModIndex::scan(Path::new(""), &game.game_dir.join(MODS), None);
+    let install = ModIndex::scan(Path::new(""), &game.mods_dir(), None);
     let mut report = GuardReport::default();
     for active_id in active {
         let base = active_id

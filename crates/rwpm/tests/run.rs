@@ -1,8 +1,11 @@
-//! `rwpm run` contract (I.cmd, V11, V17) against a fake game. Linux/Unix only.
+//! `rwpm run` contract (I.cmd, V11, V17) against a fake game. Linux only — the fixtures
+//! below are Linux-specific throughout (`RimWorldLinux`, `start_RimWorld.sh`, `LD_PRELOAD`).
+//! T43: real macOS launch coverage is T48's e2e, against the actual Steam install, not a
+//! fake-binary port of this harness.
 //!
 //! The process-scan scenarios share global state (any `RimWorldLinux` process counts),
 //! so they run serially inside one test. They fail if a real RimWorld is open.
-#![cfg(unix)]
+#![cfg(target_os = "linux")]
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};

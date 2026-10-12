@@ -74,10 +74,19 @@ jobs:
     needs: plan
     # always(): a hand-run publish skips CI, and GitHub would skip every job after a skipped one.
     if: always() && needs.plan.result == 'success' && needs.plan.outputs.version != ''
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [linux, windows]
+        # T47: macOS can't be cross-compiled from Linux — codesign and the adhoc-sign
+        # step (T46/V42) need the real toolchain — so it gets its own Mac runner, unlike
+        # Windows which cross-builds fine with mingw from the ubuntu runner.
+        include:
+          - os: linux
+            runner: ubuntu-24.04
+          - os: windows
+            runner: ubuntu-24.04
+          - os: macos
+            runner: macos-14
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,6 +119,11 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: release-windows
+      - name: Cache the macOS build
+        if: matrix.os == 'macos'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: release-macos
       - name: Set the release version for the bundle names
         if: needs.plan.outputs.existing != 'true'
         env:
@@ -139,6 +153,7 @@ jobs:
             target/dist/rwpm-${{ needs.plan.outputs.version }}-x86_64.AppImage
             target/dist/rwpm-${{ needs.plan.outputs.version }}-windows-x86_64.zip
             target/dist/rwpm-${{ needs.plan.outputs.version }}-windows-x86_64-setup.exe
+            target/dist/rwpm-${{ needs.plan.outputs.version }}-macos-arm64.zip
           if-no-files-found: error
 
   publish:

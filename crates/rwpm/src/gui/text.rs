@@ -562,6 +562,16 @@ pub fn launcher_failed(reason: &str) -> String {
     )
 }
 
+/// V46/R30: an un-notarised `.app` run from a quarantined location (eg straight out of
+/// Downloads) can execute from a Gatekeeper-translocated path that changes on every
+/// launch, so Steam/RimSort references to it would break.
+pub fn macos_launcher_failed(reason: &str) -> String {
+    format!(
+        "This app could not copy its launcher to a stable folder ({reason}). \
+         Launching from Steam or RimSort may not work until it is moved to Applications."
+    )
+}
+
 pub fn other_profiles(other: &Path, used: &Path) -> String {
     format!(
         "Profiles also exist in {}. This app uses {}, the folder that goes with \

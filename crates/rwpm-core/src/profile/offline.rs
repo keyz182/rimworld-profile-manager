@@ -85,11 +85,7 @@ pub fn plan_offline<T: Trash>(
         Vec::new()
     };
     let workshop = game.steam.as_ref().map(|s| s.workshop_dir.as_path());
-    let index = ModIndex::scan(
-        &game.game_dir.join("Data"),
-        &game.game_dir.join(MODS),
-        workshop,
-    );
+    let index = ModIndex::scan(&game.data_dir(), &game.mods_dir(), workshop);
     let candidates = group_candidates(&index, &active, &file, &mut plan);
     for (package_id, mut options) in candidates {
         if options.len() == 1 {

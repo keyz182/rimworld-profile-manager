@@ -151,6 +151,8 @@ fn ask(text: &str) -> Result<Choice, String> {
     }
     if cfg!(windows) {
         ask_windows(text)
+    } else if cfg!(target_os = "macos") {
+        ask_osascript(text)
     } else {
         ask_zenity(text)
     }
@@ -264,6 +266,72 @@ fn encode_utf16_base64(text: &str) -> String {
     out
 }
 
+/// macOS (T41, V45): `choose from list` rather than `display dialog`, which caps at 3
+/// buttons — this needs 4 outcomes (Add/Turn off/Launch anyway/Cancel). The script's own
+/// built-in Cancel button returns `false`, distinct from the three named items. Text
+/// travels via `system attribute`, which reads the process environment — never through
+/// `-e` string interpolation, which would make `text` (player-controlled: mod names, R33)
+/// an AppleScript injection hazard. The script is piped to `osascript -`'s stdin, so
+/// nothing but Rust's own constant labels ever appears on its command line.
+fn ask_osascript(text: &str) -> Result<Choice, String> {
+    let mut child = Command::new("osascript")
+        .arg("-")
+        .env(TEXT_ENV, text)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("cannot run osascript: {e}"))?;
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(macos_dialog_script().as_bytes())
+        .map_err(|e| format!("cannot write osascript stdin: {e}"))?;
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("osascript failed: {e}"))?;
+    choice_from_osascript_output(out.status.success(), &out.stdout, &out.stderr)
+}
+
+fn choice_from_osascript_output(ok: bool, stdout: &[u8], stderr: &[u8]) -> Result<Choice, String> {
+    if !ok {
+        return Err(format!(
+            "osascript exit failed: {}",
+            String::from_utf8_lossy(stderr).trim()
+        ));
+    }
+    match String::from_utf8_lossy(stdout).trim() {
+        s if s == ADD => Ok(Choice::Add),
+        s if s == TURN_OFF => Ok(Choice::TurnOff),
+        s if s == LAUNCH => Ok(Choice::LaunchAnyway),
+        "cancel" => Ok(Choice::Cancel),
+        other => Err(format!("osascript output: {other}")),
+    }
+}
+
+/// `system attribute` reads `RWPM_GUARD_TEXT` from the process env rather than having
+/// the text spliced into the script source. A GUI-less session (headless CI, no Finder
+/// login) makes `choose from list` raise error -1743 ("not allowed to send keystrokes" /
+/// user-interaction-not-allowed); the catch turns that into `"error"`, which
+/// `choice_from_osascript_output` treats as a failure — same "dialog unavailable →
+/// launch + log" path as Windows/Linux.
+fn macos_dialog_script() -> String {
+    format!(
+        r#"try
+  set guardText to system attribute "{TEXT_ENV}"
+  set theChoice to choose from list {{"{ADD}", "{TURN_OFF}", "{LAUNCH}"}} with title "{TITLE}" with prompt guardText without multiple selections allowed
+  if theChoice is false then
+    return "cancel"
+  else
+    return item 1 of theChoice
+  end if
+on error
+  return "error"
+end try"#
+    )
+}
+
 /// zenity: exit 0 = OK button; exit 1 = an extra button (its label on stdout), Cancel,
 /// or the window closed; "Failed to open display" on stderr = no dialog possible.
 fn ask_zenity(text: &str) -> Result<Choice, String> {
@@ -303,6 +371,23 @@ fn show_error(text: &str) {
              [void][System.Windows.Forms.MessageBox]::Show($env:{TEXT_ENV}, '{TITLE}', 'OK', 'Error')"
         );
         let _ = powershell(&script).env(TEXT_ENV, text).status();
+    } else if cfg!(target_os = "macos") {
+        let script = format!(
+            r#"display alert "{TITLE}" message (system attribute "{TEXT_ENV}") as critical"#
+        );
+        if let Ok(mut child) = Command::new("osascript")
+            .arg("-")
+            .env(TEXT_ENV, text)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(script.as_bytes());
+            }
+            let _ = child.wait();
+        }
     } else {
         let _ = Command::new("zenity")
             .args(["--error", "--no-markup", "--title", TITLE, "--text", text])
@@ -350,6 +435,40 @@ mod tests {
         }
         assert!(!script.contains('"'), "no double quotes to escape");
         assert!(script.contains(&format!("$env:{TEXT_ENV}")));
+    }
+
+    #[test]
+    fn osascript_output_maps_to_choices() {
+        assert_eq!(
+            choice_from_osascript_output(true, ADD.as_bytes(), b""),
+            Ok(Choice::Add)
+        );
+        assert_eq!(
+            choice_from_osascript_output(true, TURN_OFF.as_bytes(), b""),
+            Ok(Choice::TurnOff)
+        );
+        assert_eq!(
+            choice_from_osascript_output(true, LAUNCH.as_bytes(), b""),
+            Ok(Choice::LaunchAnyway)
+        );
+        assert_eq!(
+            choice_from_osascript_output(true, b"cancel", b""),
+            Ok(Choice::Cancel)
+        );
+        // The script's own catch block (headless/-1743) or a hard osascript failure:
+        // either way, no dialog was shown.
+        assert!(choice_from_osascript_output(true, b"error", b"").is_err());
+        assert!(choice_from_osascript_output(false, b"", b"not allowed").is_err());
+    }
+
+    #[test]
+    fn osascript_script_offers_the_three_list_items_and_title() {
+        let script = macos_dialog_script();
+        for label in [ADD, TURN_OFF, LAUNCH, TITLE] {
+            assert!(script.contains(label), "{label}");
+        }
+        assert!(script.contains(&format!("system attribute \"{TEXT_ENV}\"")));
+        assert!(script.contains("choose from list"));
     }
 
     #[test]

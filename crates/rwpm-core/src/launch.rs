@@ -19,6 +19,8 @@ pub const ARG_INNER: &str = "--rwpm-inner";
 const LINUX_START_SCRIPT: &str = "start_RimWorld.sh";
 const LINUX_ELF: &str = "RimWorldLinux";
 const LINUX_DOORSTOP_LIB: &str = "libdoorstop.so";
+const MACOS_DOORSTOP_LIB: &str = "libdoorstop.dylib";
+const MACOS_BUNDLE_EXT: &str = "app";
 const PAYLOAD_LOG: &str = "payload.log";
 const DOORSTOP_GUARDS: [&str; 2] = ["DOORSTOP_INITIALIZED", "DOORSTOP_DISABLE"];
 
@@ -26,12 +28,15 @@ const DOORSTOP_GUARDS: [&str; 2] = ["DOORSTOP_INITIALIZED", "DOORSTOP_DISABLE"];
 pub enum Os {
     Linux,
     Windows,
+    MacOs,
 }
 
 impl Os {
     pub fn current() -> Self {
         if cfg!(windows) {
             Self::Windows
+        } else if cfg!(target_os = "macos") {
+            Self::MacOs
         } else {
             Self::Linux
         }
@@ -42,7 +47,8 @@ impl Os {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadFiles {
     pub dll: PathBuf,
-    /// Linux: dir holding `libdoorstop.so`. Windows: unused (winhttp.dll lives in the game dir, T12).
+    /// Linux: dir holding `libdoorstop.so`. macOS: dir holding `libdoorstop.dylib` (R26).
+    /// Windows: unused (winhttp.dll lives in the game dir, T12).
     pub doorstop_dir: PathBuf,
     /// Linux: the `rwpm` binary, given to the game as argv[0] so an in-game Restart
     /// re-enters rwpm (V28). `None`: no trampoline, Doorstop stays on for helpers.
@@ -90,6 +96,8 @@ pub enum LaunchError {
         "the game is started through another program, and rwpm cannot find itself to go between them"
     )]
     WrappedWithoutRwpm,
+    #[error("`{}` is a macOS app bundle rwpm could not read (missing or malformed Info.plist)", .0.display())]
+    BadBundle(PathBuf),
 }
 
 /// Builds the launch for `profile`. `env` reads the inherited environment (for V18 prepends).
@@ -113,6 +121,12 @@ pub fn build(
         replaced,
         ..LaunchPlan::default()
     };
+    // V41/R33: Steam's %command% on macOS names the .app bundle DIRECTORY, not the inner
+    // Mach-O, in every mode (live-confirmed, not Offline-only) — resolve it up front,
+    // before any Doorstop/env work, so nothing downstream ever sees the bundle path.
+    if os == Os::MacOs {
+        plan.program = resolve_macos_bundle(&plan.program)?;
+    }
     // V24: Steam app id via env, independent of steam_appid.txt (R17, R20, R21).
     set(&mut plan, "SteamAppId", STEAM_APP_ID);
     if profile.mode == Mode::Offline {
@@ -213,7 +227,19 @@ fn add_offline(
     }
     match os {
         Os::Linux => {
-            add_linux_doorstop(plan, payload, env)?;
+            add_nix_doorstop(plan, payload, env, &LINUX_NIX)?;
+            // V25 / R19: never preload into the bash start script; run the ELF as the
+            // script would.
+            if plan.program.file_name() == Some(OsStr::new(LINUX_START_SCRIPT)) {
+                let dir = plan
+                    .program
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_default();
+                plan.program = dir.join(LINUX_ELF);
+                plan.cwd = Some(dir);
+                set(plan, "LC_ALL", "C");
+            }
             if let Some(rwpm) = &payload.trampoline {
                 // V28: GenCommandLine.Restart re-runs argv[0]; rwpm then re-adds Doorstop.
                 plan.arg0 = Some(rwpm.clone().into_os_string());
@@ -221,6 +247,23 @@ fn add_offline(
                 let exe = plan.program.clone();
                 set(plan, ENV_GAME_EXE, exe);
             }
+            Ok(())
+        }
+        Os::MacOs => {
+            // V41/R33: `plan.program` is already the resolved inner Mach-O (build()
+            // resolved the bundle up front) — no shell/start-script substitution exists
+            // or is needed here, unlike Linux.
+            //
+            // T42/V48: no restart trampoline, deliberately — never set `arg0`/
+            // `ENV_RESTART` here even if `payload.trampoline` is populated. The payload's
+            // `DisableDoorstopForHelpers()` only disables Doorstop for helper processes
+            // when `RWPM_RESTART` is set, specifically to work around Linux's B1/B2/B3
+            // shell-hook breakage (dup2/fclose). That breakage does not reproduce on
+            // macOS (R28, sc_shellhook) — Doorstop simply stays enabled across an
+            // in-game Restart with no intervention needed, confirmed live (R31,
+            // sc_restart: redirect held on the restarted process with no trampoline at
+            // all). Adding one here would cost real complexity for zero benefit.
+            add_nix_doorstop(plan, payload, env, &MACOS_NIX)?;
             Ok(())
         }
         Os::Windows => {
@@ -234,37 +277,90 @@ fn add_offline(
     }
 }
 
-fn add_linux_doorstop(
+/// A "nix" (Doorstop's own term, src/nix/) Unix-like loader: Linux's `LD_PRELOAD` /
+/// `LD_LIBRARY_PATH` and macOS's `DYLD_INSERT_LIBRARIES` / `DYLD_LIBRARY_PATH` share the
+/// same `DOORSTOP_ENABLED`/`DOORSTOP_TARGET_ASSEMBLY` contract (R26) and only differ in
+/// variable names and in whether the inserted entry is a bare leaf name or an absolute path.
+struct NixDoorstop {
+    loader_env: &'static str,
+    path_env: &'static str,
+    lib_name: &'static str,
+    /// macOS (V40): insert the absolute dylib path rather than relying on leaf-name
+    /// resolution through `DYLD_LIBRARY_PATH` — sidesteps a dyld4 behaviour the spike
+    /// didn't need to pin down (plan decision). Linux keeps preload-by-name (R20).
+    absolute_loader_entry: bool,
+}
+
+const LINUX_NIX: NixDoorstop = NixDoorstop {
+    loader_env: "LD_PRELOAD",
+    path_env: "LD_LIBRARY_PATH",
+    lib_name: LINUX_DOORSTOP_LIB,
+    absolute_loader_entry: false,
+};
+
+const MACOS_NIX: NixDoorstop = NixDoorstop {
+    loader_env: "DYLD_INSERT_LIBRARIES",
+    path_env: "DYLD_LIBRARY_PATH",
+    lib_name: MACOS_DOORSTOP_LIB,
+    absolute_loader_entry: true,
+};
+
+fn add_nix_doorstop(
     plan: &mut LaunchPlan,
     payload: &PayloadFiles,
     env: &dyn Fn(&str) -> Option<OsString>,
+    vars: &NixDoorstop,
 ) -> Result<(), LaunchError> {
-    require(&payload.doorstop_dir.join(LINUX_DOORSTOP_LIB))?;
+    require(&payload.doorstop_dir.join(vars.lib_name))?;
     if payload.doorstop_dir.to_string_lossy().contains(':') {
         return Err(LaunchError::PathHasColon(payload.doorstop_dir.clone()));
     }
     set(plan, "DOORSTOP_ENABLED", "1");
     set(plan, "DOORSTOP_TARGET_ASSEMBLY", payload.dll.clone());
-    // V18: prepend, never replace. Preload by name: LD_PRELOAD splits on spaces too (R20).
-    let lib_path = prepend(payload.doorstop_dir.as_os_str(), env("LD_LIBRARY_PATH"));
-    set(plan, "LD_LIBRARY_PATH", lib_path);
+    // V18/V40: prepend, never replace.
+    let lib_path = prepend(payload.doorstop_dir.as_os_str(), env(vars.path_env));
+    set(plan, vars.path_env, lib_path);
+    let entry: OsString = if vars.absolute_loader_entry {
+        payload.doorstop_dir.join(vars.lib_name).into_os_string()
+    } else {
+        OsString::from(vars.lib_name)
+    };
     set(
         plan,
-        "LD_PRELOAD",
-        prepend(OsStr::new(LINUX_DOORSTOP_LIB), env("LD_PRELOAD")),
+        vars.loader_env,
+        prepend(entry.as_os_str(), env(vars.loader_env)),
     );
-    // V25 / R19: never preload into the bash start script; run the ELF as the script would.
-    if plan.program.file_name() == Some(OsStr::new(LINUX_START_SCRIPT)) {
-        let dir = plan
-            .program
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_default();
-        plan.program = dir.join(LINUX_ELF);
-        plan.cwd = Some(dir);
-        set(plan, "LC_ALL", "C");
-    }
     Ok(())
+}
+
+/// V41/R33: resolves a `%command%` entry naming a macOS `.app` bundle DIRECTORY to the
+/// actual Mach-O binary inside it, by reading `CFBundleExecutable` out of its
+/// `Contents/Info.plist` — never by spawning a shell (R27: SIP purges `DYLD_*` across a
+/// shell exec, R30: app translocation makes a bundle-relative path unsafe to trust
+/// anyway). Anything not ending in `.app` passes through unchanged, so this is safe to
+/// call on every macOS launch, live or stored.
+fn resolve_macos_bundle(path: &Path) -> Result<PathBuf, LaunchError> {
+    if path.extension().and_then(|e| e.to_str()) != Some(MACOS_BUNDLE_EXT) {
+        return Ok(path.to_path_buf());
+    }
+    let plist_path = path.join("Contents").join("Info.plist");
+    let plist = std::fs::read_to_string(&plist_path)
+        .map_err(|_| LaunchError::MissingFile(plist_path.clone()))?;
+    let exe_name = extract_plist_string(&plist, "CFBundleExecutable")
+        .ok_or_else(|| LaunchError::BadBundle(plist_path.clone()))?;
+    Ok(path.join("Contents").join("MacOS").join(exe_name))
+}
+
+/// Minimal scan for one string-valued key in Apple's XML plist format — Info.plist is
+/// always the simple `<key>k</key>\n<string>v</string>` shape (R33 live-confirmed on this
+/// Mac), so a tiny string search avoids pulling in a full plist-parsing dependency for
+/// the one field rwpm needs.
+fn extract_plist_string(xml: &str, key: &str) -> Option<String> {
+    let marker = format!("<key>{key}</key>");
+    let after_key = xml.split_once(&marker)?.1;
+    let after_open = after_key.split_once("<string>")?.1;
+    let value = after_open.split_once("</string>")?.0;
+    Some(value.trim().to_string())
 }
 
 fn require(path: &Path) -> Result<(), LaunchError> {
@@ -327,13 +423,16 @@ mod tests {
         }
     }
 
-    /// Payload files that exist on disk, so OFFLINE builds pass the fail-closed check.
+    /// Payload files that exist on disk, so OFFLINE builds pass the fail-closed check —
+    /// for every OS, so the same fixture works in `[Os::Linux, Os::Windows, Os::MacOs]`
+    /// loops without each test having to know which loader file it needs.
     fn payload(tmp: &Path) -> PayloadFiles {
         let p = PayloadFiles::beside(tmp);
         std::fs::create_dir_all(p.dll.parent().expect("parent")).expect("payload dir");
         std::fs::write(&p.dll, b"").expect("dll");
         std::fs::create_dir_all(&p.doorstop_dir).expect("doorstop dir");
         std::fs::write(p.doorstop_dir.join(LINUX_DOORSTOP_LIB), b"").expect("so");
+        std::fs::write(p.doorstop_dir.join(MACOS_DOORSTOP_LIB), b"").expect("dylib");
         p
     }
 
@@ -343,6 +442,11 @@ mod tests {
 
     fn linux_script() -> Vec<OsString> {
         cmd(&[&format!("{GAME}/start_RimWorld.sh"), "-popupwindow"])
+    }
+
+    /// A macOS program path that is NOT a `.app` bundle (already-resolved inner binary).
+    fn macos_script() -> Vec<OsString> {
+        cmd(&[&format!("{GAME}/RimWorldMac"), "-popupwindow"])
     }
 
     fn no_env(_: &str) -> Option<OsString> {
@@ -360,7 +464,7 @@ mod tests {
     #[test]
     fn offline_removes_doorstop_guards() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        for os in [Os::Linux, Os::Windows] {
+        for os in [Os::Linux, Os::Windows, Os::MacOs] {
             let plan = build(
                 &stored(Mode::Offline),
                 &linux_script(),
@@ -378,7 +482,7 @@ mod tests {
     #[test]
     fn live_has_no_doorstop_env_or_args() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        for os in [Os::Linux, Os::Windows] {
+        for os in [Os::Linux, Os::Windows, Os::MacOs] {
             for profile in [stored(Mode::Live), default_profile()] {
                 let plan = build(&profile, &linux_script(), &payload(tmp.path()), os, &no_env)
                     .expect("build");
@@ -530,7 +634,7 @@ mod tests {
     #[test]
     fn steam_app_id_set_in_every_mode() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        for os in [Os::Linux, Os::Windows] {
+        for os in [Os::Linux, Os::Windows, Os::MacOs] {
             for profile in [stored(Mode::Live), stored(Mode::Offline), default_profile()] {
                 let plan = build(&profile, &linux_script(), &payload(tmp.path()), os, &no_env)
                     .expect("build");
@@ -584,7 +688,7 @@ mod tests {
     fn offline_sets_payload_channel_and_log() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let p = payload(tmp.path());
-        for os in [Os::Linux, Os::Windows] {
+        for os in [Os::Linux, Os::Windows, Os::MacOs] {
             let plan =
                 build(&stored(Mode::Offline), &linux_script(), &p, os, &no_env).expect("build");
             assert_eq!(
@@ -727,7 +831,7 @@ mod tests {
     fn offline_missing_payload_files_fails_closed() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let p = PayloadFiles::beside(tmp.path());
-        for os in [Os::Linux, Os::Windows] {
+        for os in [Os::Linux, Os::Windows, Os::MacOs] {
             let r = build(&stored(Mode::Offline), &linux_script(), &p, os, &no_env);
             assert!(
                 matches!(r, Err(LaunchError::MissingFile(_))),
@@ -928,6 +1032,160 @@ mod tests {
         assert_eq!(plan.program, PathBuf::from("/rt/_v2-entry-point"));
         assert!(has_arg(&plan, &format!("{GAME}/start_RimWorld.sh")));
         assert!(!has_arg(&plan, ARG_INNER));
+    }
+
+    /// V40/R31: DYLD_INSERT_LIBRARIES carries the absolute dylib path (plan decision,
+    /// unlike Linux's leaf-name LD_PRELOAD), DYLD_LIBRARY_PATH still prepends the dir.
+    #[test]
+    fn macos_dyld_set_when_absent() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = payload(tmp.path());
+        let plan = build(
+            &stored(Mode::Offline),
+            &linux_script(),
+            &p,
+            Os::MacOs,
+            &no_env,
+        )
+        .expect("build");
+        let expected_lib = p.doorstop_dir.join(MACOS_DOORSTOP_LIB).into_os_string();
+        assert_eq!(env_get(&plan, "DYLD_INSERT_LIBRARIES"), Some(&expected_lib));
+        assert_eq!(
+            env_get(&plan, "DYLD_LIBRARY_PATH"),
+            Some(&p.doorstop_dir.clone().into_os_string())
+        );
+        assert!(env_get(&plan, "LD_PRELOAD").is_none());
+    }
+
+    #[test]
+    fn macos_dyld_prepends_existing() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = payload(tmp.path());
+        let env = |k: &str| match k {
+            "DYLD_INSERT_LIBRARIES" => Some(OsString::from("/steam/overlay.dylib")),
+            "DYLD_LIBRARY_PATH" => Some(OsString::from("/steam/runtime/lib")),
+            _ => None,
+        };
+        let plan =
+            build(&stored(Mode::Offline), &linux_script(), &p, Os::MacOs, &env).expect("build");
+        let expected_lib = format!(
+            "{}:/steam/overlay.dylib",
+            p.doorstop_dir.join(MACOS_DOORSTOP_LIB).display()
+        );
+        assert_eq!(
+            env_get(&plan, "DYLD_INSERT_LIBRARIES"),
+            Some(&OsString::from(expected_lib))
+        );
+        let expected_path = format!("{}:/steam/runtime/lib", p.doorstop_dir.display());
+        assert_eq!(
+            env_get(&plan, "DYLD_LIBRARY_PATH"),
+            Some(&OsString::from(expected_path))
+        );
+    }
+
+    fn write_info_plist(bundle: &Path, exe_name: &str) {
+        std::fs::create_dir_all(bundle.join("Contents").join("MacOS")).expect("MacOS dir");
+        let xml = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<plist version=\"1.0\"><dict>\n  <key>CFBundleExecutable</key>\n  <string>{exe_name}</string>\n</dict></plist>\n"
+        );
+        std::fs::write(bundle.join("Contents").join("Info.plist"), xml).expect("Info.plist");
+    }
+
+    /// V41/R33: a `%command%` naming the `.app` bundle directory resolves to the Mach-O
+    /// named by `CFBundleExecutable`, whose name may itself contain spaces (R29).
+    #[test]
+    fn macos_bundle_resolves_to_inner_binary() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let bundle = tmp.path().join("RimWorldMac.app");
+        write_info_plist(&bundle, "RimWorld by Ludeon Studios");
+        let command = cmd(&[bundle.to_str().expect("utf8"), "-disable-compute-shaders"]);
+        let plan = build(
+            &default_profile(),
+            &command,
+            &payload(tmp.path()),
+            Os::MacOs,
+            &no_env,
+        )
+        .expect("build");
+        assert_eq!(
+            plan.program,
+            bundle
+                .join("Contents")
+                .join("MacOS")
+                .join("RimWorld by Ludeon Studios")
+        );
+        assert!(has_arg(&plan, "-disable-compute-shaders"));
+    }
+
+    /// A path not ending in `.app` is left untouched — the common case on Linux/Windows,
+    /// and for an already-resolved inner binary on macOS.
+    #[test]
+    fn non_bundle_path_passes_through_resolve() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let plan = build(
+            &default_profile(),
+            &macos_script(),
+            &payload(tmp.path()),
+            Os::MacOs,
+            &no_env,
+        )
+        .expect("build");
+        assert_eq!(plan.program, PathBuf::from(format!("{GAME}/RimWorldMac")));
+    }
+
+    #[test]
+    fn macos_bundle_missing_info_plist_fails_closed() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let bundle = tmp.path().join("RimWorldMac.app");
+        std::fs::create_dir_all(&bundle).expect("bundle dir");
+        let command = cmd(&[bundle.to_str().expect("utf8")]);
+        let r = build(
+            &default_profile(),
+            &command,
+            &payload(tmp.path()),
+            Os::MacOs,
+            &no_env,
+        );
+        assert!(matches!(r, Err(LaunchError::MissingFile(_))), "{r:?}");
+    }
+
+    #[test]
+    fn macos_bundle_malformed_info_plist_fails_closed() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let bundle = tmp.path().join("RimWorldMac.app");
+        std::fs::create_dir_all(bundle.join("Contents")).expect("Contents dir");
+        std::fs::write(bundle.join("Contents").join("Info.plist"), "not a plist")
+            .expect("Info.plist");
+        let command = cmd(&[bundle.to_str().expect("utf8")]);
+        let r = build(
+            &default_profile(),
+            &command,
+            &payload(tmp.path()),
+            Os::MacOs,
+            &no_env,
+        );
+        assert!(matches!(r, Err(LaunchError::BadBundle(_))), "{r:?}");
+    }
+
+    /// T42/V48: macOS never sets a restart trampoline — proven even when one is
+    /// configured (eg a caller mistakenly reusing a Linux `PayloadFiles`), not just
+    /// absent by omission. See the long comment on `Os::MacOs` in `add_offline`.
+    #[test]
+    fn macos_never_sets_restart_trampoline() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut p = payload(tmp.path());
+        p.trampoline = Some(PathBuf::from("/app/rwpm"));
+        let plan = build(
+            &stored(Mode::Offline),
+            &linux_script(),
+            &p,
+            Os::MacOs,
+            &no_env,
+        )
+        .expect("build");
+        assert_eq!(plan.arg0, None);
+        assert!(env_get(&plan, ENV_RESTART).is_none());
+        assert!(env_get(&plan, ENV_GAME_EXE).is_none());
     }
 
     #[test]
