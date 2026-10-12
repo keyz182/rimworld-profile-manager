@@ -2,6 +2,33 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.3.0](https://github.com/keyz182/rimworld-profile-manager/compare/a214fe2af287146c95865a0265721f66032fc521..v1.3.0) - 2026-10-12
+#### Features
+- (**launch**) T65 launch RimWorld 1.7 (Waylith) profiles - ([e9a5d82](https://github.com/keyz182/rimworld-profile-manager/commit/e9a5d82e87575802da2f3d5818ac8c19a8a7bcc5)) - [@keyz182](https://github.com/keyz182)
+- (**log**) T66 per-engine game log for RimWorld 1.7 - ([e839cfc](https://github.com/keyz182/rimworld-profile-manager/commit/e839cfce8364f8a954cd8476293bca227f094a75)) - [@keyz182](https://github.com/keyz182)
+- (**payload**) T64 startup-hook payload for RimWorld 1.7 - ([b96ddac](https://github.com/keyz182/rimworld-profile-manager/commit/b96ddac2dd2bd99d2fa8b19f29f89eb41700c185)) - [@keyz182](https://github.com/keyz182)
+#### Bug Fixes
+- (**discovery**) backprop §B.13 + §V.69: find RimWorld 1.7 on Windows - ([204b0aa](https://github.com/keyz182/rimworld-profile-manager/commit/204b0aa16b2da54fa00733597d0a0d3f6acee350)) - [@keyz182](https://github.com/keyz182)
+- (**launch**) backprop §B.14 + §V.70: no game-folder loader for 1.7 - ([2358acf](https://github.com/keyz182/rimworld-profile-manager/commit/2358acf47891e2440ba76396d7a8b88f02b8227f)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- (**spec**) accept Windows 1.6 build overlay limit (issue #5) - ([cbe326b](https://github.com/keyz182/rimworld-profile-manager/commit/cbe326bd77c256702f0e2b152b3c3bca9184deaf)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) record Windows build spike, close T51 (R46) - ([1e998e9](https://github.com/keyz182/rimworld-profile-manager/commit/1e998e9401fd1125340381381d0e8e4084493d23)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) record Windows 1.7 spike, close T67 (R45) - ([43522e2](https://github.com/keyz182/rimworld-profile-manager/commit/43522e26e568042cb4d1e22d8215266ecbfc310f)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) record 1.7 smoke test (R43) - ([92c53ec](https://github.com/keyz182/rimworld-profile-manager/commit/92c53ec99882a160de64faa7395e574f4814b81b)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) live_log_17 → log-dir hook for LIVE 1.7 (R42) - ([10efcee](https://github.com/keyz182/rimworld-profile-manager/commit/10efcee02402f0b9e582309b2f69aec087e8fa04)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) decide ?live_log_17, capture LIVE 1.7 output - ([ad5ece5](https://github.com/keyz182/rimworld-profile-manager/commit/ad5ece549b234272bf1b91f3b7c0c75687b54506)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) close T61, superseded by T65 - ([1457738](https://github.com/keyz182/rimworld-profile-manager/commit/14577385b4471782ea141d34631831d17e4d8141)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) backprop §B.10-11 + §V.67-68: 1.7 startup hooks spike - ([37ca71b](https://github.com/keyz182/rimworld-profile-manager/commit/37ca71bc8913d401f89295e26cec9f63534e4ed3)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) plan v1.3 RimWorld 1.7 support - ([7dee8a6](https://github.com/keyz182/rimworld-profile-manager/commit/7dee8a6b090bb714978ce49e2e376981eb13cd43)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) backprop §B.7-9 + §V.62-63: 1.7 engine change, Version.txt lag - ([bddaf9f](https://github.com/keyz182/rimworld-profile-manager/commit/bddaf9f9d54edf27e03ebf5b348fdfc653d4e968)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) plan v1.2 game builds - ([0286f91](https://github.com/keyz182/rimworld-profile-manager/commit/0286f91a7979c3ec89509a1f5a2e723688a3e77a)) - [@keyz182](https://github.com/keyz182)
+- T69 explain RimWorld 1.7 support - ([f5277f0](https://github.com/keyz182/rimworld-profile-manager/commit/f5277f0fe6443ad030f643fd87dde8f0167f0171)) - [@keyz182](https://github.com/keyz182)
+- Update README.md - ([a214fe2](https://github.com/keyz182/rimworld-profile-manager/commit/a214fe2af287146c95865a0265721f66032fc521)) - Kieran Evans
+#### Tests
+- (**run**) T70 hold the run lock through a 1.7 Restart - ([1e28075](https://github.com/keyz182/rimworld-profile-manager/commit/1e28075054fc318ff62144d5be99e78c5a88c0a8)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.2.0](https://github.com/keyz182/rimworld-profile-manager/compare/b7809bc84947d90902809d52c8d7f8f83ce45222..v1.2.0) - 2026-10-12
 #### Features
 - (**macos**) macOS support (T37-T49) (#2) - ([b7809bc](https://github.com/keyz182/rimworld-profile-manager/commit/b7809bc84947d90902809d52c8d7f8f83ce45222)) - Kieran Evans
