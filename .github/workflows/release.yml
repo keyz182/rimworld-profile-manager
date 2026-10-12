@@ -129,7 +129,10 @@ jobs:
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml
+          # perl, not `sed -i`: BSD sed (macOS runner, T47) takes -i's next arg as a
+          # backup suffix and would eat the filename. -0777 slurps so the //m match
+          # without /g hits only the first `version =`, i.e. [workspace.package].
+          perl -0777 -i -pe 's/^version = ".*"/version = "$ENV{VERSION}"/m' Cargo.toml
           cargo update --workspace
       - run: scripts/package.sh "$OS"
         env:
