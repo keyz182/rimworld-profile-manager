@@ -21,7 +21,7 @@ remote_ps() {
 stage() {
   local zip
   zip="$("$ROOT/scripts/package.sh" windows | tail -1)"
-  dotnet build "$ROOT/spike/linux/probe/Source" -c Release -o "$OUT/probe-build" -nologo >"$OUT/build.log" 2>&1 || {
+  dotnet build "$ROOT/e2e/probe/Source" -c Release -o "$OUT/probe-build" -nologo >"$OUT/build.log" 2>&1 || {
     tail -20 "$OUT/build.log" >&2
     exit 1
   }
@@ -29,7 +29,7 @@ stage() {
   mkdir -p "$STAGE/probe/Assemblies"
   unzip -q "$zip" -d "$STAGE"
   mv "$STAGE"/rwpm-*-windows-x86_64 "$STAGE/app"
-  cp -r "$ROOT/spike/linux/probe/About" "$STAGE/probe/"
+  cp -r "$ROOT/e2e/probe/About" "$STAGE/probe/"
   cp "$OUT/probe-build/Rwpm.SpikeProbe.dll" "$STAGE/probe/Assemblies/"
   cp "$ROOT/e2e/windows/"{e2e,launch,scenarios,guicheck,clicker}.ps1 "$STAGE/"
 }
