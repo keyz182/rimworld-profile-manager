@@ -11,8 +11,10 @@ command -v magick >/dev/null || {
   exit 1
 }
 
+# No date/time chunks, so the PNGs change only when the picture does.
 render() { # size output
-  magick -background none -density 384 "$svg" -resize "$1x$1" "$2"
+  magick -background none -density 384 "$svg" -resize "$1x$1" \
+    -define png:exclude-chunks=date,time "$2"
 }
 
 for n in 16 32 48 64 128 256; do
