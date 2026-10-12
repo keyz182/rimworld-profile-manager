@@ -53,7 +53,7 @@ desktop app (Linux + Windows) manage RimWorld profiles: create/clone/delete/rena
 - 1.7 support ships only at parity (user 2026-10-12): ⊥ LIVE-only release.
 - ?macos_waylith: whether 1.7 ships for macOS at all (Vulkan via MoltenVK) unknown → parked, ⊥ in v1.3 scope.
 - ?parity_fallback: if T63 shows Waylith ignores startup hooks, the parity gate blocks 1.7 forever → user re-decides (LIVE-only \| wait for Ludeon).
-- ?overlay_16_copy: Windows 1.6 build copy has no Steam overlay (R46). Options: accept + say so in T59 help \| store Windows builds inside the Steam library (eg `steamapps\common\RimWorld Builds\<key>`) if that restores it (needs a spike) \| other. needs user decision before T56/T59.
+- Windows 1.6 build overlay (user 2026-10-12, was ?overlay_16_copy): accepted as a known limit; T59 help + README say Windows 1.6 builds have no Steam overlay; fix tracked in GitHub issue #5.
 - Waylith log (user 2026-10-12, was ?live_log_17; stdout capture dropped after R42): stored profile (LIVE + OFFLINE) → startup hook w/ `RWPM_LOG_DIR=<profile>` → `<profile>/Logs/Player.log`; LIVE gets ⊥ `RWPM_MODS_DIR`; LIVE + hook file missing → launch w/o hook, log in Default's `Logs/` (⊥ refuse).
 - repo: private GitHub `keyz182/rimworld-profile-manager`. commits = conventional (Angular types: feat fix docs style refactor perf test build ci chore revert), checked on PRs + local `commit-msg` hook (`cog install-hook --all`). push to main → CI (fmt, clippy Linux + windows-gnu + macOS, tests incl. a real `macos-14` runner leg) → `cog bump --auto` (tag `vX.Y.Z`, CHANGELOG) when feat/fix since last tag → Linux (soldier) + Windows + macOS legs in parallel, cached (macOS on its own `macos-14` runner, T47 — cross-build + adhoc-signing from Linux is impossible) → GitHub Release: Linux tar.gz + AppImage (V38), Windows zip + per-user setup.exe (V39), macOS arm64 `.app` zip adhoc-signed via `ditto` (T46, V42); all built before the atomic push of bump commit + tag. actions pinned by SHA (≥2 weeks old), zizmor clean.
 
@@ -172,7 +172,7 @@ V48: macOS: ⊥ restart trampoline, deliberately — in-game Restart re-execs th
 V49: macOS: Steam `%command%` = literal argv naming the `.app` bundle directory, ⊥ a shell, ⊥ LaunchServices (R33); rwpm ! resolve `CFBundleExecutable` + exec the inner Mach-O direct (V41) — confirmed live via Steam, not assumed
 V50: pinned profile, Steam install on other version → app Play starts pinned build (Player.log version line = build key's version)
 V51: pinned profile launched via Steam/RimSort `rwpm run … -- %command%` → pinned build starts, ⊥ Steam's install; wrappers before target unchanged
-V52: launch from a build → Steam init ok (workshop mods listed) w/ `SteamAppId` env only; overlay opens except Windows Unity (1.6) copies (B15, ?overlay_16_copy)
+V52: launch from a build → Steam init ok (workshop mods listed) w/ `SteamAppId` env only; overlay opens except Windows Unity (1.6) copies (B15, accepted, issue #5)
 V53: 2nd profile pinning an existing build → disk use ⊥ grows beyond its own profile dir; capture of a stored buildid → no-op
 V54: rwpm ⊥ writes inside `<build>/` after capture, except `Mods/` + consented `winhttp.dll`; Delete build refused while ∃ pinning profile; Default ⊥ pinnable
 V55: effective game (§C) — go OFFLINE, Refresh, mod list, guard, health (winhttp), RimSort export (`game_folder` + `local_folder`) ∀ resolve via it; test per consumer w/ a pinned profile whose build ≠ Steam install (offline.rs:87, mod_list.rs:54, health.rs:69, rimsort.rs:188)
@@ -244,7 +244,7 @@ T47|x|CI+release macOS leg (cross-build impossible, signing needs host) — `mac
 T48|x|e2e macOS: Steam/app/RimSort OFFLINE launch, Restart, guard, Default log, helpers unbroken — `crates/rwpm/tests/e2e_macos.rs`, real ProfileStore+discovery+launch::build against the real packaged bundle + real Steam install, passed live (redirect, DYLD env, correct Player.log path, clean teardown)|T37,T40,T41,T42
 T49|x|§C+§I amendment+docs; T20 → x — §I profiles-root/save-dir/RimSort/launcher-copy lines extended for macOS; §C CI/release line covers the macOS leg + bundle|-
 T50|x|spike Linux: capture Steam install → copy outside `steamapps`; launch via `rwpm run` argv swap (native + Flatpak chain); prove Steam init w/ `SteamAppId` (?steam_init_copy); record `Version.txt` path+format (?version_txt) + install size w/ all DLC (?build_size) — 1.6 all pass (R34); V58 confirmed (R36); 1.7 leg blocked by engine change (R37 → T62); Flatpak chain not run (no Flatpak Steam here), native chain = same soldier shape as R23|V50,V51,V52,V58
-T51|x|spike Windows (VM): as T50; plus consented `winhttp.dll` in a build copy + OFFLINE redirect from it — done 2026-10-12 (R46, B15; ?overlay_16_copy open)|V50,V51,V52
+T51|x|spike Windows (VM): as T50; plus consented `winhttp.dll` in a build copy + OFFLINE redirect from it — done 2026-10-12 (R46, B15; overlay limit accepted, issue #5)|V50,V51,V52
 T52|.|spike macOS: as T50; copied `.app` keeps valid adhoc signature, ⊥ Gatekeeper translocation (R30) (?macos_copy_sign)|V50,V51,V52
 T53|.|core: build store — capture (reflink-or-copy, key from `Version.txt`, `build.toml`), list, delete-guard; `builds` reserved slug; DLC list + Update stored build|V53,V54,V56,V58,V59,V60,V63,I.file
 T54|.|core: `profile.toml` schema 2 + `game_build`; Default ⊥ pin|V54,I.file
@@ -252,7 +252,7 @@ T55|.|`rwpm run`: per-OS target swap for pinned profile, wrappers kept, missing 
 T56|.|gui: Settings Game versions list (Capture w/ progress + size/free space, Delete), profile "Game version" row + picker; text via catalogue|V54,V61,I.gui
 T57|.|RimSort export: pinned LIVE → `local_folder=<build>/Mods`|I.file
 T58|.|e2e per OS: Steam on 1.6 + profile pinned to captured 1.7 → app + Steam launch both run 1.7; dedup check|V50,V51,V52,V53
-T59|.|docs + help text: capture workflow (switch Steam branch → Capture → switch back), disk use|-
+T59|.|docs + help text: capture workflow (switch Steam branch → Capture → switch back), disk use; Windows 1.6 builds have no Steam overlay (R46, issue #5)|-
 T60|.|core: effective-game resolver; route go OFFLINE/Refresh, mod list, guard, health, RimSort export through it|V55
 T61|x|`rwpm run` engine detect: Waylith ∧ OFFLINE → refuse w/ plain reason; fixture test — superseded by T65 2026-10-12: engine detect + fail-closed w/o hook (v62_waylith_* tests), stop-gap refusal ⊥ needed|V62
 T62|x|grill 1.7 Waylith support — done 2026-10-12: full parity Linux + Windows, startup hooks fallback refuse, macOS parked; decompile → R38; spike + build = T63-T69|R37,R38
