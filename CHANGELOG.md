@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.2.0](https://github.com/keyz182/rimworld-profile-manager/compare/b7809bc84947d90902809d52c8d7f8f83ce45222..v1.2.0) - 2026-10-12
+#### Features
+- (**macos**) macOS support (T37-T49) (#2) - ([b7809bc](https://github.com/keyz182/rimworld-profile-manager/commit/b7809bc84947d90902809d52c8d7f8f83ce45222)) - Kieran Evans
+#### Bug Fixes
+- (**release**) don't depend on macOS 26 tools when packaging (#4) - ([03efbdf](https://github.com/keyz182/rimworld-profile-manager/commit/03efbdf6314da79eb6698e4eec7e1bada4b34e09)) - Kieran Evans
+- (**release**) set the bundle version portably on macOS runners (#3) - ([b32b1b6](https://github.com/keyz182/rimworld-profile-manager/commit/b32b1b6b2844ee0208fd26e0836c191742843396)) - Kieran Evans
+
+- - -
+
 ## [v1.1.1](https://github.com/keyz182/rimworld-profile-manager/compare/eed7fcc300d52f81eac9a5ff9f4f202fedd1bc49..v1.1.1) - 2026-10-12
 #### Bug Fixes
 - (**gui**) show why in the Steam guide when the launcher copy failed - ([cc1e188](https://github.com/keyz182/rimworld-profile-manager/commit/cc1e188e57b87b768780c55d836a527a75be7c7a)) - [@keyz182](https://github.com/keyz182)
