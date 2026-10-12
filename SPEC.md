@@ -247,7 +247,7 @@ T57|.|RimSort export: pinned LIVE → `local_folder=<build>/Mods`|I.file
 T58|.|e2e per OS: Steam on 1.6 + profile pinned to captured 1.7 → app + Steam launch both run 1.7; dedup check|V50,V51,V52,V53
 T59|.|docs + help text: capture workflow (switch Steam branch → Capture → switch back), disk use|-
 T60|.|core: effective-game resolver; route go OFFLINE/Refresh, mod list, guard, health, RimSort export through it|V55
-T61|.|`rwpm run` engine detect: Waylith ∧ OFFLINE → refuse w/ plain reason; fixture test|V62
+T61|x|`rwpm run` engine detect: Waylith ∧ OFFLINE → refuse w/ plain reason; fixture test — superseded by T65 2026-10-12: engine detect + fail-closed w/o hook (v62_waylith_* tests), stop-gap refusal ⊥ needed|V62
 T62|x|grill 1.7 Waylith support — done 2026-10-12: full parity Linux + Windows, startup hooks fallback refuse, macOS parked; decompile → R38; spike + build = T63-T69|R37,R38
 T63|x|spike Linux (captured 1.7 build): minimal startup hook → runs before `ModLister` cctor? sets `modsFolderPath`? (?startup_hooks_waylith); Restart re-launch + env carry (?waylith_restart); net8 helper w/ env (V65); Prepatcher/Harmony on 1.7 (?prepatcher_17) — W1-W4 pass 2026-10-12 (R39); restart detaches (R40 → V68); log ignores `-savedatafolder` (R41 → V67)|V64,V65,V66
 T64|x|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
