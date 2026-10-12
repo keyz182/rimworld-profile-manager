@@ -56,13 +56,18 @@ jobs:
             echo "existing=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Nothing to release (only chore/docs/ci… since the last tag) → empty version.
-          if next="$(cog bump --auto --dry-run 2>/dev/null)"; then
-            echo "version=${next#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "No feat/fix since the last tag; nothing to release."
-          fi
+          # cog only bumps on a branch named in cog.toml; the checkout above is detached.
+          git checkout -q -B main
+          next="$(cog bump --auto --dry-run)"
           echo "existing=false" >> "$GITHUB_OUTPUT"
+          if [[ "$next" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version=${next#v}" >> "$GITHUB_OUTPUT"
+          elif [[ "$next" == "No conventional commits"* ]]; then
+            echo "No feat/fix since the last tag; nothing to release."
+          else
+            echo "cog bump --dry-run gave: $next" >&2
+            exit 1
+          fi
 
   build:
     name: Bundle (${{ matrix.os }})
@@ -152,6 +157,7 @@ jobs:
       - name: Bump version and changelog
         if: needs.plan.outputs.existing != 'true'
         run: |
+          git checkout -q -B main  # cog bumps only on main (cog.toml)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cog bump --auto
