@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>rwpm spike probe</name>
+  <author>rwpm</author>
+  <packageId>rwpm.spike.probe</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>Test-only mod for the rwpm Linux spike. Logs what the game loaded, then quits.</description>
+</ModMetaData>

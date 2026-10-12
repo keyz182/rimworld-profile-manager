@@ -1,0 +1,6 @@
+RimWorld Profile Manager app icon (crates/rwpm/assets/icon/rwpm.svg and the PNG, ICO
+and RGBA files generated from it by scripts/icon.sh)
+
+Made by Kieran David Evans, the author of RimWorld Profile Manager, for this project.
+It is distributed under the same licence as the program (see LICENSE).
+It is not affiliated with or endorsed by Ludeon Studios.

@@ -1,0 +1,27 @@
+[package]
+name = "rwpm-core"
+description = "RimWorld profile manager core logic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+dirs = "7.0.0"
+reflink-copy = "0.1.30"
+roxmltree = "0.21.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+sha2 = "0.11.0"
+steamlocate = "2.1.1"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system", "disk"] }
+thiserror = "2.0.21"
+toml = "1.1.8"
+trash = "5.2.9"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

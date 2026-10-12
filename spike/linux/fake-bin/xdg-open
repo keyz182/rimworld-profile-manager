@@ -1,0 +1,5 @@
+#!/bin/sh
+# ?U2 stand-in for xdg-open: like the real script it relies on command substitution,
+# which Doorstop's dup2 hook broke in B1. Logs instead of opening anything.
+v=$(printf ok)
+printf 'subst=%s\tenabled=%s\tpreload=%s\targs=%s\n' "$v" "${DOORSTOP_ENABLED:-<unset>}" "${LD_PRELOAD:-<unset>}" "$*" >>"$RWPM_SPIKE_DIR/xdg-open.log"

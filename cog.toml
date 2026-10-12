@@ -1,0 +1,25 @@
+# Conventional commits (Angular types) and releases with cocogitto.
+# Releases: CI on main → release.yml runs `cog bump --auto`.
+tag_prefix = "v"
+branch_whitelist = ["main"]
+ignore_merge_commits = true
+pre_bump_hooks = [
+  # The workspace version (first `version =` in Cargo.toml is [workspace.package]).
+  "sed -i '0,/^version = \".*\"/s//version = \"{{version}}\"/' Cargo.toml",
+  "cargo update --workspace",
+]
+post_bump_hooks = []
+
+[changelog]
+path = "CHANGELOG.md"
+template = "remote"
+remote = "github.com"
+owner = "keyz182"
+repository = "rimworld-profile-manager"
+authors = [{ signature = "Kieran David Evans", username = "keyz182" }]
+
+[git_hooks.commit-msg]
+script = """#!/bin/sh
+set -e
+cog verify --file "$1"
+"""

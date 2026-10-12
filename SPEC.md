@@ -1,0 +1,166 @@
+# SPEC
+
+## §G GOAL
+desktop app (Linux + Windows) manage RimWorld profiles: create/clone/delete/rename/launch. ∀ profile isolates saves+config+log. profile ∈ {LIVE, OFFLINE}; OFFLINE = private frozen copies of active mods, immune to workshop updates/unsubs/new subs. avg-player UX. v1.1 GUI redesign: task-first (find profile → see state → play, fewest steps) + flows: first-run setup, Steam launch guide, read-only profile mod list, profile health check. profiles start from \| later take on another profile's game + mod settings by group ∴ new profile ⊥ empty.
+
+## §C CONSTRAINTS
+- Rust. lib crate holds ∀ logic; iced 0.14 GUI + headless `rwpm run` = thin front ends.
+- v1 = Linux + Windows. macOS ⊥ v1 (see §T open note ?9).
+- target user = avg player. UI text high level; tech detail only in tooltips | help popups.
+- licence MIT. ship UnityDoorstop LGPL-2.1 licence text beside its binary.
+- RimSort companion: tool ⊥ edit load order | `activeMods`. RimSort | in-game mod menu own it.
+- ⊥ Steam workshop API calls. ⊥ steamcmd. ⊥ write inside Steam folders, except consented `winhttp.dll` beside `RimWorldWin64.exe` (Windows OFFLINE). read-only local reads ok (`libraryfolders.vdf`, `appworkshop_294100.acf`).
+- isolation via game arg `-savedatafolder=<profile>/SaveData` + Unity `-logFile <profile>/Player.log`.
+- OFFLINE redirect: Harmony-free C# payload via upstream UnityDoorstop 4.5.0 (unmodified). payload sets private static `Verse.GenFilePaths.modsFolderPath` (GenFilePaths.cs:13) by reflection → `<profile>/Mods` before `ModLister` static ctor (ModLister.cs:77). ⊥ ship `0Harmony`.
+- Linux Doorstop: `LD_PRELOAD` + `DOORSTOP_*` env only; install untouched. Windows: `winhttp.dll` beside `RimWorldWin64.exe`, inert unless `--doorstop-enabled true --doorstop-target-assembly <path>`. Doorstop sets `DOORSTOP_INITIALIZED` (∀ OS) + `DOORSTOP_DISABLE` (Windows) → inherited by in-game Restart child → Doorstop skipped unless cleared (V1,V3).
+- LIVE profile: ⊥ injection; only `-savedatafolder` + `-logFile`.
+- OFFLINE layout: `<profile>/Mods/<folderName>/` real dirs. ⊥ links, ⊥ junctions, ⊥ shared store. copy via `reflink-copy` 0.1.30, plain-copy fallback. clone profile → same.
+- copied folder name = source folder name (workshop id for workshop mods) ∴ `Mod_<folder>_<class>.xml` settings survive (LoadedModManager.cs:517).
+- go OFFLINE copies only `activeMods` of profile `ModsConfig.xml` (workshop + `<install>/Mods`), resolved by packageId. whole-profile toggle; Refresh re-copies ∀.
+- workshop subs ⊥ hidden in OFFLINE. pre-launch guard instead (§V.5).
+- ∀ launch path → `rwpm run`: GUI, RimSort run_args, Steam launch options, desktop shortcuts.
+- direct exe launch: `rwpm run` ! set `SteamAppId=294100` in child env ∴ ⊥ rely on `steam_appid.txt` (RimSort deletes it when `steam_client_integration`=false, R17). RimSort export sets `steam_client_integration=true`. fallback: file absent ∧ ⊥ launched by Steam ∧ env proven insufficient (T2/T3) → warn before launch (V22).
+- consent pattern: ∀ change outside tool folders (game `winhttp.dll`, RimSort `settings.json`) → ask once, plain words; recorded, repairable, removable.
+- foreign `winhttp.dll` present (eg pardeike Rimworld-Doorstop) → ⊥ overwrite; reuse if compatible UnityDoorstop 4.x; payload chain-loads user's original target assembly after redirect.
+- built-in "Default" profile = game default save-data dir, launched w/o `-savedatafolder` (Steam Cloud keeps syncing). cloneable; ⊥ move, ⊥ delete; LIVE only.
+- profiles default under OS app-data dir; Settings "Profiles folder" Move = copy → verify → remove old. show size + free space (plain words) before go OFFLINE.
+- ⊥ 2 profiles running at once (game wipes shared `temporaryCachePath` on exit, Root.cs:196-212).
+- Unity PlayerPrefs (resolution/fullscreen) shared across profiles; documented in help.
+- discovery: `steamlocate` 2.1.1; VDF/ACF: `keyvalues-serde` 0.2.4. ⊥ `new-vdf-parser` (LGPL).
+- GUI redesign keeps iced 0.14; adds embedded Font Awesome Free (icons CC BY 4.0, fonts OFL 1.1) + 1 OFL UI font (eg Inter); licence texts in `licenses/`. ⊥ paid FA plans.
+- theme follows OS light/dark only. ⊥ theme picker. 1 main window, dialogs in-window. ⊥ extra windows \| tray \| pop-outs.
+- profile mod list read-only. ⊥ per-mod enable/disable \| freeze/unfreeze \| update.
+- ∀ UI text via 1 string catalogue (`gui/text.rs`, keys); ship British English only; ⊥ language picker. exception: rwpm-core error `Display` texts (plain words, shown as is).
+- accessibility: WCAG AA contrast light+dark, Enter/Escape ∀ dialog. keyboard = app-level keys: ↑/↓ move profile selection, Enter plays, Ctrl+F search, Ctrl+N new, Esc closes dialog \| drill-in. visible focus = selected row + focused text field + dialog default button (iced 0.14: only `text_input`/`text_editor` Focusable). full Tab traversal → T32.
+- folder picker (setup, Settings): `rfd` crate (native dialog; 1 new dep) + typed path w/ live found/not-found check as fallback.
+- layout (T23, concept A): profile list left (search, 2-line rows: icon+name; mode · mods · last played; problem dot); detail right = heading + Play/last run (pinned) → Health → Mods → Start from elsewhere (Steam, RimSort); ⋯ More = copy, rename, open saves, open log, copy log, delete; drill-ins replace detail (mod list, Steam guide; ‹ Back + Esc); dialogs only confirm/short forms, dim backdrop; 1 filled accent button per view; opens w/ last played profile selected. full proposal: `docs/plans/t23-ux-proposal.md`.
+- redesign done gate: headless step-count task tests w/ budgets + light+dark PNG snapshots ∀ screen/dialog, published private for user sign-off + ux-expert audit w/ 0 open high-severity.
+- ?gamepad: researched T32 (`docs/plans/t32-gamepad.md`): iced 0.14 has no gamepad input, only text fields are Focusable, no AccessKit (⊥ screen readers). options A Steam Input layout (no code) \| B `gilrs` \| C app-level focus order (~2–3 days). user 2026-10-12: none for now (app keys + touch/trackpad enough). Deck behaviour unverified (no Deck).
+- copy settings groups (src save-data dir → target): mod list (`Config/ModsConfig.xml`) \| game settings (`Config/Prefs.xml`, `Config/KeyPrefs.xml`) \| mod settings (rest of `Config/`) \| creations (`Scenarios/`, `Ideos/`, `Xenotypes/`, `ExportedPawns/`) \| mod data (other top-level save-data folders). ⊥ `Saves/` (Copy profile does that). default ticked: first 4; mod data unticked.
+- copy settings offered: New profile "Start from" (profile \| empty); first-run setup copies from Default w/ default groups, ⊥ question; More → "Copy settings from…" (same ticks). OFFLINE target: mod list copied as is, Health offers Freeze them. Default = source only.
+- ?mod_settings_elsewhere: some mods may keep settings outside save data → ⊥ follow; check if a player reports it.
+- repo: private GitHub `keyz182/rimworld-profile-manager`. commits = conventional (Angular types: feat fix docs style refactor perf test build ci chore revert), checked on PRs + local `commit-msg` hook (`cog install-hook --all`). push to main → CI (fmt, clippy Linux + windows-gnu, tests) → `cog bump --auto` (tag `vX.Y.Z`, CHANGELOG) when feat/fix since last tag → Linux (soldier) + Windows bundles → GitHub Release; bundles built before the atomic push of bump commit + tag. actions pinned by SHA (≥2 weeks old), zizmor clean.
+
+## §I INTERFACES
+- cmd: `rwpm run [--from rimsort] <profile-id> -- <game exe> [args…]` → builds env/args for profile mode + OS, spawns game, waits through in-game Restart (V17), exit code = first game process's. `%command%`-compatible (Steam, RimSort). profile-id = stable profile dir name ≠ display name = slug of first name (`[a-z0-9-]`, ≤ 40, `-N` on collision, `default` reserved); ⊥ `=`, ⊥ whitespace. OFFLINE ∧ guard (V5) trips → small native dialog (Linux zenity, Windows PowerShell WinForms) before spawn: Add to profile (copy now) \| Turn off (drop from activeMods) \| Launch anyway \| Cancel (⊥ launch); dialog unavailable → launch + log to `<profile>/rwpm.log`. Linux OFFLINE: game argv[0] = rwpm; rwpm w/ env `RWPM_RESTART=<profile-id>` + `RWPM_GAME_EXE` + game args → restart mode: rebuild launch, exec game (⊥ lock, ⊥ guard).
+- gui: iced app. profile list; New / Clone / Delete / Rename; LIVE↔OFFLINE toggle w/ progress; Refresh; Launch; Open log / Copy log for support; Export to RimSort; Remove from game folder; Settings (game path, Steam path, Profiles folder + Move).
+- file: `<profile>/profile.toml` — `schema = 1`, `name` (display; Rename changes only this), `mode` (`live`|`offline`), `[[frozen_mods]]` {`folder`, `package_id`, `source` (`workshop`|`local`), `source_dir`, `copied_at` (TOML datetime)}. newer `schema` \| unknown field → error. Default profile has no dir & no file.
+- file: `<app data>/settings.toml` — `schema = 1`, `profiles_root` (absolute; absent → default), `game_dir`, `steam_dir` (optional overrides for discovery), `setup_done` (bool; first-run setup finished). newer `schema` \| unknown field → error. `rwpm run` + gui read it.
+- file: `<profile>/last-run.toml` — written by `rwpm run` ∀ launch attempt: `time`, `started_by` ∈ {steam, app, rimsort, other}, `outcome` ∈ {ok, refused, failed}, `reason`, `exit`. overwritten each run; tool folder only. `started_by` decided once at `rwpm run` start, before it changes its env; 1st match wins: env `RWPM_STARTED_BY=app` (GUI Play, also via `flatpak run --env`) → app; marker in RimSort `run_args` (written by export) → rimsort (pre-v1.1 exports fall through); `SteamGameId` \| `SteamAppId` set → steam; else other. `--rwpm-inner` hand-off + in-game Restart keep it. Default's record: `<profiles root>/default/last-run.toml` (list skips `default`). written when the game starts (`exit` absent) + again at exit; refused/failed at once. RimSort export writes `run --from rimsort`; re-export still finds pre-v1.1 entries. Windows Steam sets both (verified T28).
+- dir: `<profile>/SaveData/` (game save root), `<profile>/Mods/` (OFFLINE only), `<profile>/Player.log`.
+- dir: profiles root default — Linux `~/.local/share/<app>/profiles` (Flatpak Steam layout, V31: `~/.var/app/com.valvesoftware.Steam/data/<app>/profiles`), Windows `%LOCALAPPDATA%\<app>\profiles`. `<app>` = `RimWorld Profile Manager`. Delete → OS recycle bin.
+- file: game default save dir — Linux `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios` (Flatpak Steam: `~/.var/app/com.valvesoftware.Steam/config/unity3d/…`), Windows `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`.
+- file: payload `Rwpm.Payload.dll` (net48, entry `Doorstop.Entrypoint.Start`, ⊥ game refs) + UnityDoorstop libs shipped beside app. channel: env `RWPM_MODS_DIR` (absent → no-op), optional `RWPM_PAYLOAD_LOG`.
+- dir: Flatpak Steam launcher copy `<app data>/bin/{rwpm, payload/Rwpm.Payload.dll, doorstop/libdoorstop.so}` (V31); Steam launch line + RimSort run_args name it
+- file: RimSort `settings.json` `instances.<name>` — {game_folder, config_folder=`<profile>/SaveData/Config`, local_folder=`<profile>/Mods` \| `<install>/Mods` (LIVE), workshop_folder, run_args=`<rwpm> run <profile-id> -- %command%` (str), steam_client_integration=true, launch_via_steam_protocol=false}. location = platformdirs user_data_dir (RimSort d2454505).
+
+## §R RESEARCH
+id|topic|finding|src
+R1|mod discovery|order: official Data → `<install>/Mods` → workshop (SteamUGC). dup packageId local+workshop → workshop gets `_steam` postfix, local keeps plain id|ModLister.cs:100-130,290-330
+R2|save data flag|`-savedatafolder=<path>` overrides ∀ saves+Config; case-insensitive; split on `=`|GenFilePaths.cs:99; GenCommandLine.cs:22-40
+R3|mods dir|hard-coded parent(`UnityData.dataPath`)/Mods; no flag; cached in `modsFolderPath`|GenFilePaths.cs:13,155-165,416-427
+R4|Doorstop load|Windows `winhttp.dll` proxy, `enabled` default FALSE, CLI args; nix `LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` + env only; child must drop `DOORSTOP_INITIALIZED`|NeighTools/UnityDoorstop src/config/common.c, src/windows/config.c:144, src/nix/config.c:32-46, bootstrap.c:20-29
+R5|Doorstop timing|entry runs @ Mono JIT init, before `Root.cs:102` & `ModLister` cctor|NeighTools/UnityDoorstop; ModLister.cs:77
+R6|Prepatcher|normal mod; rewrites Assembly-CSharp in memory & reloads into new copy|Zetrith/Prepatcher Loader.cs, RootPatches.cs
+R7|Harmony|vanilla ships ⊥ `0Harmony`; own copy forces version on ∀ mods|pardeike/HarmonyRimWorld Main.cs:26-53
+R8|prior art|RimSort: instances, `-savedatafolder` opt-in, copies ∀ workshop mods only @ clone; #1849 folder rename loses mod settings; #2419 steamcmd clobbered libraryfolders.vdf|RimSort d2454505 app/services/instance_service.py
+R9|unsubscribe|item deleted after game quits; workshop has no versions|partner.steamgames.com/doc/api/ISteamUGC#UnsubscribeItem
+R10|direct launch|`steam_appid.txt` present → `RestartAppIfNecessary` false; verified 294100 on Linux + Windows installs 2026-10-11; file ⊥ guaranteed present (R17)|partner.steamgames.com/doc/api/steam_api
+R11|mod-change restart|`GenCommandLine.Restart` re-execs argv[0] w/ same args, inherits env|GenCommandLine.cs:41-66; ModsConfig.cs:509
+R12|mod settings file|`Mod_<identifier>_<handle>.xml`, identifier = folder name|LoadedModManager.cs:517
+R13|cross-profile leaks|Player.log, Unity PlayerPrefs (Windows registry), `temporaryCachePath` wiped on exit|Root.cs:196-212; GenFilePaths.cs:215
+R14|RimSort launch|run_args Steam-style `ENV=val wrapper %command% args`; settings.json rewritten whole on save|RimSort app/utils/generic.py:287-345; app/models/settings.py:439
+R15|crates|`reflink-copy` 0.1.30, `iced` 0.14.0, `steamlocate` 2.1.1 (MIT), `keyvalues-serde` 0.2.4 (MIT/Apache)|cargo search 2026-10-11
+R16|OS save paths|macOS `~/Library/Application Support/RimWorld`; Win/Linux `persistentDataPath`|GenFilePaths.cs:110-129
+R17|RimSort appid|`steam_client_integration` default False → each RimSort launch deletes `<install>/steam_appid.txt`; `launch_via_steam_protocol` ignores run_args|RimSort d2454505 app/models/instance.py:30; app/views/main_content_panel.py:3044-3084
+R18|Doorstop env|Windows sets `DOORSTOP_DISABLE=TRUE` after hooks; ∀ OS bootstrap skips if `DOORSTOP_INITIALIZED` set; `ignore_disabled_env` ini-only (no CLI)|NeighTools/UnityDoorstop v4.5.0 src/windows/entrypoint.c:252, src/bootstrap.c:15-19, src/windows/config.c:135-176
+R19|Doorstop nix hooks|ctor hooks `dup2` (stdout/stderr → no-op) in ∀ preloaded process → bash `$(…)` breaks → `start_RimWorld.sh` fails (empty `cd`) when preloaded; observed T2 2026-10-11|NeighTools/UnityDoorstop v4.5.0 src/nix/entrypoint.c:87-93,152
+R20|Linux launch verified|T2 spike all pass 2026-10-11: unset `DOORSTOP_INITIALIZED`/`DOORSTOP_DISABLE`; `DOORSTOP_ENABLED=1`, `DOORSTOP_TARGET_ASSEMBLY`; `LD_PRELOAD=libdoorstop.so:<existing>` by name + dir in `LD_LIBRARY_PATH` (preload list splits on space & `:`); `SteamAppId=294100` → Steam init ok w/o `steam_appid.txt`; Prepatcher loads 2nd `Assembly-CSharp` same pid; `FailFast` @ Mono init → exit 134, no window|spike/linux/launch.sh, run.sh; target/spike logs
+R21|Windows launch verified|T3 VM spike all pass 2026-10-11 (1.6.4871 rev590): `winhttp.dll` inert w/o `--doorstop-enabled true --doorstop-target-assembly <dll>`; restart child inherits `DOORSTOP_DISABLE` → payload clear needed & sufficient (V1); `SteamAppId` env → Steam init ok w/o `steam_appid.txt`; `FailFast` → exit -1073740791 (0xC0000409); Steam "verify integrity" leaves extra `winhttp.dll` present & unchanged (?U1 closed; game *update* path still unverified)|spike/windows/run.ps1, scenarios.ps1; target/spike-win logs
+R22|Doorstop nix hooks|4.5.0 ctor hooks dlsym/fclose/dup2 in ANY process w/ `DOORSTOP_ENABLED` (no target check) → sh `$(…)`/redirects break; Unity starts w/ foreign argv[0], `GetCommandLineArgs()[0]` = it|UnityDoorstop v4.5.0 src/nix/entrypoint.c:87-153; T17 sc_openurl, sc_arg0
+R23|Flatpak Steam|VM ubuntu 26.04 + Flatpak Steam 1.0.0.87, 1.6.4871 rev598 2026-10-12: sandbox `$HOME` = `~/.var/app/com.valvesoftware.Steam` (`persistent=.`), host home ⊥ visible (only /mnt, /media, /run/media) ∴ rwpm must live under it; in-sandbox XDG data/config = `…/data`, `…/config` ∴ host GUI + in-sandbox `rwpm run` see different profiles + Default saves (run GUI in sandbox → consistent); `%command%` = `_v2-entry-point --verb waitforexitandrun -- scout-on-soldier-entry-point-v2 -- start_RimWorld.sh`; env passes through to game; by-hand chain w/ rwpm in script's place → redirect ok, `SteamAppId` ok, argv[0] = rwpm|VM ubuntu-flatpak; ~/u3-chain.sh
+
+## §V INVARIANTS
+V1: payload ! clear `DOORSTOP_INITIALIZED` + `DOORSTOP_DISABLE` in-process @ start, ∀ OS ∴ `GenCommandLine.Restart` child re-runs Doorstop & keeps redirect (R18, GenCommandLine.cs:56-57)
+V2: payload ! re-apply `modsFolderPath` on `AppDomain.AssemblyLoad` of 2nd `Assembly-CSharp` (Prepatcher reload); path held in payload static \| env, ⊥ in reloaded `GenFilePaths`
+V3: `rwpm run` ! remove `DOORSTOP_INITIALIZED` + `DOORSTOP_DISABLE` from spawned child env
+V4: profile path ⊥ contain `=`, ⊥ trailing `/` \| `\` (GenFilePaths.cs:101 `TrimEnd` result discarded); `-savedatafolder=<path>` ! single argv token
+V5: OFFLINE launch → ∀ active packageId ∈ `<profile>/Mods`; else guard warns before launch (add to profile \| turn off)
+V6: ⊥ write inside any Steam library folder, except consented `winhttp.dll` beside `RimWorldWin64.exe` (V7,V8)
+V7: ⊥ write outside tool folders w/o recorded consent
+V8: foreign `winhttp.dll` ⊥ overwritten
+V9: RimSort `settings.json` written only when RimSort ⊥ running & after backup
+V10: Default profile ⊥ moved \| deleted; launched w/o `-savedatafolder`
+V11: ⊥ 2nd profile launch while one running
+V12: copied mod folder name == source folder name
+V13: LIVE launch ⊥ Doorstop env \| args
+V14: Profiles Move ⊥ remove old until copy verified
+V15: ∀ non-Default launch passes `-logFile <profile>/Player.log`. Default: no `-logFile` → Unity default `<game save dir>/Player.log` (Linux seen 2026-10-11; Windows seen 2026-10-12, T18)
+V16: payload ! create `<profile>/Mods` if absent before setting `modsFolderPath` (preset path skips `GetOrCreateModsFolder`; `ModLister` scan throws on missing dir; GenFilePaths.cs:155-165,416-427; ModLister.cs:111)
+V17: "running" = live game process (cmdline ∋ profile `-savedatafolder` \| game exe), ⊥ `rwpm run` child PID; `rwpm run` waits through in-game Restart; V11 lock held until ⊥ game process (GenCommandLine.cs:56-59 spawns child then quits)
+V18: Linux: Doorstop lib appended to existing `LD_PRELOAD`, ⊥ replace (Steam preloads overlay `.so`)
+V19: ∀ launch ref (Steam launch options, RimSort run_args, shortcuts) use stable profile-id; Rename ⊥ change profile-id \| dir; Profiles Move ! rewrite \| flag stale RimSort instance paths
+V20: go OFFLINE: active `<id>_steam` → workshop source; 2 active sources w/ same packageId → ask, ⊥ copy both (ModLister.cs:314-319; ModsConfig.cs:132-135)
+V21: RimSort export writes `run_args` str, `steam_client_integration=true` (Steam install; non-Steam → false + empty workshop_folder, as RimSort clears it), `launch_via_steam_protocol=false`; ∀ field type = RimSort `Instance` type (bad type breaks ∀ instances; settings.py:434-437)
+V22: LIVE launch ⊥ via Steam ∧ `steam_appid.txt` absent ∧ `SteamAppId` env proven insufficient → warn before launch (WorkshopItems.cs:64)
+V23: payload assembly name ≠ `Doorstop` (collides w/ pardeike `Doorstop.dll` on chain-load)
+V24: `rwpm run` child env ∋ `SteamAppId=294100` ∀ mode, ∀ OS
+V25: Linux: Doorstop preload ! reach only game ELF; `rwpm run` given `start_RimWorld.sh` → exec `<dir>/RimWorldLinux` direct, cwd = game dir, `LC_ALL=C`, same args (replicates script)
+V26: OFFLINE payload failure (any exception) → log reason + `Environment.FailFast` ∴ game ⊥ starts w/ install Mods
+V27: profile delete \| Move ! refuse while that profile's game runs (V17 detection)
+V28: Linux OFFLINE: game-spawned helpers ⊥ Doorstop hooks — payload unsets `DOORSTOP_ENABLED` after init; in-game Restart re-enters via rwpm (argv[0] = rwpm, env `RWPM_RESTART`) which re-adds Doorstop env ∴ V1 holds
+V29: Linux OFFLINE: `%command%` w/ programs before `start_RimWorld.sh` (Steam Linux Runtime, gamemoderun) → wrappers ⊥ Doorstop env; rwpm replaces script w/ `rwpm --rwpm-inner <game args>` + env `RWPM_RESTART`, `RWPM_GAME_EXE=<script>` → inner rwpm (restart mode) adds Doorstop + V25, execs game; outer rwpm keeps lock, guard, wait; `--rwpm-inner` w/o `RWPM_RESTART` → refused, ⊥ GUI
+V30: Linux release `rwpm` needs glibc ≤ 2.28 (Steam soldier runtime base; game itself needs 2.15) — `package.sh linux` builds in digest-pinned soldier SDK + fails if `objdump -T` shows newer
+V31: Linux host: RimWorld only in Flatpak Steam (or in both ∧ `<fp>/data/<app>` exists) → app data + Default save dir under `<fp>` = `~/.var/app/com.valvesoftware.Steam` (same abs paths inside sandbox; sandbox itself → standard XDG = same dirs); GUI syncs launcher copy to `<app data>/bin` (byte compare, temp + rename) + launch line uses it; GUI Play → `flatpak run --command=<copy> --env=RWPM_GUARD_CHOICE=launch com.valvesoftware.Steam run <id> -- <exe>` (host-started game ⊥ reaches Flatpak Steam); other layout's profiles ignored + notice, ⊥ auto-migrate; limitation: RimSort-started game on host → `SteamAPI.Init` fails (LIVE workshop lost)
+V32: `rwpm run` writes `<profile>/last-run.toml` ∀ attempt incl. refused (lock, guard cancel, V8) + failed spawn; write failure ⊥ blocks launch (logged); `started_by` per I.file rule
+V33: GUI usable at 960×600; 50+ profiles + 1,000-mod list stay responsive (mod list searchable); names ≤100 chars truncate w/ full-name tooltip, ⊥ layout jump; while copy job \| game running → conflicting actions disabled + reason shown
+V34: core tasks within step budgets — headless iced_test counts steps (step = 1 click \| key press on a control; typing a whole value = 1; scroll free; native folder dialog = 1): first open → Play new profile ≤3 (game found) / ≤5 (not found); Play last played profile =1; Play another ≤2; go OFFLINE ≤3 +1 per duplicate-mod choice; set up Steam launch in app ≤3; fix a health problem ≤2 +1 w/ consent; find a profile among 50 ≤2
+V35: 1 check (`rimsort::runs_profile`) decides whether a RimSort instance is ours — export, Move's stale list, health; accepts every `run_args` form this tool has written (with \| without `--from rimsort`)
+V36: go OFFLINE on a profile without a mod list (new profile) → nothing to freeze, mode → OFFLINE, ⊥ dialog; mods turned on later are caught by the launch guard (V5)
+V37: copy settings: ⊥ copies `Saves/`; ⊥ writes Default (game's own dir); same-name target file \| folder → recycle bin before replace, target-only kept; refused while any RimWorld runs (V11 detection)
+
+## §T TASKS
+id|status|task|cites
+T1|x|scaffold cargo workspace: `rwpm-core` lib + `rwpm` bin (gui + `run`); MIT LICENSE; fmt/clippy/test gate|-
+T2|x|spike Linux: C# payload (framework = game Mono), reflection write `modsFolderPath`, launch via Doorstop env; prove redirect + in-game restart + Prepatcher reload; prove `SteamAppId` env → `RestartAppIfNecessary` false + workshop listed w/ `steam_appid.txt` removed|V1,V2,V3,V16,V18,V24,V25,V26
+T3|x|spike Windows (VM): `winhttp.dll` + args; prove redirect + restart (`DOORSTOP_DISABLE` cleared); prove `SteamAppId` env as T2; check Steam verify vs added dll (?U1)|V1,V8,V16,V24
+T4|x|core: Steam + game discovery (`steamlocate`, libraryfolders.vdf, workshop content dir)|V6
+T5|x|core: parse `ModsConfig.xml` activeMods; resolve packageId → source folder via `About/About.xml` across `<install>/Mods` + workshop|R1
+T6|x|core: profile model + `profile.toml`; create/rename/delete; Default profile|V4,V10,V19,V27,I.file
+T7|x|core: clone profile (reflink-or-copy SaveData + Mods)|V12
+T8|x|core: go OFFLINE / Refresh / go LIVE; size + free-space estimate|V6,V12,V20
+T9|x|core: launch builder per mode + OS (`-savedatafolder`, `-logFile`, Doorstop env/args, `SteamAppId`)|V3,V4,V13,V15,V18,V22,V24,V25,V26
+T10|x|bin: `rwpm run <profile-id> -- %command%` + single-instance lock (survives in-game Restart)|V11,V17,I.cmd
+T11|x|core: OFFLINE pre-launch guard + fixes (add to profile, turn off); `rwpm run` dialog|V5,I.cmd
+T12|x|core: consent store; `winhttp.dll` install/hash/repair/remove; foreign-dll detect + chain-load|V6,V7,V8,V23
+T13|x|core: RimSort export (running check, backup, write instance)|V9,V21,I.file
+T14|x|core: Profiles folder Move|V14,V19,V27
+T15|x|gui: iced shell, profile list, actions, progress|I.gui
+T16|x|gui: plain-language text + tooltips/help popups; Open/Copy log|I.gui
+T17|x|e2e Linux: OFFLINE launch, in-game restart keeps redirect, Prepatcher present; game-spawned shell helpers (xdg-open: open folder, URLs) under preload (?U2 → B2/V28); Flatpak Steam: `%command%` runs in sandbox + Steam Linux Runtime (?U3 → R23, B3/V29) — verified 2026-10-12: Steam Play + in-game Restart redirected|V1,V2,V5,V28,V29
+T18|x|e2e Windows VM: packaged rwpm.exe, OFFLINE redirect, in-game Restart, guard add, foreign winhttp.dll reuse/block, Default log, GUI window w/o console|V1,V5,V8,V10,V12,V15
+T19|x|package Linux + Windows bundles incl Doorstop + licence texts|-
+T20|.|open ?9 macOS v2: Doorstop under SIP, entitlement, signing; needs Mac decompile \| SSH|-
+T21|x|gui-less Windows guard dialog for `rwpm run` (Steam launch): Add to profile \| Turn off \| Launch anyway \| Cancel; today Windows launches + logs (zenity absent)|V5,I.cmd
+T22|x|Flatpak-aware host app: layout pick, launcher copy in Flatpak Steam's folder, Play via `flatpak run`; VM 2026-10-12: GUI Play steam=True, Steam Play via copied line ok, no `~/.local/share` dir made|V31
+T23|x|ux-expert audit of current GUI (8 dims) + redesign proposal: IA, layout, flows, step budgets, started_by rule; user OK 2026-10-12: concept A, app-level keys, `rfd` picker (0 critical, 11 major, 9 minor, 4 enh)|V33,V34
+T24|x|theme: OS light/dark palette (WCAG AA), embed Font Awesome Free + UI font, licence texts; string catalogue (∀ UI text keyed) — Inter 4.1 + FA Free 7.3.1 (upstream zip; Arch file differs), contrast + cmap + checksum + inline-text tests|V33
+T25|x|layout rework per T23: profile list + state at a glance, details, busy states, small-window + long-name handling, keyboard shortcuts + dialog Enter/Escape — search, 2-line rows (mode · mods), Play pinned + wait reason, Mods + Start sections, ⋯ More menu, running-game watch (2 s), app keys; last played + problem dot wait for T26/T30|V33
+T26|x|`last-run.toml` from `rwpm run` (V32) + reader in core — app Play sets `RWPM_STARTED_BY=app`; list rows show "played … ago", Play row shows last outcome + who; app opens on last played (B2)|V32,I.file
+T27|x|first-run setup flow: find game \| pick folder, LIVE vs OFFLINE in plain words, offer first profile; `setup_done` — installs w/ profiles \| chosen game folder skip it; `rfd` 0.17.2 picker also in Settings (Browse…); B1 (3 steps) + B1b (4) tested; soldier bundle still glibc 2.28|V34,I.file
+T28|x|Steam launch guide: copy line, where to paste, last-run check "started from Steam: worked"; verify Steam's env vars on Windows (win11-lg) for the started_by rule — guide done (drill-in, live check, B5 = 3 steps tested); win11-lg 2026-10-12: Steam sets `SteamGameId`, `SteamAppId` (=294100) + `SteamClientLaunch=1` for the launched command|V32,V34
+T29|x|read-only profile mod list: name, source (frozen \| Steam \| install), guard flags, search — `profile::mod_list` (Game \| Frozen copy \| Steam Workshop \| Mods folder; Not installed \| Not frozen \| Installed twice), read off the window thread; mod names from About.xml also in the guard dialog (M6); 1,000 rows ≈150 ms layout (debug)|V33
+T30|x|profile health check: plain-words status + one-click fixes (missing frozen mods, Windows loader, stale RimSort path, other-layout profiles); fixes outside tool folders keep consent pattern — `profile::health` (Not frozen → Freeze them; Not installed → View mod list; loader missing → Install loader… w/ consent, ⊥ play; foreign loader → words only; RimSort entry elsewhere → Add again); checked off-thread on select / job end / game start-stop; ⚠ mark in list rows; other-layout profiles = lasting banner + Open that folder; B6 = 2 steps tested; last-run outcome stays on the Play row|V5,V8,V31,V32
+T31|x|redesign gate: step-count task tests (V34), light+dark PNG snapshots ∀ screen/dialog published private for sign-off, ux-expert audit 0 open high — 2026-10-12: all 8 V34 budgets + 1,000-mod check tested, 11/11 major closed (m9 open, minor), 22 screens × 2 themes published; user signed off 2026-10-12|V33,V34
+T32|x|research ?gamepad: iced 0.14 focus/gamepad on Steam Deck Game Mode + full Tab traversal over buttons; report cost — A/B/C with costs, rec A|-
+T33|x|copy settings core (groups, recycle-bin replace, Default ⊥ target, refuse while running) + GUI: New profile Start from, setup seeding from Default, More → Copy settings from… w/ 5 tick groups; tests — staged copy (review H1), sizes per group (M1), stale staging binned (M2); New starts from Default by default, Empty skips; nothing to copy → ⊥ job|V37,V34
+T34|x|health: profile w/ only game content (`ludeon.rimworld*`) or no mod list, while Default has other mods → "Only the game's own content…" + Copy settings from…; setup keeps a refused copy's error in view (found by test while a game ran)|V37
+
+## §B BUGS
+id|date|cause|fix
+B1|2026-10-11|LD_PRELOAD Doorstop into `start_RimWorld.sh` → dup2 hook breaks cmd subst → game never starts|V25
+B2|2026-10-11|game-spawned helpers (xdg-open) inherit `DOORSTOP_ENABLED` → Doorstop dup2 hook in every process → sh `$(…)` + redirects broken → OFFLINE Open folder/URL fail (Linux)|V28
+B3|2026-10-12|Flatpak Steam wraps `%command%` in Steam Linux Runtime `/bin/sh` scripts (`_v2-entry-point` → `scout-on-soldier-entry-point-v2` → `start_RimWorld.sh`); rwpm put Doorstop env on whole chain → `$(readlink -f "$0")` empty → "A command to run is required" → game ⊥ starts|V29
+B4|2026-10-12|Linux bundle built on host (CachyOS glibc 2.44) links newest symbol versions (`cosh`/`sinh` GLIBC_2.44, `acosf` 2.43) → "GLIBC_2.44 not found" on Ubuntu 26.04 host; worked in Flatpak only b/c runtime glibc 2.44|V30
+B5|2026-10-12|T26 added `--from rimsort` to RimSort `run_args`; export's own-instance match was updated but Move's `stale_rimsort` kept matching ` run <id> -- %command%` → after a Profiles-folder Move, entries exported since T26 not listed for re-adding|V35
+B6|2026-10-12|go OFFLINE refused a profile with no `ModsConfig.xml` (`NoModsConfig`) → first-run setup's OFFLINE choice always ended in an error naming the profile id|V36
