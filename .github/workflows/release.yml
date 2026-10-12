@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || inputs.tag }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: cocogitto/cocogitto-action@9a9fe03b31c47444290c0d7f9b1ee1b44ee13f20 # v4.1.0
+      - uses: cocogitto/cocogitto-action@52d0023b4396897f1815648e553db2ab8d782f3a # v4.2.0
         with:
           command: --version
       - id: next
@@ -151,7 +151,7 @@ jobs:
           # The bump commit and tag are pushed with this job's GITHUB_TOKEN (contents: write).
           # Pushes made with it start no new workflow runs, so a release cannot loop.
           persist-credentials: true
-      - uses: cocogitto/cocogitto-action@9a9fe03b31c47444290c0d7f9b1ee1b44ee13f20 # v4.1.0
+      - uses: cocogitto/cocogitto-action@52d0023b4396897f1815648e553db2ab8d782f3a # v4.2.0
         with:
           command: --version
       - name: Bump version and changelog
