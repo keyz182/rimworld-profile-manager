@@ -1,0 +1,79 @@
+<p align="center">
+  <img src="crates/rwpm/assets/icon/rwpm.svg" width="128" height="128" alt="RimWorld Profile Manager logo">
+</p>
+
+<h1 align="center">RimWorld Profile Manager</h1>
+
+<p align="center">
+  Separate RimWorld profiles, each with its own saves, settings and mod list.
+</p>
+
+---
+
+RimWorld Profile Manager keeps more than one RimWorld setup on one computer. Playing one profile never changes another.
+
+- **LIVE profiles** use your Steam Workshop mods. Mod updates on Steam reach them.
+- **OFFLINE profiles** keep private copies of their mods. A Workshop update cannot break a colony in progress. You choose when to update.
+- **Default** is the game as it is without this app. Steam Cloud keeps syncing it.
+
+![The main window with an OFFLINE profile](.github/readme/main-window.png)
+
+You can start a profile from the app, from Steam's own Play button, or from [RimSort](https://github.com/RimSort/RimSort). The app runs on Windows and Linux.
+
+## Download
+
+Get the newest version from [Releases](https://github.com/keyz182/rimworld-profile-manager/releases/latest).
+
+| System | File |
+|---|---|
+| Windows | `…-windows-x86_64-setup.exe` (installer) or `…-windows-x86_64.zip` |
+| Linux | `…-x86_64.AppImage` or `…-linux-x86_64.tar.gz` |
+
+The [wiki](https://github.com/keyz182/rimworld-profile-manager/wiki) tells you how to install the app, set up Steam and RimSort, and fix problems. It has screenshots of each step.
+
+## How it works
+
+- Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.
+- An OFFLINE profile also loads a small payload through [UnityDoorstop](https://github.com/NeighTools/UnityDoorstop). The payload points the game's mods folder at the profile's frozen copies. The game files are not changed.
+- On Windows, OFFLINE needs Doorstop's `winhttp.dll` in the RimWorld folder. The app asks before it adds the file, and you can remove it from the app.
+- The app does not change your load order. RimSort or the in-game mod menu does that.
+
+## Build from source
+
+You need:
+
+- Rust (the version in `rust-toolchain.toml`; `rustup` installs it).
+- On Linux: `pkg-config`, `libxkbcommon` and `libwayland` development files.
+- For the OFFLINE payload: the .NET 10 SDK.
+
+```sh
+cargo run -p rwpm              # start the app
+scripts/check.sh               # format, lint and test
+scripts/package.sh linux       # Linux bundle (needs Docker)
+scripts/package.sh windows     # Windows bundle (needs mingw-w64)
+```
+
+The release workflow also builds the AppImage (`scripts/appimage.sh`) and the Windows installer (`scripts/installer.sh`, needs NSIS).
+
+| Folder | What is in it |
+|---|---|
+| `crates/rwpm-core` | All the logic: profiles, freezing, launching, Steam and RimSort. |
+| `crates/rwpm` | The app (iced GUI) and the `rwpm run` launcher. |
+| `payload` | The C# payload that OFFLINE profiles load. |
+| `packaging`, `scripts` | Release bundles, installer and AppImage. |
+| `e2e` | End-to-end tests against the real game on Windows. |
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/). A push to `main` makes a release when it has a `feat` or `fix` commit.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
+
+The releases also include:
+
+- UnityDoorstop 4.5.0, under LGPL-2.1, unchanged.
+- The Inter font (SIL OFL 1.1) and Font Awesome Free icons (CC BY 4.0).
+
+Each release has the full licence texts in its `licenses` folder.
+
+RimWorld is a trademark of Ludeon Studios. This project is not made or endorsed by Ludeon Studios.
