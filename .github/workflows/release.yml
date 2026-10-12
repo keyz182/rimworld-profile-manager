@@ -67,7 +67,8 @@ jobs:
   build:
     name: Bundles
     needs: plan
-    if: needs.plan.outputs.version != ''
+    # always(): a hand-run publish skips CI, and GitHub would skip every job after a skipped one.
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.version != ''
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,6 +106,7 @@ jobs:
   publish:
     name: Tag and publish
     needs: [plan, build]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
