@@ -12,6 +12,27 @@ SOLDIER_SDK="registry.gitlab.steamos.cloud/steamrt/soldier/sdk@sha256:f87b72ad00
 GLIBC_FLOOR="2.28"
 os="${1:?usage: package.sh linux|windows|macos}"
 
+# `sha256sum` is not on every macOS: it arrived with macOS 26, and the macos-14 CI
+# runner has no such command (exit 127). `shasum` ships with every macOS and with the
+# Linux runners, and reads the same `<hash>  <path>` format.
+sha256_check() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -c --quiet "$1"
+  else
+    shasum -a 256 -c "$1" >/dev/null
+  fi
+}
+
+# `trash` is a local convenience, absent on the CI runners. `$1` is always a build
+# output directory this script owns under target/, so plain removal is safe there.
+discard() {
+  if command -v trash >/dev/null 2>&1; then
+    trash "$1"
+  else
+    rm -rf "$1"
+  fi
+}
+
 case "$os" in
 linux)
   target="x86_64-unknown-linux-gnu"
@@ -50,7 +71,7 @@ arch="x86_64"
 [[ "$os" != macos ]] || arch="arm64"
 name="rwpm-$version-$os-$arch"
 out="$ROOT/target/dist/$name"
-[[ ! -e "$out" ]] || trash "$out"
+[[ ! -e "$out" ]] || discard "$out"
 # T46: macOS ships an .app bundle. `PayloadFiles::beside(app_dir)` resolves payload/ and
 # doorstop/ as siblings of the exe (launch.rs/run.rs — unchanged for macOS), so the exe,
 # payload/ and doorstop/ all live in Contents/MacOS/ together, exactly like the flat
@@ -105,7 +126,7 @@ fi
 dotnet build "$ROOT/payload/Rwpm.Payload" -c Release -o "$ROOT/target/dist/payload-build" -nologo >/dev/null
 cp "$ROOT/target/dist/payload-build/Rwpm.Payload.dll" "$bin_dir/payload/"
 
-(cd "$VENDOR" && sha256sum -c --quiet SHA256SUMS)
+(cd "$VENDOR" && sha256_check SHA256SUMS)
 cp "$VENDOR/$loader" "$bin_dir/doorstop/"
 
 cp "$ROOT/LICENSE" "$root_file_dir/LICENSE"
