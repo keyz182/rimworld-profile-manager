@@ -36,6 +36,9 @@ The [wiki](https://github.com/keyz182/rimworld-profile-manager/wiki) tells you h
 - Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.
 - An OFFLINE profile also loads a small payload through [UnityDoorstop](https://github.com/NeighTools/UnityDoorstop). The payload points the game's mods folder at the profile's frozen copies. The game files are not changed.
 - On Windows, OFFLINE needs Doorstop's `winhttp.dll` in the RimWorld folder. The app asks before it adds the file, and you can remove it from the app.
+- On RimWorld 1.7, an OFFLINE profile loads the payload as a .NET startup hook (`DOTNET_STARTUP_HOOKS`), not through Doorstop. Windows needs no `winhttp.dll` for 1.7.
+- On 1.7, the game log of a profile is `<profile>/Logs/Player.log`.
+- The first time a profile starts on 1.7, the game clears its mod list. A 1.6 mod list does not carry over. Keep separate profiles for 1.6 and 1.7. If you press Play in Steam without the launch options, Steam starts Default, and the game clears the mod list of Default.
 - The app does not change your load order. RimSort or the in-game mod menu does that.
 
 ## Build from source
@@ -44,11 +47,12 @@ You need:
 
 - Rust (the version in `rust-toolchain.toml`; `rustup` installs it).
 - On Linux: `pkg-config`, `libxkbcommon` and `libwayland` development files.
-- For the OFFLINE payload: the .NET 10 SDK.
+- For the OFFLINE payloads: the .NET 10 SDK. To run `scripts/test-hook.sh`, you also need the .NET 8 runtime.
 
 ```sh
 cargo run -p rwpm              # start the app
 scripts/check.sh               # format, lint and test
+scripts/test-hook.sh           # test the 1.7 startup hook
 scripts/package.sh linux       # Linux bundle (needs Docker)
 scripts/package.sh windows     # Windows bundle (needs mingw-w64)
 ```
@@ -59,7 +63,7 @@ The release workflow also builds the AppImage (`scripts/appimage.sh`) and the Wi
 |---|---|
 | `crates/rwpm-core` | All the logic: profiles, freezing, launching, Steam and RimSort. |
 | `crates/rwpm` | The app (iced GUI) and the `rwpm run` launcher. |
-| `payload` | The C# payload that OFFLINE profiles load. |
+| `payload` | The C# payloads that OFFLINE profiles load: the Doorstop payload (1.6) and the startup hook (1.7). |
 | `packaging`, `scripts` | Release bundles, installer and AppImage. |
 | `e2e` | End-to-end tests against the real game on Windows. |
 

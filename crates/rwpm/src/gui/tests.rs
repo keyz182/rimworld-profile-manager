@@ -585,6 +585,19 @@ fn help_opens_and_ok_closes() {
     assert!(app.dialog.is_none());
 }
 
+/// T69 / B9: Help explains 1.7, including the mod list the game clears on a first 1.7 start.
+#[test]
+fn help_explains_rimworld_17() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    let _ = app.update(Message::Help);
+    let (title, words) = text::HELP_SECTIONS[5];
+    assert_eq!(title, "RimWorld 1.7");
+    assert!(words.contains("clears its mod list"), "{words}");
+    let mut ui = iced_test::simulator(app.view());
+    ui.find(words).expect("1.7 section shown");
+}
+
 #[test]
 fn steam_launch_options_shown_and_copyable() {
     let sb = Sandbox::new();
