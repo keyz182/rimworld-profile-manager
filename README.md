@@ -65,6 +65,26 @@ The release workflow also builds the AppImage (`scripts/appimage.sh`) and the Wi
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/). A push to `main` makes a release when it has a `feat` or `fix` commit.
 
+
+## FAQ
+
+### Was this vibe coded?
+
+Yes. I needed a thing that I didn't have time to write myself. AI took my plan and research and turned it into this codebase.
+
+### Can you add X?
+
+Maybe? Make an issue and we shall see.
+
+### Why doesn't Y?
+
+Make an issue to ask.
+
+### I ran this program and my wife left me!
+
+Well now you have time for Rimworld. 
+
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
