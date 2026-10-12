@@ -65,27 +65,46 @@ jobs:
           echo "existing=false" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Bundles
+    name: Bundle (${{ matrix.os }})
     needs: plan
     # always(): a hand-run publish skips CI, and GitHub would skip every job after a skipped one.
     if: always() && needs.plan.result == 'success' && needs.plan.outputs.version != ''
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        os: [linux, windows]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
       - name: System packages
+        if: matrix.os == 'windows'
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends \
-            pkg-config libxkbcommon-dev libwayland-dev zip \
-            gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+            zip gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
       - name: Rust toolchain (from rust-toolchain.toml)
         run: rustup show active-toolchain || rustup toolchain install
+      # Caches are keyed on the committed Cargo.lock, so they come before the version is set.
+      # Only runs on main write the caches these jobs read; pull request caches stay separate.
+      - name: Cache the soldier toolchain, crates and build
+        if: matrix.os == 'linux'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            target/soldier-cache
+            target/soldier
+          key: soldier-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'scripts/package.sh') }}
+          restore-keys: soldier-
+      - name: Cache the Windows build
+        if: matrix.os == 'windows'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: release-windows
       - name: Set the release version for the bundle names
         if: needs.plan.outputs.existing != 'true'
         env:
@@ -93,11 +112,12 @@ jobs:
         run: |
           sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml
           cargo update --workspace
-      - run: scripts/package.sh linux
-      - run: scripts/package.sh windows
+      - run: scripts/package.sh "$OS"
+        env:
+          OS: ${{ matrix.os }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: bundles
+          name: bundle-${{ matrix.os }}
           path: |
             target/dist/*.tar.gz
             target/dist/*.zip
@@ -138,7 +158,8 @@ jobs:
           git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: bundles
+          pattern: bundle-*
+          merge-multiple: true
           path: dist
       - name: GitHub Release
         env:
