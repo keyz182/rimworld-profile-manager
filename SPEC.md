@@ -53,7 +53,7 @@ desktop app (Linux + Windows) manage RimWorld profiles: create/clone/delete/rena
 - 1.7 support ships only at parity (user 2026-10-12): ⊥ LIVE-only release.
 - ?macos_waylith: whether 1.7 ships for macOS at all (Vulkan via MoltenVK) unknown → parked, ⊥ in v1.3 scope.
 - ?parity_fallback: if T63 shows Waylith ignores startup hooks, the parity gate blocks 1.7 forever → user re-decides (LIVE-only \| wait for Ludeon).
-- ?live_log_17: Waylith log ignores `-savedatafolder` (R41) ∴ LIVE 1.7 profile (no hook) writes + rotates Default's `Logs/Player.log`. rec: `rwpm run` sends game stdout to `<profile>/Player.log` (replacement inherits the fd across Restart) \| alt: hook in LIVE for log only (bends §C.16). needs user decision before T66.
+- Waylith LIVE log (user 2026-10-12, was ?live_log_17): `rwpm run` sends game stdout + stderr to `<profile>/Player.log` (Restart replacement inherits the fd, R40); ⊥ hook in LIVE (§C.16 holds); accepted cost: engine still writes + rotates Default's `Logs/Player.log` on LIVE 1.7 runs (R41).
 - repo: private GitHub `keyz182/rimworld-profile-manager`. commits = conventional (Angular types: feat fix docs style refactor perf test build ci chore revert), checked on PRs + local `commit-msg` hook (`cog install-hook --all`). push to main → CI (fmt, clippy Linux + windows-gnu + macOS, tests incl. a real `macos-14` runner leg) → `cog bump --auto` (tag `vX.Y.Z`, CHANGELOG) when feat/fix since last tag → Linux (soldier) + Windows + macOS legs in parallel, cached (macOS on its own `macos-14` runner, T47 — cross-build + adhoc-signing from Linux is impossible) → GitHub Release: Linux tar.gz + AppImage (V38), Windows zip + per-user setup.exe (V39), macOS arm64 `.app` zip adhoc-signed via `ditto` (T46, V42); all built before the atomic push of bump commit + tag. actions pinned by SHA (≥2 weeks old), zizmor clean.
 
 ## §I INTERFACES
@@ -181,7 +181,7 @@ V63: build identity = appmanifest `buildid`; same `Version.txt` + new buildid �
 V64: Waylith OFFLINE → env `DOTNET_STARTUP_HOOKS` = hook dll; hook sets `modsFolderPath` before `ModLister` cctor; payload log "patched … -> <profile>/Mods"; ⊥ `LD_PRELOAD`, ⊥ `winhttp.dll`, ⊥ `DOORSTOP_*` on Waylith
 V65: hook ! load in any .NET ≥ 6 process + no-op unless process = RimWorld (entry assembly check) ∴ game-spawned .NET helpers (eg `rimmcp-proxy`, net8) inherit env w/o crash \| redirect. test: net8 dummy w/ env set → exits 0, no patch line
 V66: Waylith in-game Restart → redirect holds in restarted process (payload log 2× patched, 2 pids) (?waylith_restart)
-V67: Waylith launch ⊥ `-logFile`; OFFLINE: hook calls `FileLog.SetDirectory(<profile>)` before Main ∴ log = `<profile>/Logs/Player.log`, Default's `Logs/` untouched (R41, B10); LIVE per ?live_log_17; Default: `<default save dir>/Logs/Player.log`; Open log / Copy log / health / last-run read the per-engine path
+V67: Waylith launch ⊥ `-logFile`; OFFLINE: hook calls `FileLog.SetDirectory(<profile>)` before Main ∴ log = `<profile>/Logs/Player.log`, Default's `Logs/` untouched (R41, B10); LIVE (stored): `rwpm run` captures stdout + stderr → `<profile>/Player.log`; Default: `<default save dir>/Logs/Player.log`; Open log / Copy log / health / last-run read the per-engine path
 V68: Waylith: `rwpm run` ! wait for the Restart replacement (process w/ `-WaitForExitingPid=<child pid>`, R40) before releasing `run.lock` \| writing last-run `exit`; test: fixture parent exits + replacement lives → lock held until replacement exits (B11)
 V69: Waylith install = `<dir>/Waylith.dll` beside game exe (Linux `<dir>/RimWorld`) ! accepted by discovery (exe = `<dir>/RimWorld`, engine = Waylith); `game_program` ! pick that exe from a wrapped `%command%`; process probe ! count `RimWorld` as a game (V11, V17)
 
@@ -252,7 +252,7 @@ T62|x|grill 1.7 Waylith support — done 2026-10-12: full parity Linux + Windows
 T63|x|spike Linux (captured 1.7 build): minimal startup hook → runs before `ModLister` cctor? sets `modsFolderPath`? (?startup_hooks_waylith); Restart re-launch + env carry (?waylith_restart); net8 helper w/ env (V65); Prepatcher/Harmony on 1.7 (?prepatcher_17) — W1-W4 pass 2026-10-12 (R39); restart detaches (R40 → V68); log ignores `-savedatafolder` (R41 → V67)|V64,V65,V66
 T64|x|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
 T65|x|core: engine detect + Waylith launch branch (⊥ `-logFile`, ⊥ Doorstop, `DOTNET_STARTUP_HOOKS` + `RWPM_*`, `SteamAppId`, `-savedatafolder`); lift V62 refusal when shipped; discovery + process probe + game_program know Waylith (B12)|V62,V64,V67,V69
-T66|.|core+gui: per-engine log path for Open/Copy log, health, last-run; LIVE 1.7 log per ?live_log_17|V67
+T66|.|core+gui: per-engine log path for Open/Copy log, health, last-run; LIVE 1.7: `rwpm run` captures stdout + stderr → `<profile>/Player.log` (check stdout carries the FileLog lines)|V67
 T67|.|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows)|V64,V65,V66
 T68|.|e2e Linux + Windows 1.7: app/Steam/RimSort × LIVE/OFFLINE, Restart, helpers unbroken, 1.6 + 1.7 side by side via builds|V50,V51,V64,V65,V66,V67
 T69|.|docs + help: 1.7 support, B9 warning (Steam Play on 1.7 w/o rwpm resets Default mod list)|-
