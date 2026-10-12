@@ -621,7 +621,8 @@ impl App {
     }
 
     fn open_log(&mut self) {
-        let Some(log) = self.current().map(|p| p.log_path()) else {
+        let engine = super::support::engine(self.game.as_ref().ok());
+        let Some(log) = self.current().map(|p| p.log_path(engine)) else {
             return;
         };
         self.notice = Some(if !log.is_file() {

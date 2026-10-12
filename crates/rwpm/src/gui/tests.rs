@@ -6,6 +6,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use rwpm_core::discovery::Engine;
 use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::{Mode, ProfileFile};
 
@@ -520,11 +521,11 @@ fn support_text_has_versions_logs_and_trims_long_ones() {
     let id = sb.offline_profile("Helped", &[]);
     let app = sb.app();
     let profile = app.profiles.iter().find(|p| p.id == id).expect("profile");
-    let dir = profile.log_path().parent().expect("dir").to_path_buf();
+    let dir = profile.stored_dir().expect("dir").to_path_buf();
     std::fs::write(dir.join("rwpm.log"), "guard: player chose Add\n").expect("w");
     let mut big = vec![b'a'; 300 * 1024];
     big.extend_from_slice(b"LAST LINE\n");
-    std::fs::write(profile.log_path(), big).expect("w");
+    std::fs::write(profile.log_path(Engine::Unity), big).expect("w");
     let report = super::support::support_text(profile, app.game.as_ref().ok());
     assert!(report.starts_with(&format!("RimWorld Profile Manager {}", rwpm_core::VERSION)));
     assert!(
@@ -536,6 +537,32 @@ fn support_text_has_versions_logs_and_trims_long_ones() {
     assert!(report.contains("===== payload.log =====\n(none)"));
     assert!(report.contains("bytes left out]") && report.ends_with("LAST LINE\n"));
     assert!(report.len() < 270 * 1024, "trimmed to the end of the log");
+}
+
+/// V67: with a 1.7 (Waylith) game, the game log is `<profile>/Logs/Player.log`; our own
+/// logs still come from the profile folder.
+#[test]
+fn v67_support_text_reads_waylith_log() {
+    let sb = Sandbox::new();
+    std::fs::write(sb.game_dir().join("Waylith.dll"), "").expect("marker");
+    let id = sb.offline_profile("Seventeen", &[]);
+    let app = sb.app();
+    let profile = app.profiles.iter().find(|p| p.id == id).expect("profile");
+    let dir = profile.stored_dir().expect("dir").to_path_buf();
+    std::fs::write(dir.join("rwpm.log"), "guard: ok\n").expect("w");
+    std::fs::create_dir_all(dir.join("Logs")).expect("logs dir");
+    std::fs::write(dir.join("Logs/Player.log"), "=== Waylith log ===\n").expect("w");
+    std::fs::write(dir.join("Player.log"), "stale unity log\n").expect("w");
+    let report = super::support::support_text(profile, app.game.as_ref().ok());
+    assert!(
+        report.contains("===== Player.log =====\n=== Waylith log ==="),
+        "{report}"
+    );
+    assert!(!report.contains("stale unity log"), "{report}");
+    assert!(
+        report.contains("===== rwpm.log =====\nguard: ok"),
+        "{report}"
+    );
 }
 
 #[test]

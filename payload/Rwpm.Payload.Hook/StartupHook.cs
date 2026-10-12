@@ -1,18 +1,19 @@
 using System;
-using System.IO;
 using System.Reflection;
 using Rwpm.Shared;
 
 /// <summary>
 /// Startup hook for RimWorld 1.7 (Waylith, CoreCLR). The runtime calls Initialize before the
-/// game's Main (R39). OFFLINE profiles: redirects the mods folder to RWPM_MODS_DIR (V64) and
-/// the game log to the profile folder (V67). The runtime looks the type up by this exact
-/// name, so it stays in the global namespace.
+/// game's Main (R39). Two independent jobs, each only when its variable is set:
+/// RWPM_MODS_DIR redirects the mods folder (OFFLINE, V64, fails closed) and RWPM_LOG_DIR
+/// moves the game log (every stored profile, V67). The runtime looks the type up by this
+/// exact name, so it stays in the global namespace.
 /// </summary>
 internal static class StartupHook
 {
     const string GameEntryAssembly = "RimWorld";
     const string FileLogType = "Waylith.Logging.FileLog, Waylith";
+    const string LogDirEnv = "RWPM_LOG_DIR";
 
     static string? modsDir;
     static string? logPath;
@@ -30,12 +31,25 @@ internal static class StartupHook
             return;
         }
         modsDir = Environment.GetEnvironmentVariable(ModsRedirect.ModsDirEnv);
-        if (string.IsNullOrEmpty(modsDir))
+        string? logDir = Environment.GetEnvironmentVariable(LogDirEnv);
+        if (string.IsNullOrEmpty(modsDir) && string.IsNullOrEmpty(logDir))
         {
-            Log("no " + ModsRedirect.ModsDirEnv + "; nothing to do");
+            Log("no " + ModsRedirect.ModsDirEnv + " or " + LogDirEnv + "; nothing to do");
             return;
         }
+        if (!string.IsNullOrEmpty(modsDir))
+        {
+            RedirectMods();
+        }
+        // After the fail-closed mods step: a log failure must not stop the game.
+        if (!string.IsNullOrEmpty(logDir))
+        {
+            RedirectLog(logDir);
+        }
+    }
 
+    static void RedirectMods()
+    {
         try
         {
             if (ModsRedirect.EnsureDir(modsDir))
@@ -52,26 +66,17 @@ internal static class StartupHook
         {
             Fail("start failed", ex);
         }
-        // Outside the fail-closed block: the mods redirect is already in place.
-        RedirectLog();
     }
 
     /// <summary>
     /// V67: Waylith's FileLog keeps the first SetDirectory call (R41). Calling it before Main
-    /// puts Logs/Player.log in the profile folder (the parent of its Mods folder) instead of
-    /// the Default save dir. A failure here leaves mods isolation intact, so it only logs.
+    /// puts Logs/Player.log in the profile folder instead of the Default save dir. A failure
+    /// here leaves mods isolation intact, so it only logs.
     /// </summary>
-    static void RedirectLog()
+    static void RedirectLog(string profile)
     {
         try
         {
-            string? profile = Path.GetDirectoryName(
-                Path.TrimEndingDirectorySeparator(Path.GetFullPath(modsDir!)));
-            if (string.IsNullOrEmpty(profile))
-            {
-                Log("log redirect skipped: no parent folder for " + modsDir);
-                return;
-            }
             Type.GetType(FileLogType, true)!
                 .GetMethod("SetDirectory", BindingFlags.Public | BindingFlags.Static, null,
                     new[] { typeof(string) }, null)!

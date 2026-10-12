@@ -16,6 +16,8 @@ pub const ENV_GAME_EXE: &str = "RWPM_GAME_EXE";
 /// A foreign Doorstop's own target assembly, started by our payload after the redirect.
 /// .NET's startup-hook list; the Waylith payload goes first (V64).
 pub const ENV_STARTUP_HOOKS: &str = "DOTNET_STARTUP_HOOKS";
+/// Where the Waylith hook moves the game log: the profile folder (V67).
+pub const ENV_LOG_DIR: &str = "RWPM_LOG_DIR";
 pub const ENV_CHAIN_TARGET: &str = "RWPM_CHAIN_TARGET";
 /// V29: first arg of the inner rwpm that takes the start script's place behind wrappers.
 pub const ARG_INNER: &str = "--rwpm-inner";
@@ -182,7 +184,7 @@ fn waylith_program(command: &[OsString]) -> Option<&OsString> {
 
 /// RimWorld 1.7 (Waylith, R37). Steam's wrapper chain stays as given: the env reaches the
 /// game through it (R39). No Doorstop, no restart trampoline, no `-logFile` (the engine
-/// ignores it, V67); OFFLINE adds the startup hook (V64).
+/// ignores it, V67); stored profiles add the startup hook (V64, V67).
 fn build_waylith(
     profile: &Profile,
     command: &[OsString],
@@ -198,24 +200,47 @@ fn build_waylith(
         ..LaunchPlan::default()
     };
     set(&mut plan, "SteamAppId", STEAM_APP_ID);
-    if profile.mode == Mode::Offline {
-        let mods = profile
-            .mods_dir()
-            .ok_or_else(|| LaunchError::NoModsDir(profile.id.to_string()))?;
-        // V62: fail closed; the game must not start on the install's Mods folder.
-        require(&payload.hook)?;
-        let sep = if os == Os::Windows { ';' } else { ':' };
-        if payload.hook.to_string_lossy().contains(sep) {
-            return Err(LaunchError::HookPathHasSeparator(payload.hook.clone(), sep));
-        }
-        set(&mut plan, ENV_PAYLOAD_LOG, mods.with_file_name(PAYLOAD_LOG));
-        set(&mut plan, ENV_MODS_DIR, mods);
-        let hooks = prepend_with(payload.hook.as_os_str(), env(ENV_STARTUP_HOOKS), sep);
-        set(&mut plan, ENV_STARTUP_HOOKS, hooks);
+    if let Some(dir) = profile.stored_dir() {
+        add_waylith_hook(&mut plan, profile, dir, payload, os, env)?;
     }
     plan.args.extend(game_args);
     plan.args.extend(profile.savedatafolder_arg());
     Ok(plan)
+}
+
+/// The startup hook for a stored profile. OFFLINE: mods redirect + log dir, and no launch
+/// without the hook (V62, V64). LIVE: log dir only (V67); without a usable hook the game
+/// still starts, and its log then lands in Default's folder (R41).
+fn add_waylith_hook(
+    plan: &mut LaunchPlan,
+    profile: &Profile,
+    dir: &Path,
+    payload: &PayloadFiles,
+    os: Os,
+    env: &dyn Fn(&str) -> Option<OsString>,
+) -> Result<(), LaunchError> {
+    let sep = if os == Os::Windows { ';' } else { ':' };
+    let usable = || {
+        require(&payload.hook)?;
+        if payload.hook.to_string_lossy().contains(sep) {
+            return Err(LaunchError::HookPathHasSeparator(payload.hook.clone(), sep));
+        }
+        Ok(())
+    };
+    if profile.mode == Mode::Offline {
+        let mods = profile
+            .mods_dir()
+            .ok_or_else(|| LaunchError::NoModsDir(profile.id.to_string()))?;
+        usable()?;
+        set(plan, ENV_MODS_DIR, mods);
+    } else if usable().is_err() {
+        return Ok(());
+    }
+    set(plan, ENV_PAYLOAD_LOG, dir.join(PAYLOAD_LOG));
+    set(plan, ENV_LOG_DIR, dir);
+    let hooks = prepend_with(payload.hook.as_os_str(), env(ENV_STARTUP_HOOKS), sep);
+    set(plan, ENV_STARTUP_HOOKS, hooks);
+    Ok(())
 }
 
 /// V29 / B3: wrappers before the start script (Steam Linux Runtime, gamemoderun) are
@@ -1409,14 +1434,47 @@ mod tests {
     }
 
     #[test]
-    fn waylith_live_sets_no_hook() {
+    fn v67_waylith_log_dir_for_stored_profiles() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
+        let hook = p.hook.clone().into_os_string();
+        for mode in [Mode::Offline, Mode::Live] {
+            let plan = build(&stored(mode), &command, &p, Os::Linux, &no_env).expect("plan");
+            assert_eq!(
+                env_get(&plan, ENV_LOG_DIR),
+                Some(&OsString::from("/profiles/run")),
+                "{mode:?}"
+            );
+            assert_eq!(env_get(&plan, ENV_STARTUP_HOOKS), Some(&hook), "{mode:?}");
+            // LIVE: the log only, never the mods redirect (§C.16).
+            assert_eq!(
+                env_get(&plan, ENV_MODS_DIR).is_some(),
+                mode == Mode::Offline,
+                "{mode:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn v67_waylith_live_without_hook_still_launches() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        std::fs::remove_file(&p.hook).expect("remove hook");
         let plan = build(&stored(Mode::Live), &command, &p, Os::Linux, &no_env).expect("plan");
         assert_eq!(env_keys(&plan), vec!["SteamAppId".to_owned()]);
         let last = plan.args.last().expect("savedatafolder").to_string_lossy();
         assert!(last.to_lowercase().contains("savedatafolder"), "{plan:?}");
+    }
+
+    #[test]
+    fn v67_waylith_default_gets_no_hook() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        let plan = build(&default_profile(), &command, &p, Os::Linux, &no_env).expect("plan");
+        assert_eq!(env_keys(&plan), vec!["SteamAppId".to_owned()]);
     }
 
     #[test]

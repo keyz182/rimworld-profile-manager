@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use crate::discovery::Engine;
 use crate::error::ProfileError;
 use crate::profile::file::{FILE_NAME, Mode, ProfileFile};
 use crate::profile::id::ProfileId;
@@ -11,6 +12,8 @@ use crate::profile::running::RunningProbe;
 const SAVE_DATA: &str = "SaveData";
 const MODS: &str = "Mods";
 const PLAYER_LOG: &str = "Player.log";
+/// R41: Waylith's `FileLog` writes `<dir>/Logs/Player.log`.
+const WAYLITH_LOG_DIR: &str = "Logs";
 const DEFAULT_NAME: &str = "Default";
 const MAX_SUFFIX: u32 = 999;
 /// Top-level files in the game's own save dir that a clone of Default leaves behind:
@@ -76,16 +79,24 @@ impl Profile {
         self.stored_dir().map(|dir| dir.join(PLAYER_LOG))
     }
 
-    /// Where the game's log for this profile is: ours for stored profiles, Unity's own
-    /// default (`<game save dir>/Player.log`) for Default (V15).
-    pub fn log_path(&self) -> PathBuf {
-        match &self.location {
-            Location::Default { save_dir } => save_dir.join(PLAYER_LOG),
-            Location::Stored { dir } => dir.join(PLAYER_LOG),
+    /// Where the game's log for this profile is, per engine (V67).
+    /// Unity: ours (`-logFile`) for stored profiles, Unity's own default
+    /// (`<game save dir>/Player.log`) for Default (V15).
+    /// Waylith: `<folder>/Logs/Player.log`, the folder being the profile's (startup hook,
+    /// `RWPM_LOG_DIR`) or Default's save dir (the engine's own default, R41).
+    pub fn log_path(&self, engine: Engine) -> PathBuf {
+        let dir = match &self.location {
+            Location::Default { save_dir } => save_dir,
+            Location::Stored { dir } => dir,
+        };
+        match engine {
+            Engine::Unity => dir.join(PLAYER_LOG),
+            Engine::Waylith => dir.join(WAYLITH_LOG_DIR).join(PLAYER_LOG),
         }
     }
 
-    fn stored_dir(&self) -> Option<&Path> {
+    /// The profile's own folder; `None` for Default, which has none.
+    pub fn stored_dir(&self) -> Option<&Path> {
         match &self.location {
             Location::Default { .. } => None,
             Location::Stored { dir } => Some(dir),
@@ -667,7 +678,10 @@ mod tests {
         assert_eq!(d.mode, Mode::Live);
         assert_eq!(d.savedatafolder_arg(), None);
         assert_eq!(d.save_data_dir(), tmp.path().join("game-save"));
-        assert_eq!(d.log_path(), tmp.path().join("game-save").join(PLAYER_LOG));
+        assert_eq!(
+            d.log_path(Engine::Unity),
+            tmp.path().join("game-save").join(PLAYER_LOG)
+        );
     }
 
     #[test]
@@ -734,5 +748,35 @@ mod tests {
         let dir = tmp.path().join("profiles/run");
         assert_eq!(p.mods_dir(), Some(dir.join(MODS)));
         assert_eq!(p.log_file(), Some(dir.join(PLAYER_LOG)));
+    }
+
+    #[test]
+    fn v67_log_path_per_engine() {
+        let dir = PathBuf::from("/profiles/p");
+        let save = PathBuf::from("/home/u/.config/unity3d/x");
+        let stored = Profile {
+            id: ProfileId::parse("p").expect("id"),
+            name: "P".into(),
+            mode: Mode::Live,
+            location: Location::Stored { dir: dir.clone() },
+        };
+        let default = Profile {
+            id: ProfileId::default_id(),
+            name: "Default".into(),
+            mode: Mode::Live,
+            location: Location::Default {
+                save_dir: save.clone(),
+            },
+        };
+        assert_eq!(stored.log_path(Engine::Unity), dir.join("Player.log"));
+        assert_eq!(default.log_path(Engine::Unity), save.join("Player.log"));
+        assert_eq!(
+            stored.log_path(Engine::Waylith),
+            dir.join("Logs/Player.log")
+        );
+        assert_eq!(
+            default.log_path(Engine::Waylith),
+            save.join("Logs/Player.log")
+        );
     }
 }

@@ -32,15 +32,18 @@ fail() {
   failed=1
 }
 
-# run <offline|live> <app dll>: fresh profile dir $p; OFFLINE sets RWPM_MODS_DIR=$p/Mods.
+# run <offline|livelog|none> <app dll>: fresh profile dir $p. offline: RWPM_MODS_DIR=$p/Mods
+# + RWPM_LOG_DIR=$p (OFFLINE profile); livelog: RWPM_LOG_DIR=$p only (LIVE profile); none:
+# neither (Default, or a game started without rwpm).
 # Sets $out (stdout), $code, $log.
 run() {
   p="$(mktemp -d "$OUT/runs/XXXXXX")"
   log="$p/payload.log"
   local env=(DOTNET_STARTUP_HOOKS="$HOOK" RWPM_PAYLOAD_LOG="$log")
-  [[ "$1" == live ]] || env+=(RWPM_MODS_DIR="$p/Mods")
+  [[ "$1" != offline ]] || env+=(RWPM_MODS_DIR="$p/Mods")
+  [[ "$1" == none ]] || env+=(RWPM_LOG_DIR="$p")
   set +e
-  out="$(env -u RWPM_MODS_DIR "${env[@]}" dotnet "$2" 2>"$p/stderr")"
+  out="$(env -u RWPM_MODS_DIR -u RWPM_LOG_DIR "${env[@]}" dotnet "$2" 2>"$p/stderr")"
   code=$?
   set -e
   touch "$log"
@@ -75,12 +78,21 @@ grep -qF "not RimWorld; nothing to do" "$log" || fail "no guard line in log"
 [[ ! -e "$p/Mods" ]] || fail "helper created a Mods dir"
 done_case
 
-start V65_live_noop
-run live "$OUT/game/RimWorld.dll"
+start V67_live_log_only
+run livelog "$OUT/game/RimWorld.dll"
 [[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
-has "$out" "mods=$OUT/game/Mods" || fail "LIVE run redirected: $out"
-has "$out" "logdir=$OUT/game/default-logs" || fail "LIVE run moved the log: $out"
-grep -qF "no RWPM_MODS_DIR; nothing to do" "$log" || fail "no LIVE line in log"
+has "$out" "logdir=$p" || fail "LIVE log not moved: $out"
+has "$out" "mods=$OUT/game/Mods" || fail "LIVE run redirected mods: $out"
+[[ ! -e "$p/Mods" ]] || fail "LIVE run created a Mods dir"
+! grep -qF "patched" "$log" || fail "LIVE run patched GenFilePaths"
+done_case
+
+start V65_no_env_noop
+run none "$OUT/game/RimWorld.dll"
+[[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
+has "$out" "mods=$OUT/game/Mods" || fail "run redirected mods: $out"
+has "$out" "logdir=$OUT/game/default-logs" || fail "run moved the log: $out"
+grep -qF "no RWPM_MODS_DIR or RWPM_LOG_DIR; nothing to do" "$log" || fail "no no-op line in log"
 done_case
 
 start V26_fail_closed

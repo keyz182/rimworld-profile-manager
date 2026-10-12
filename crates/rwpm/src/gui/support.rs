@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use rwpm_core::discovery::GameInstall;
+use rwpm_core::discovery::{Engine, GameInstall};
 use rwpm_core::profile::Profile;
 
 /// Only the end of a long game log is useful; keep the paste a sane size.
@@ -22,14 +22,18 @@ pub fn support_text(profile: &Profile, game: Option<&GameInstall>) -> String {
         game.and_then(|g| g.version.clone())
             .unwrap_or_else(|| "not found".into()),
     );
-    let dir = profile.log_path().parent().map(Path::to_path_buf);
-    if let (false, Some(dir)) = (profile.is_default(), dir) {
+    if let Some(dir) = profile.stored_dir() {
         for name in ["rwpm.log", "payload.log"] {
             section(&mut out, name, &dir.join(name));
         }
     }
-    section(&mut out, "Player.log", &profile.log_path());
+    section(&mut out, "Player.log", &profile.log_path(engine(game)));
     out
+}
+
+/// The engine whose log path applies (V67): the found game's, else Unity's.
+pub fn engine(game: Option<&GameInstall>) -> Engine {
+    game.map_or(Engine::Unity, GameInstall::engine)
 }
 
 fn section(out: &mut String, name: &str, path: &Path) {

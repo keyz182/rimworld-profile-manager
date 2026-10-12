@@ -128,7 +128,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
     }
 
     // V15: a stored (non-Default) profile's log sits beside SaveData, not inside it.
-    let player_log = profile.log_path();
+    let player_log = profile.log_path(rwpm_core::discovery::Engine::Unity);
     assert!(
         player_log.is_file(),
         "no Player.log at {}",
