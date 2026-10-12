@@ -34,9 +34,14 @@ impl RunningProbe for ProcessProbe {
     }
 }
 
-/// Executable names of the game on Linux and Windows. `RimWorld`: the Linux 1.7 (Waylith)
-/// exe (V69), so the one-game check (V11) and the exit wait (V17) see 1.7 too.
-pub const GAME_PROCESS_NAMES: [&str; 3] = ["RimWorldLinux", "RimWorldWin64.exe", "RimWorld"];
+/// Executable names of the game on Linux and Windows. `RimWorld` / `RimWorld.exe`: the 1.7
+/// (Waylith) exes (V69, B13), so the one-game check (V11) and the exit wait (V17) see 1.7 too.
+pub const GAME_PROCESS_NAMES: [&str; 4] = [
+    "RimWorldLinux",
+    "RimWorldWin64.exe",
+    "RimWorld",
+    "RimWorld.exe",
+];
 
 /// Is any RimWorld process alive (whatever its profile, launched by us or not)?
 /// V11: profiles share `temporaryCachePath`, so only one game may run at once.
@@ -107,5 +112,10 @@ mod tests {
         let _ = child.kill();
         let _ = child.wait();
         assert!(seen, "probe did not see a process named RimWorld");
+    }
+
+    #[test]
+    fn v69_process_names_cover_windows_waylith() {
+        assert!(GAME_PROCESS_NAMES.contains(&"RimWorld.exe"));
     }
 }
