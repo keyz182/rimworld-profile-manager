@@ -5,7 +5,7 @@ branch_whitelist = ["main"]
 ignore_merge_commits = true
 pre_bump_hooks = [
   # The workspace version (first `version =` in Cargo.toml is [workspace.package]).
-  "sed -i '0,/^version = \".*\"/s//version = \"{{version}}\"/' Cargo.toml",
+  "perl -0777 -i -pe 's/^version = \".*\"/version = \"{{version}}\"/m' Cargo.toml",
   "cargo update --workspace",
 ]
 post_bump_hooks = []
