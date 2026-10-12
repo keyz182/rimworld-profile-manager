@@ -216,6 +216,7 @@ pub const NO_GAME: &str = "RimWorld was not found. Choose its folder in Settings
 pub const NO_RIMSORT: &str = "RimSort's folder was not found.";
 pub const NO_RIMSORT_CONSENT: &str = "Permission to change RimSort's settings is missing.";
 pub const BAD_LAUNCH_FOLDER: &str = "This tool's folder cannot be used in a launch command.";
+pub const NO_LAUNCHER: &str = "Steam and RimSort need this app's launcher, which could not be set up. Close this app and open it again to retry.";
 
 /// "1 mod", "3 mods".
 pub fn count(n: usize, one: &str, many: &str) -> String {
@@ -545,6 +546,13 @@ pub fn moved(to: &Path, readd: &[String]) -> String {
         ));
     }
     line
+}
+
+pub fn appimage_launcher_failed(reason: &str) -> String {
+    format!(
+        "This app could not copy its launcher out of the AppImage ({reason}). \
+         Launching from Steam will not work."
+    )
 }
 
 pub fn launcher_failed(reason: &str) -> String {

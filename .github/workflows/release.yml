@@ -115,6 +115,9 @@ jobs:
       - run: scripts/package.sh "$OS"
         env:
           OS: ${{ matrix.os }}
+      - name: Linux AppImage
+        if: matrix.os == 'linux'
+        run: scripts/appimage.sh target/dist/rwpm-*-linux-x86_64/
       - name: Windows installer
         if: matrix.os == 'windows'
         run: scripts/installer.sh target/dist/rwpm-*-windows-x86_64/
@@ -125,6 +128,7 @@ jobs:
             target/dist/*.tar.gz
             target/dist/*.zip
             target/dist/*-setup.exe
+            target/dist/*.AppImage
           if-no-files-found: error
 
   publish:

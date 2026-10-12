@@ -39,7 +39,7 @@ desktop app (Linux + Windows) manage RimWorld profiles: create/clone/delete/rena
 - copy settings groups (src save-data dir → target): mod list (`Config/ModsConfig.xml`) \| game settings (`Config/Prefs.xml`, `Config/KeyPrefs.xml`) \| mod settings (rest of `Config/`) \| creations (`Scenarios/`, `Ideos/`, `Xenotypes/`, `ExportedPawns/`) \| mod data (other top-level save-data folders). ⊥ `Saves/` (Copy profile does that). default ticked: first 4; mod data unticked.
 - copy settings offered: New profile "Start from" (profile \| empty); first-run setup copies from Default w/ default groups, ⊥ question; More → "Copy settings from…" (same ticks). OFFLINE target: mod list copied as is, Health offers Freeze them. Default = source only.
 - ?mod_settings_elsewhere: some mods may keep settings outside save data → ⊥ follow; check if a player reports it.
-- repo: private GitHub `keyz182/rimworld-profile-manager`. commits = conventional (Angular types: feat fix docs style refactor perf test build ci chore revert), checked on PRs + local `commit-msg` hook (`cog install-hook --all`). push to main → CI (fmt, clippy Linux + windows-gnu, tests) → `cog bump --auto` (tag `vX.Y.Z`, CHANGELOG) when feat/fix since last tag → Linux (soldier) + Windows bundles → GitHub Release; bundles built before the atomic push of bump commit + tag. actions pinned by SHA (≥2 weeks old), zizmor clean.
+- repo: private GitHub `keyz182/rimworld-profile-manager`. commits = conventional (Angular types: feat fix docs style refactor perf test build ci chore revert), checked on PRs + local `commit-msg` hook (`cog install-hook --all`). push to main → CI (fmt, clippy Linux + windows-gnu, tests) → `cog bump --auto` (tag `vX.Y.Z`, CHANGELOG) when feat/fix since last tag → Linux (soldier) + Windows legs in parallel, cached → GitHub Release: Linux tar.gz + AppImage (V38), Windows zip + per-user setup.exe (V39); all built before the atomic push of bump commit + tag. actions pinned by SHA (≥2 weeks old), zizmor clean.
 
 ## §I INTERFACES
 - cmd: `rwpm run [--from rimsort] <profile-id> -- <game exe> [args…]` → builds env/args for profile mode + OS, spawns game, waits through in-game Restart (V17), exit code = first game process's. `%command%`-compatible (Steam, RimSort). profile-id = stable profile dir name ≠ display name = slug of first name (`[a-z0-9-]`, ≤ 40, `-N` on collision, `default` reserved); ⊥ `=`, ⊥ whitespace. OFFLINE ∧ guard (V5) trips → small native dialog (Linux zenity, Windows PowerShell WinForms) before spawn: Add to profile (copy now) \| Turn off (drop from activeMods) \| Launch anyway \| Cancel (⊥ launch); dialog unavailable → launch + log to `<profile>/rwpm.log`. Linux OFFLINE: game argv[0] = rwpm; rwpm w/ env `RWPM_RESTART=<profile-id>` + `RWPM_GAME_EXE` + game args → restart mode: rebuild launch, exec game (⊥ lock, ⊥ guard).
@@ -51,7 +51,7 @@ desktop app (Linux + Windows) manage RimWorld profiles: create/clone/delete/rena
 - dir: profiles root default — Linux `~/.local/share/<app>/profiles` (Flatpak Steam layout, V31: `~/.var/app/com.valvesoftware.Steam/data/<app>/profiles`), Windows `%LOCALAPPDATA%\<app>\profiles`. `<app>` = `RimWorld Profile Manager`. Delete → OS recycle bin.
 - file: game default save dir — Linux `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios` (Flatpak Steam: `~/.var/app/com.valvesoftware.Steam/config/unity3d/…`), Windows `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`.
 - file: payload `Rwpm.Payload.dll` (net48, entry `Doorstop.Entrypoint.Start`, ⊥ game refs) + UnityDoorstop libs shipped beside app. channel: env `RWPM_MODS_DIR` (absent → no-op), optional `RWPM_PAYLOAD_LOG`.
-- dir: Flatpak Steam launcher copy `<app data>/bin/{rwpm, payload/Rwpm.Payload.dll, doorstop/libdoorstop.so}` (V31); Steam launch line + RimSort run_args name it
+- dir: launcher copy `<app data>/bin/{rwpm, payload/Rwpm.Payload.dll, doorstop/libdoorstop.so}` — Flatpak Steam (V31) ∨ AppImage (V38); Steam launch line + RimSort run_args + Play name it
 - file: RimSort `settings.json` `instances.<name>` — {game_folder, config_folder=`<profile>/SaveData/Config`, local_folder=`<profile>/Mods` \| `<install>/Mods` (LIVE), workshop_folder, run_args=`<rwpm> run <profile-id> -- %command%` (str), steam_client_integration=true, launch_via_steam_protocol=false}. location = platformdirs user_data_dir (RimSort d2454505).
 
 ## §R RESEARCH
@@ -118,6 +118,8 @@ V34: core tasks within step budgets — headless iced_test counts steps (step = 
 V35: 1 check (`rimsort::runs_profile`) decides whether a RimSort instance is ours — export, Move's stale list, health; accepts every `run_args` form this tool has written (with \| without `--from rimsort`)
 V36: go OFFLINE on a profile without a mod list (new profile) → nothing to freeze, mode → OFFLINE, ⊥ dialog; mods turned on later are caught by the launch guard (V5)
 V37: copy settings: ⊥ copies `Saves/`; ⊥ writes Default (game's own dir); same-name target file \| folder → recycle bin before replace, target-only kept; refused while any RimWorld runs (V11 detection)
+V38: AppImage: GUI exe under `$APPDIR` → sync launcher copy to `<app data>/bin` (as V31) ∧ every launch line names copy, ⊥ mount path; `APPDIR` (resolved) set but exe outside it (inherited by Steam/game) → ignored; copy failed → ⊥ Steam line ∧ ⊥ RimSort export (Play ok); last AppImage started wins the copy (older one can downgrade it)
+V39: Windows installer (NSIS, per-user, no admin): default `%LOCALAPPDATA%\Programs\<app>` ≠ app data dir; ⊥ change any file while `rwpm.exe` ∨ `payload\Rwpm.Payload.dll` in use (Retry/Cancel; silent → exit 2); upgrade → same folder (HKCU InstallLocation); subfolders emptied only when `rwpm.exe` present; uninstall ⊥ touches app data ∨ game folder
 
 ## §T TASKS
 id|status|task|cites
@@ -155,6 +157,8 @@ T31|x|redesign gate: step-count task tests (V34), light+dark PNG snapshots ∀ s
 T32|x|research ?gamepad: iced 0.14 focus/gamepad on Steam Deck Game Mode + full Tab traversal over buttons; report cost — A/B/C with costs, rec A|-
 T33|x|copy settings core (groups, recycle-bin replace, Default ⊥ target, refuse while running) + GUI: New profile Start from, setup seeding from Default, More → Copy settings from… w/ 5 tick groups; tests — staged copy (review H1), sizes per group (M1), stale staging binned (M2); New starts from Default by default, Empty skips; nothing to copy → ⊥ job|V37,V34
 T34|x|health: profile w/ only game content (`ludeon.rimworld*`) or no mod list, while Default has other mods → "Only the game's own content…" + Copy settings from…; setup keeps a refused copy's error in view (found by test while a game ran)|V37
+T35|x|Linux AppImage: `scripts/appimage.sh` (appimagetool 1.9.1 + type2-runtime 20251108, sha256-pinned, extract-and-run), `appimage::mount_dir`; launcher copy checked byte-equal 2026-10-12; live Steam launch from AppImage unverified|V38
+T36|x|Windows installer: `packaging/windows/rwpm.nsi` + `scripts/installer.sh` (makensis -WX), release ships setup.exe; VM 2026-10-12: install/upgrade/custom folder/in-use refuse/uninstall 32 checks pass; e2e restart from spaced app path pass|V39
 
 ## §B BUGS
 id|date|cause|fix

@@ -543,7 +543,10 @@ impl App {
         }
     }
 
-    fn export_job(&mut self, settings: PathBuf) -> Task<Message> {
+    pub(super) fn export_job(&mut self, settings: PathBuf) -> Task<Message> {
+        if self.ctx.launcher_failed {
+            return self.fail(t::NO_LAUNCHER);
+        }
         let Ok(game) = self.game.clone() else {
             return self.no_game();
         };
@@ -656,6 +659,9 @@ impl App {
     }
 
     fn copy_launch_options(&mut self) -> Task<Message> {
+        if self.ctx.launcher_failed {
+            return self.fail(t::NO_LAUNCHER);
+        }
         let Some(line) = self.launch_options() else {
             return self.fail(t::BAD_LAUNCH_FOLDER);
         };

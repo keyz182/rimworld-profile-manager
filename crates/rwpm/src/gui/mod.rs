@@ -25,7 +25,7 @@ use rwpm_core::discovery::GameInstall;
 use rwpm_core::paths::Layout;
 use rwpm_core::profile::{LastRun, OsTrash, Profile, ProfileId, ProfileStore};
 use rwpm_core::settings::AppSettings;
-use rwpm_core::{ProfileError, flatpak, paths};
+use rwpm_core::{ProfileError, appimage, flatpak, paths};
 
 pub use message::Dialog;
 
@@ -35,10 +35,14 @@ pub struct Ctx {
     pub app_dir: PathBuf,
     pub game_save_dir: PathBuf,
     /// `rwpm` itself, for launching (`rwpm run`) and RimSort's run_args. With Flatpak
-    /// Steam: the copy in `<app data>/bin`, which Steam's sandbox can see (V31).
+    /// Steam: the copy in `<app data>/bin`, which Steam's sandbox can see (V31). From an
+    /// AppImage: the same copy, since the AppImage's own folder goes when it exits.
     pub exe: PathBuf,
     /// With Flatpak Steam: the `flatpak` program; Play then runs rwpm in Steam's sandbox.
     pub flatpak: Option<PathBuf>,
+    /// The launcher copy failed: `exe` is a path Steam cannot use (Flatpak) or that goes
+    /// when this app exits (AppImage), so nothing may save it (V38).
+    pub launcher_failed: bool,
 }
 
 impl Ctx {
@@ -49,6 +53,7 @@ impl Ctx {
             game_save_dir: paths::default_game_save_dir().ok_or("no game save folder")?,
             exe: std::env::current_exe().map_err(|e| e.to_string())?,
             flatpak: None,
+            launcher_failed: false,
         };
         let mut notes = Vec::new();
         if paths::layout() == Layout::FlatpakSteam {
@@ -58,7 +63,18 @@ impl Ctx {
                     ctx.exe = copy;
                     ctx.flatpak = Some("flatpak".into());
                 }
-                Err(e) => notes.push(text::launcher_failed(&e.to_string())),
+                Err(e) => {
+                    ctx.launcher_failed = true;
+                    notes.push(text::launcher_failed(&e.to_string()));
+                }
+            }
+        } else if let Some(mount) = appimage::current() {
+            match flatpak::sync_launcher(&mount, &ctx.app_dir.join("bin")) {
+                Ok(copy) => ctx.exe = copy,
+                Err(e) => {
+                    ctx.launcher_failed = true;
+                    notes.push(text::appimage_launcher_failed(&e.to_string()));
+                }
             }
         }
         Ok((ctx, (!notes.is_empty()).then(|| notes.join("\n"))))

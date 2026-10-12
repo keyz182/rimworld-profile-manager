@@ -59,6 +59,7 @@ impl Sandbox {
             game_save_dir: self.path("game-save"),
             exe: self.path("rwpm"),
             flatpak: None,
+            launcher_failed: false,
         }
     }
 
@@ -401,6 +402,8 @@ fn render_screens_manual() {
     shot(&app, "01-main-default");
     let _ = app.update(Message::New);
     shot(&app, "02-name-dialog");
+    // Start empty: a copy from Default runs as a job, and the screens below need none.
+    let _ = app.update(Message::CopyFrom(None));
     let _ = app.update(Message::Input(Field::Name, "Modded Run".into()));
     let _ = app.update(Message::Confirm);
     shot(&app, "03-main-live");
@@ -579,6 +582,22 @@ fn steam_launch_options_shown_and_copyable() {
     );
     let _ = app.update(Message::CopyLaunchOptions);
     assert!(matches!(&app.notice, Some(Notice::Info(n)) if n.contains("Launch options")));
+}
+
+/// V38: a failed launcher copy (AppImage, Flatpak) never hands out a launch line or
+/// writes RimSort's settings, since the path in them would not work.
+#[test]
+fn failed_launcher_copy_refuses_launch_line_and_rimsort() {
+    let sb = Sandbox::new();
+    let mut ctx = sb.ctx();
+    ctx.launcher_failed = true;
+    let mut app = App::new(ctx);
+    let _ = app.update(Message::CopyLaunchOptions);
+    assert_eq!(app.notice, Some(Notice::Error(text::NO_LAUNCHER.into())));
+    app.notice = None;
+    let _ = app.export_job(sb.path("rimsort/settings.json"));
+    assert_eq!(app.notice, Some(Notice::Error(text::NO_LAUNCHER.into())));
+    assert!(app.job.is_none(), "no RimSort job started");
 }
 
 /// V34 B5: set up a Steam launch in ≤ 3 steps (select, Set up Steam, Copy line).
