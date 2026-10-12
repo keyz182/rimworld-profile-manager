@@ -157,7 +157,7 @@ T31|x|redesign gate: step-count task tests (V34), light+dark PNG snapshots ∀ s
 T32|x|research ?gamepad: iced 0.14 focus/gamepad on Steam Deck Game Mode + full Tab traversal over buttons; report cost — A/B/C with costs, rec A|-
 T33|x|copy settings core (groups, recycle-bin replace, Default ⊥ target, refuse while running) + GUI: New profile Start from, setup seeding from Default, More → Copy settings from… w/ 5 tick groups; tests — staged copy (review H1), sizes per group (M1), stale staging binned (M2); New starts from Default by default, Empty skips; nothing to copy → ⊥ job|V37,V34
 T34|x|health: profile w/ only game content (`ludeon.rimworld*`) or no mod list, while Default has other mods → "Only the game's own content…" + Copy settings from…; setup keeps a refused copy's error in view (found by test while a game ran)|V37
-T35|x|Linux AppImage: `scripts/appimage.sh` (appimagetool 1.9.1 + type2-runtime 20251108, sha256-pinned, extract-and-run), `appimage::mount_dir`; launcher copy checked byte-equal 2026-10-12; live Steam launch from AppImage unverified|V38
+T35|x|Linux AppImage: `scripts/appimage.sh` (appimagetool 1.9.1 + type2-runtime 20251108, sha256-pinned, extract-and-run), `appimage::mount_dir`; launcher copy checked byte-equal 2026-10-12; live 2026-10-12 (v1.1.0 release AppImage, native Steam, OFFLINE): Steam Play ran `<app data>/bin/rwpm`, AppImage closed + mount gone before in-game Restart, redirect held both loads, last-run started_by=steam exit 0|V38
 T36|x|Windows installer: `packaging/windows/rwpm.nsi` + `scripts/installer.sh` (makensis -WX), release ships setup.exe; VM 2026-10-12: install/upgrade/custom folder/in-use refuse/uninstall 32 checks pass; e2e restart from spaced app path pass|V39
 
 ## §B BUGS
