@@ -13,6 +13,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use rwpm_core::ProfileError;
+use rwpm_core::discovery::{Engine, engine_of};
 use rwpm_core::launch::{self, LaunchPlan, Os, PayloadFiles};
 use rwpm_core::paths;
 use rwpm_core::profile::last_run::{self, LastRun, RunOutcome, StartedBy};
@@ -143,7 +144,10 @@ fn launch(
         return Ok(Ended::Cancelled);
     }
     let mut payload = payload_files().map_err(RunError::Failed)?;
-    if profile.mode == Mode::Offline && Os::current() == Os::Windows {
+    let engine = launch::game_program(command)
+        .and_then(|p| Path::new(p).parent())
+        .map_or(Engine::Unity, engine_of);
+    if launch::needs_game_folder_loader(profile.mode, Os::current(), engine) {
         payload.chain_target = windows_loader(profile, command)?;
     }
     let plan = launch::build(profile, command, &payload, Os::current(), &|k| {

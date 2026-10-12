@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use iced::Task;
 use rwpm_core::consent::{ConsentStore, Scope};
-use rwpm_core::launch::Os;
+use rwpm_core::launch::{self, Os};
 use rwpm_core::profile::guard::{self, GuardReport};
 use rwpm_core::profile::offline::{self, OfflinePlan};
 use rwpm_core::profile::relocate::{self, MovePlan};
@@ -476,8 +476,8 @@ impl App {
         let Ok(game) = self.game.clone() else {
             return self.no_game();
         };
-        let offline = self.current().is_some_and(|p| p.mode == Mode::Offline);
-        if offline && Os::current() == Os::Windows {
+        let mode = self.current().map_or(Mode::Live, |p| p.mode);
+        if launch::needs_game_folder_loader(mode, Os::current(), game.engine()) {
             match winhttp::launch_check(&game.game_dir, &self.ctx.app_dir) {
                 Ok(_) => {}
                 Err(winhttp::WinhttpError::NotInstalled) => {

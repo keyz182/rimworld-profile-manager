@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use crate::discovery::GameInstall;
-use crate::launch::Os;
+use crate::launch::{self, Os};
 use crate::profile::{Mode, Profile, ProfileStore, Trash, guard};
 use crate::{rimsort, winhttp};
 
@@ -65,7 +65,7 @@ pub fn check<T: Trash>(
             problems.push(Problem::NotInstalled(report.missing));
         }
     }
-    if offline && os == Os::Windows {
+    if !profile.is_default() && launch::needs_game_folder_loader(profile.mode, os, game.engine()) {
         match winhttp::launch_check(&game.game_dir, app_dir) {
             Ok(_) => {}
             Err(winhttp::WinhttpError::Foreign) => problems.push(Problem::LoaderForeign),
@@ -246,5 +246,15 @@ mod tests {
             Os::Linux,
         );
         assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn v70_waylith_offline_windows_no_loader_problem() {
+        let w = World::new();
+        let p = w.offline(&[]);
+        std::fs::create_dir_all(w.path("game")).expect("game");
+        std::fs::write(w.path("game/Waylith.dll"), "").expect("marker");
+        let problems = check(&w.store(), &p, &w.game(), &w.path("app"), None, Os::Windows);
+        assert!(problems.is_empty(), "{problems:?}");
     }
 }

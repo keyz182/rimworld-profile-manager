@@ -161,6 +161,12 @@ fn is_start_script(arg: &OsString) -> bool {
     Path::new(arg).file_name() == Some(OsStr::new(LINUX_START_SCRIPT))
 }
 
+/// V70: the game-folder loader (`winhttp.dll`, T12) is for Windows OFFLINE on Unity only;
+/// 1.7 (Waylith) takes the startup hook instead and must never get it.
+pub fn needs_game_folder_loader(mode: Mode, os: Os, engine: Engine) -> bool {
+    mode == Mode::Offline && os == Os::Windows && engine == Engine::Unity
+}
+
 /// The game's own program in `%command%`: the start script or the Waylith exe behind any
 /// wrappers (V69), else the first.
 pub fn game_program(command: &[OsString]) -> Option<&OsString> {
@@ -1482,5 +1488,22 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (exe, command) = waylith_chain(tmp.path(), &["-popupwindow"]);
         assert_eq!(game_program(&command), Some(&exe.into_os_string()));
+    }
+
+    #[test]
+    fn v70_game_folder_loader_only_for_windows_offline_unity() {
+        for mode in [Mode::Live, Mode::Offline] {
+            for os in [Os::Linux, Os::Windows, Os::MacOs] {
+                for engine in [Engine::Unity, Engine::Waylith] {
+                    let want =
+                        mode == Mode::Offline && os == Os::Windows && engine == Engine::Unity;
+                    assert_eq!(
+                        needs_game_folder_loader(mode, os, engine),
+                        want,
+                        "{mode:?} {os:?} {engine:?}"
+                    );
+                }
+            }
+        }
     }
 }

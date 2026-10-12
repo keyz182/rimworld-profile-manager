@@ -187,6 +187,7 @@ V66: Waylith in-game Restart → redirect holds in restarted process (payload lo
 V67: Waylith launch ⊥ `-logFile`; stored profile (LIVE + OFFLINE): `RWPM_LOG_DIR=<profile>` → hook calls `FileLog.SetDirectory` before Main ∴ log = `<profile>/Logs/Player.log`, Default's `Logs/` untouched (R41, B10); Default: `<default save dir>/Logs/Player.log`; Open log / Copy log / health / last-run read the per-engine path
 V68: Waylith: `rwpm run` ! wait for the Restart replacement (process w/ `-WaitForExitingPid=<child pid>`, R40) before releasing `run.lock` \| writing last-run `exit`; test: fixture parent exits + replacement lives → lock held until replacement exits (B11)
 V69: Waylith install = `<dir>/Waylith.dll` beside game exe (Linux `<dir>/RimWorld`, Windows `<dir>/RimWorld.exe`) ! accepted by discovery (exe = that file, engine = Waylith); `game_program` ! pick that exe from a wrapped `%command%`; process probe ! count `RimWorld` + `RimWorld.exe` as a game (V11, V17)
+V70: game-folder loader (`winhttp.dll`) needed iff Windows ∧ OFFLINE ∧ engine = Unity; one rule (`launch::needs_game_folder_loader`) used by `rwpm run`, GUI Play consent, health ∴ Waylith ⊥ check, ⊥ consent, ⊥ LoaderMissing
 
 ## §T TASKS
 id|status|task|cites
@@ -276,3 +277,4 @@ B10|2026-10-12|V67 assumed Waylith log follows `-savedatafolder` → `<save data
 B11|2026-10-12|Waylith Restart replacement detaches (`setsid`, reparented, R40) ∴ launcher's wait ends at first exit → `rwpm run` would drop `run.lock` + write last-run exit mid-session|V68
 B12|2026-10-12|1.7 install has ⊥ `RimWorldLinux` (R37): discovery rejects game dir (guard + app can't find game), process probe misses `RimWorld` ∴ V11 one-game check + V17 exit wait blind on 1.7|V69
 B13|2026-10-12|Windows 1.7 exe = `RimWorld.exe` (⊥ `RimWorldWin64.exe`, T67): V69 fix was Linux-only ∴ discovery + process probe blind on Windows 1.7|V69
+B14|2026-10-12|Windows OFFLINE loader rule (T12) applied to 1.7: `rwpm run` refused "need the game-folder loader", GUI would ask to install `winhttp.dll`, health flags LoaderMissing (T67)|V70
