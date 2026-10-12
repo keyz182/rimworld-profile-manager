@@ -35,7 +35,7 @@ VIAddVersionKey "LegalCopyright" "keyz182"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Start ${APP}"
-!define MUI_UNCONFIRMPAGE_TEXT_TOP "Your profiles and saves stay in $LOCALAPPDATA\${APP}.$\r$\n$\r$\nBefore you uninstall, use Remove loader in ${APP} and clear RimWorld's launch options in Steam. If you do not, Steam cannot start the game."
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "Your profiles and saves stay in $LOCALAPPDATA\${APP}.$\r$\n$\r$\nBefore you uninstall, select More, then Remove from game folder in ${APP}, and clear RimWorld's launch options in Steam. If you do not, Steam cannot start the game."
 
 !insertmacro MUI_PAGE_LICENSE "${SRC}\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
