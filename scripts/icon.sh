@@ -6,6 +6,10 @@ set -euo pipefail
 
 dir="$(cd "$(dirname "$0")/.." && pwd)/crates/rwpm/assets/icon"
 svg="$dir/rwpm.svg"
+command -v magick >/dev/null || {
+  echo "icon.sh: ImageMagick 7 (magick) not found; install it first" >&2
+  exit 1
+}
 
 render() { # size output
   magick -background none -density 384 "$svg" -resize "$1x$1" "$2"
