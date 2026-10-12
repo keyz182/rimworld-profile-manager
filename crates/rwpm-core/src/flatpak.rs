@@ -2,6 +2,11 @@
 //! `~/.var/app/com.valvesoftware.Steam`, at the same absolute paths. So with Flatpak Steam
 //! this app keeps its data there, Steam launches a copy of rwpm kept there, and the
 //! app's own Play goes through `flatpak run` so the game can reach Steam.
+//!
+//! `sync_launcher` is also reused outside Flatpak: by an AppImage mount (V38) and by a
+//! macOS `.app` bundle (V46/R30) — both need a stable on-disk copy of the binary for the
+//! same underlying reason (a transient or translocated run location Steam/RimSort can't
+//! keep naming).
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -9,12 +14,19 @@ use std::process::Command;
 
 pub const STEAM_APP: &str = "com.valvesoftware.Steam";
 
-/// Files rwpm needs beside it: the payload and Doorstop (payload_files in rwpm run).
-const LAUNCHER_FILES: [&str; 3] = [
-    "rwpm",
-    "payload/Rwpm.Payload.dll",
-    "doorstop/libdoorstop.so",
-];
+/// Files rwpm needs beside it: the payload and Doorstop (`payload_files` in `rwpm run`).
+/// macOS's loader is `libdoorstop.dylib`, not `.so` (R26).
+fn launcher_files() -> [&'static str; 3] {
+    [
+        "rwpm",
+        "payload/Rwpm.Payload.dll",
+        if cfg!(target_os = "macos") {
+            "doorstop/libdoorstop.dylib"
+        } else {
+            "doorstop/libdoorstop.so"
+        },
+    ]
+}
 
 /// `<home>/.var/app/com.valvesoftware.Steam`: Flatpak Steam's home inside the sandbox.
 pub fn steam_home(home: &Path) -> PathBuf {
@@ -30,7 +42,7 @@ pub fn in_sandbox() -> bool {
 /// only files that differ, each via a temp file + rename (a running copy keeps its file).
 /// → `<to>/rwpm`, the program Steam's launch options name.
 pub fn sync_launcher(from: &Path, to: &Path) -> io::Result<PathBuf> {
-    for rel in LAUNCHER_FILES {
+    for rel in launcher_files() {
         let (src, dst) = (from.join(rel), to.join(rel));
         let new = std::fs::read(&src)?;
         if std::fs::read(&dst).is_ok_and(|old| old == new) {
@@ -70,7 +82,7 @@ mod tests {
     use super::*;
 
     fn bundle(dir: &Path, tag: &str) {
-        for rel in LAUNCHER_FILES {
+        for rel in launcher_files() {
             let p = dir.join(rel);
             std::fs::create_dir_all(p.parent().expect("parent")).expect("dir");
             std::fs::write(&p, format!("{rel}:{tag}")).expect("file");
@@ -83,7 +95,7 @@ mod tests {
         let (app, copy) = (tmp.path().join("app"), tmp.path().join("copy"));
         bundle(&app, "v1");
         assert_eq!(sync_launcher(&app, &copy).expect("sync"), copy.join("rwpm"));
-        for rel in LAUNCHER_FILES {
+        for rel in launcher_files() {
             assert_eq!(
                 std::fs::read_to_string(copy.join(rel)).expect("copied"),
                 format!("{rel}:v1")

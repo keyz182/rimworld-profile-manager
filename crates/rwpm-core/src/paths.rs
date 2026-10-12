@@ -29,7 +29,10 @@ pub struct GameIn {
 /// already keeps its data there. Inside a sandbox the standard folders already are
 /// Flatpak Steam's.
 pub fn decide_layout(in_sandbox: bool, game: GameIn, flatpak_data_exists: bool) -> Layout {
-    if in_sandbox || cfg!(windows) {
+    // V44: macOS has no Flatpak analogue — always Standard. Also true by the match's
+    // fallback arm below (no Flatpak Steam install is ever found there), but spelled out
+    // so the invariant doesn't depend on that happening to be the only unmatched case.
+    if in_sandbox || cfg!(windows) || cfg!(target_os = "macos") {
         return Layout::Standard;
     }
     match (game.native, game.flatpak) {
@@ -43,7 +46,7 @@ pub fn decide_layout(in_sandbox: bool, game: GameIn, flatpak_data_exists: bool) 
 pub fn layout() -> Layout {
     static LAYOUT: OnceLock<Layout> = OnceLock::new();
     *LAYOUT.get_or_init(|| {
-        if flatpak::in_sandbox() || cfg!(windows) {
+        if flatpak::in_sandbox() || cfg!(windows) || cfg!(target_os = "macos") {
             return Layout::Standard;
         }
         let flatpak_data = dirs::home_dir().map(|h| flatpak_app_dir(&h));
@@ -92,11 +95,20 @@ pub fn run_lock_path() -> Option<PathBuf> {
 }
 
 /// The game's own save-data dir, used by the Default profile (§I).
-/// Unity `persistentDataPath`: Windows `AppData\LocalLow\…`, Linux `$XDG_CONFIG_HOME/unity3d/…`;
-/// Flatpak Steam: its sandbox's `$XDG_CONFIG_HOME`.
+/// Unity `persistentDataPath`: Windows `AppData\LocalLow\…`, Linux `$XDG_CONFIG_HOME/unity3d/…`,
+/// macOS `~/Library/Application Support/RimWorld` directly (R16/R29, live-confirmed — NOT
+/// a `unity3d`/`Ludeon Studios` subpath, unlike the other two); Flatpak Steam: its
+/// sandbox's `$XDG_CONFIG_HOME`.
 pub fn default_game_save_dir() -> Option<PathBuf> {
     if layout() == Layout::FlatpakSteam {
         return dirs::home_dir().map(|h| flatpak_game_save_dir(&h));
+    }
+    if cfg!(target_os = "macos") {
+        return dirs::home_dir().map(|h| {
+            h.join("Library")
+                .join("Application Support")
+                .join("RimWorld")
+        });
     }
     #[cfg(windows)]
     let base = dirs::home_dir().map(|h| h.join("AppData").join("LocalLow"));
@@ -107,7 +119,7 @@ pub fn default_game_save_dir() -> Option<PathBuf> {
 
 /// The other layout's profiles folder, when it holds profiles this app now ignores.
 pub fn ignored_profiles() -> Option<PathBuf> {
-    if flatpak::in_sandbox() || cfg!(windows) {
+    if flatpak::in_sandbox() || cfg!(windows) || cfg!(target_os = "macos") {
         return None;
     }
     let other = match layout() {
@@ -130,13 +142,23 @@ mod tests {
         assert!(root.ends_with(PathBuf::from(APP_DIR).join("profiles")));
     }
 
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn game_save_dir_ends_with_ludeon_path() {
         let dir = default_game_save_dir().expect("home dir on test host");
         assert!(dir.ends_with(PathBuf::from("Ludeon Studios").join("RimWorld by Ludeon Studios")));
     }
 
-    #[cfg(not(windows))]
+    /// R16/R29/V44, live-confirmed: no `unity3d`/`Ludeon Studios` subpath on macOS.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_game_save_dir_is_application_support_rimworld() {
+        let dir = default_game_save_dir().expect("home dir on test host");
+        assert!(dir.ends_with(PathBuf::from("Application Support").join("RimWorld")));
+        assert!(!dir.to_string_lossy().contains("unity3d"));
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
     #[test]
     fn layout_follows_where_the_game_is() {
         let only = |native, flatpak| GameIn { native, flatpak };
@@ -154,6 +176,24 @@ mod tests {
             assert_eq!(
                 decide_layout(sandbox, only(native, flatpak), exists),
                 want,
+                "{sandbox} {native} {flatpak} {exists}"
+            );
+        }
+    }
+
+    /// V44: macOS has no Flatpak analogue — always Standard, whatever the inputs say.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_layout_is_always_standard() {
+        let only = |native, flatpak| GameIn { native, flatpak };
+        for (sandbox, native, flatpak, exists) in [
+            (false, false, true, false),
+            (false, true, true, true),
+            (true, false, true, true),
+        ] {
+            assert_eq!(
+                decide_layout(sandbox, only(native, flatpak), exists),
+                Layout::Standard,
                 "{sandbox} {native} {flatpak} {exists}"
             );
         }

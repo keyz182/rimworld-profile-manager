@@ -7,7 +7,12 @@ pub const RIMWORLD_APP_ID: u32 = 294100;
 
 #[cfg(windows)]
 pub const GAME_EXE: &str = "RimWorldWin64.exe";
-#[cfg(not(windows))]
+/// R29: the bundle DIRECTORY, not the inner Mach-O — matches R33 (Steam's own
+/// `%command%` names the bundle too); `launch::resolve_macos_bundle` resolves it to the
+/// actual binary at launch time, not here.
+#[cfg(target_os = "macos")]
+pub const GAME_EXE: &str = "RimWorldMac.app";
+#[cfg(not(any(windows, target_os = "macos")))]
 pub const GAME_EXE: &str = "RimWorldLinux";
 
 const VERSION_FILE: &str = "Version.txt";
@@ -20,6 +25,50 @@ pub struct GameInstall {
     pub version: Option<String>,
     /// `None` for a non-Steam install (e.g. GOG): no workshop.
     pub steam: Option<SteamInfo>,
+}
+
+impl GameInstall {
+    /// Is `exe` a macOS `.app` bundle (R29), rather than a flat Linux/Windows binary?
+    /// Decided by `exe`'s own shape, not the host running this code — so a Linux-style
+    /// fixture behaves like Linux everywhere, including in `cargo test` on a Mac.
+    fn is_macos_bundle(&self) -> bool {
+        self.exe.extension().and_then(|e| e.to_str()) == Some("app")
+    }
+
+    /// The game's own read-only content dir (R1 mod discovery, Managed assemblies).
+    /// Linux/Windows: `<game_dir>/Data`, a flat sibling of the exe. macOS: `exe` IS the
+    /// bundle (`<game_dir>/RimWorldMac.app`, R29) and `Data` lives inside it, at
+    /// `Contents/Resources/Data` (GenFilePaths' `UnityData.dataPath`, live-confirmed).
+    pub fn data_dir(&self) -> PathBuf {
+        if self.is_macos_bundle() {
+            self.exe.join("Contents").join("Resources").join("Data")
+        } else {
+            self.game_dir.join("Data")
+        }
+    }
+
+    /// The game's own install Mods dir (LIVE source; V12/V20 install-Mods checks).
+    /// Linux/Windows: `<game_dir>/Mods`. macOS: `<bundle>/Mods` — GenFilePaths walks up
+    /// from `UnityData.dataPath` to the bundle's parent, i.e. the bundle itself (R29).
+    pub fn mods_dir(&self) -> PathBuf {
+        if self.is_macos_bundle() {
+            self.exe.join("Mods")
+        } else {
+            self.game_dir.join("Mods")
+        }
+    }
+
+    /// RimSort's `game_folder` field (T45). Linux/Windows: `game_dir`, the flat install
+    /// root. macOS: the `.app` bundle itself — confirmed live against this machine's real
+    /// `~/Library/Application Support/RimSort/settings.json`, which names the bundle
+    /// path, not its parent (R29 addendum).
+    pub fn rimsort_game_folder(&self) -> &Path {
+        if self.is_macos_bundle() {
+            &self.exe
+        } else {
+            &self.game_dir
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,7 +150,13 @@ pub fn from_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
 
 fn read_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
     let exe = dir.join(GAME_EXE);
-    if !exe.is_file() {
+    // macOS: GAME_EXE is the `.app` bundle, a directory, not a file (R29).
+    let exists = if cfg!(target_os = "macos") {
+        exe.is_dir()
+    } else {
+        exe.is_file()
+    };
+    if !exists {
         return Err(DiscoveryError::NotAGameDir {
             dir: dir.to_path_buf(),
             exe,
@@ -146,8 +201,70 @@ mod tests {
 
     const INSTALL_DIR: &str = "RimWorld";
 
+    fn flat_install() -> GameInstall {
+        GameInstall {
+            game_dir: PathBuf::from("/games/RimWorld"),
+            exe: PathBuf::from("/games/RimWorld/RimWorldLinux"),
+            version: None,
+            steam: None,
+        }
+    }
+
+    fn macos_bundle_install() -> GameInstall {
+        GameInstall {
+            game_dir: PathBuf::from("/games/RimWorld"),
+            exe: PathBuf::from("/games/RimWorld/RimWorldMac.app"),
+            version: None,
+            steam: None,
+        }
+    }
+
+    /// Fixture shape decides branch, not the host running the tests (same principle as
+    /// `resolve_macos_bundle` in launch.rs — a Linux fixture stays Linux everywhere).
+    #[test]
+    fn data_dir_and_mods_dir_flat_vs_bundle() {
+        let flat = flat_install();
+        assert_eq!(flat.data_dir(), PathBuf::from("/games/RimWorld/Data"));
+        assert_eq!(flat.mods_dir(), PathBuf::from("/games/RimWorld/Mods"));
+
+        let bundle = macos_bundle_install();
+        assert_eq!(
+            bundle.data_dir(),
+            PathBuf::from("/games/RimWorld/RimWorldMac.app/Contents/Resources/Data")
+        );
+        assert_eq!(
+            bundle.mods_dir(),
+            PathBuf::from("/games/RimWorld/RimWorldMac.app/Mods")
+        );
+    }
+
+    /// T45, live-confirmed against this machine's real RimSort settings.json: macOS
+    /// `game_folder` names the bundle, not its parent (R29 addendum).
+    #[test]
+    fn rimsort_game_folder_flat_vs_bundle() {
+        assert_eq!(
+            flat_install().rimsort_game_folder(),
+            Path::new("/games/RimWorld")
+        );
+        assert_eq!(
+            macos_bundle_install().rimsort_game_folder(),
+            Path::new("/games/RimWorld/RimWorldMac.app")
+        );
+    }
+
     fn vdf_path(p: &Path) -> String {
         p.display().to_string().replace('\\', "\\\\")
+    }
+
+    /// Writes `GAME_EXE` under `dir` as whatever `read_game_dir` expects to find for this
+    /// host OS — a plain file on Linux/Windows, a bundle DIRECTORY on macOS (R29).
+    fn write_game_exe(dir: &Path) {
+        let exe = dir.join(GAME_EXE);
+        if cfg!(target_os = "macos") {
+            std::fs::create_dir_all(&exe).expect("bundle dir");
+        } else {
+            std::fs::write(&exe, b"").expect("exe");
+        }
     }
 
     /// Builds `<root>/steam` with the given extra libraries. `game_lib` indexes
@@ -179,7 +296,7 @@ mod tests {
             .expect("manifest");
             let game = lib.join("steamapps/common").join(INSTALL_DIR);
             std::fs::create_dir_all(&game).expect("game dir");
-            std::fs::write(game.join(GAME_EXE), b"").expect("exe");
+            write_game_exe(&game);
             std::fs::write(game.join(VERSION_FILE), "1.6.4871 rev598\r\n").expect("version");
         }
         (steam, libs)
@@ -242,7 +359,7 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         let game = tmp.path().join("GOG Games/RimWorld");
         std::fs::create_dir_all(&game).expect("dir");
-        std::fs::write(game.join(GAME_EXE), b"").expect("exe");
+        write_game_exe(&game);
         let gi = from_game_dir(&game).expect("manual");
         assert_eq!(gi.steam, None);
         assert_eq!(gi.version, None);

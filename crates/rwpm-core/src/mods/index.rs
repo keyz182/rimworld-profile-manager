@@ -493,11 +493,7 @@ mod tests {
     fn real_install_resolves_live_modsconfig() {
         let game = crate::discovery::discover(None).expect("discover");
         let ws = game.steam.as_ref().map(|s| s.workshop_dir.clone());
-        let index = ModIndex::scan(
-            &game.game_dir.join("Data"),
-            &game.game_dir.join("Mods"),
-            ws.as_deref(),
-        );
+        let index = ModIndex::scan(&game.data_dir(), &game.mods_dir(), ws.as_deref());
         let config = crate::paths::default_game_save_dir()
             .expect("save dir")
             .join("Config/ModsConfig.xml");

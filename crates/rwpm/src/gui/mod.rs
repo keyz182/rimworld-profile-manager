@@ -76,6 +76,18 @@ impl Ctx {
                     notes.push(text::appimage_launcher_failed(&e.to_string()));
                 }
             }
+        } else if cfg!(target_os = "macos") {
+            // V46/R30: Gatekeeper app translocation makes a bundle's own run location
+            // unstable for an un-notarised .app, same class of problem as the AppImage
+            // mount path above — always sync a copy to a location that stays put.
+            let install = ctx.exe.parent().ok_or("cannot find this app's folder")?;
+            match flatpak::sync_launcher(install, &ctx.app_dir.join("bin")) {
+                Ok(copy) => ctx.exe = copy,
+                Err(e) => {
+                    ctx.launcher_failed = true;
+                    notes.push(text::macos_launcher_failed(&e.to_string()));
+                }
+            }
         }
         Ok((ctx, (!notes.is_empty()).then(|| notes.join("\n"))))
     }

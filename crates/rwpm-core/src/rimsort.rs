@@ -175,7 +175,7 @@ impl Fields<'_> {
     fn build(&self, mut map: Map<String, Value>) -> Result<Map<String, Value>, RimSortError> {
         let local = match (self.profile.mode, self.profile.mods_dir()) {
             (Mode::Offline, Some(dir)) => dir,
-            _ => self.game.game_dir.join("Mods"),
+            _ => self.game.mods_dir(),
         };
         let (workshop, integration) = match &self.game.steam {
             Some(s) => (text(&s.workshop_dir)?, true),
@@ -185,7 +185,7 @@ impl Fields<'_> {
             map.insert(k.to_owned(), v);
         };
         set("name", self.name.into());
-        set("game_folder", text(&self.game.game_dir)?.into());
+        set("game_folder", text(self.game.rimsort_game_folder())?.into());
         set(
             "config_folder",
             text(&self.profile.save_data_dir().join("Config"))?.into(),

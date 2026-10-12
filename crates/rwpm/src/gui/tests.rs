@@ -1,4 +1,7 @@
-#![cfg(unix)]
+// T43: Linux only — fixtures assume `RimWorldLinux`, `start_RimWorld.sh`, zenity, a flat
+// `Mods`/`Data` install layout. Real macOS GUI/launch coverage is T48's e2e against the
+// actual Steam install, not a fake-binary port of this harness.
+#![cfg(target_os = "linux")]
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
