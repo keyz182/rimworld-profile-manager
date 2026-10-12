@@ -8,7 +8,7 @@ param([Parameter(Mandatory = $true)][string]$Scenario)
 $ErrorActionPreference = 'Stop'
 
 $Root = 'C:\rwpm-e2e'
-$App = Join-Path $Root 'app'
+$App = Join-Path $Root 'RimWorld Profile Manager'  # spaces, like the installer default
 $Rwpm = Join-Path $App 'rwpm.exe'
 $OurDll = Join-Path $App 'doorstop\winhttp.dll'
 $Game = 'C:\Program Files (x86)\Steam\steamapps\common\RimWorld'

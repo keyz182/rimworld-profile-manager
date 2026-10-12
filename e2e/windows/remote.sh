@@ -11,6 +11,7 @@ SSH="$HOME/dotfiles/bin/ssh.sh"
 OUT="$ROOT/target/e2e-win"
 STAGE="$OUT/stage"
 REMOTE='C:\rwpm-e2e'
+APP='RimWorld Profile Manager'
 
 log() { printf '[remote] %s\n' "$*" >&2; }
 
@@ -28,7 +29,8 @@ stage() {
   [[ ! -e "$STAGE" ]] || trash "$STAGE"
   mkdir -p "$STAGE/probe/Assemblies"
   unzip -q "$zip" -d "$STAGE"
-  mv "$STAGE"/rwpm-*-windows-x86_64 "$STAGE/app"
+  # Folder name with spaces, like the installer's default folder.
+  mv "$STAGE"/rwpm-*-windows-x86_64 "$STAGE/$APP"
   cp -r "$ROOT/e2e/probe/About" "$STAGE/probe/"
   cp "$OUT/probe-build/Rwpm.SpikeProbe.dll" "$STAGE/probe/Assemblies/"
   cp "$ROOT/e2e/windows/"{e2e,launch,scenarios,guicheck,clicker}.ps1 "$STAGE/"
@@ -37,7 +39,8 @@ stage() {
 # Fail unless the shipped scripts and rwpm.exe on the VM match the staged copies.
 verify_deploy() {
   local f want got
-  for f in e2e.ps1 launch.ps1 scenarios.ps1 guicheck.ps1 clicker.ps1 app/rwpm.exe app/doorstop/winhttp.dll; do
+  local files=(e2e.ps1 launch.ps1 scenarios.ps1 guicheck.ps1 clicker.ps1 "$APP/rwpm.exe" "$APP/doorstop/winhttp.dll")
+  for f in "${files[@]}"; do
     want="$(sha256sum "$STAGE/$f" | cut -d' ' -f1)"
     got="$("$SSH" "$HOST" "powershell -NoProfile -Command \"(Get-FileHash '$REMOTE\\${f//\//\\}').Hash.ToLower()\"" | tr -d '\r' | tail -1)"
     [[ "$want" == "$got" ]] || {

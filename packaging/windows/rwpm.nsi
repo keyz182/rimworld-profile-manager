@@ -1,0 +1,118 @@
+; Windows installer for RimWorld Profile Manager: per-user, no admin.
+; Built by scripts/installer.sh: makensis -DVERSION=<x.y.z> -DSRC=<bundle dir> -DOUT=<setup.exe>
+; Profiles, saves and settings live in %LOCALAPPDATA%\RimWorld Profile Manager and are
+; never touched here; neither is the game folder.
+
+Unicode true
+SetCompressor /SOLID lzma
+RequestExecutionLevel user
+ManifestDPIAware true
+
+!ifndef VERSION | SRC | OUT
+  !error "pass -DVERSION, -DSRC and -DOUT"
+!endif
+
+!define APP "RimWorld Profile Manager"
+!define EXE "rwpm.exe"
+!define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\rwpm"
+!define ICON "${__FILEDIR__}\..\..\crates\rwpm\assets\icon\rwpm.ico"
+
+Name "${APP}"
+OutFile "${OUT}"
+; Not $LOCALAPPDATA\${APP}: that is the data folder.
+InstallDir "$LOCALAPPDATA\Programs\${APP}"
+InstallDirRegKey HKCU "${UNINST_KEY}" "InstallLocation"
+VIProductVersion "${VERSION}.0"
+VIAddVersionKey "ProductName" "${APP}"
+VIAddVersionKey "ProductVersion" "${VERSION}"
+VIAddVersionKey "FileVersion" "${VERSION}"
+VIAddVersionKey "FileDescription" "${APP} installer"
+VIAddVersionKey "LegalCopyright" "keyz182"
+
+!include "MUI2.nsh"
+!define MUI_ICON "${ICON}"
+!define MUI_UNICON "${ICON}"
+!define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${EXE}"
+!define MUI_FINISHPAGE_RUN_TEXT "Start ${APP}"
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "Your profiles and saves stay in $LOCALAPPDATA\${APP}.$\r$\n$\r$\nBefore you uninstall, use Remove loader in ${APP} and clear RimWorld's launch options in Steam. If you do not, Steam cannot start the game."
+
+!insertmacro MUI_PAGE_LICENSE "${SRC}\LICENSE"
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
+
+; Sets $R8 to 1 when FILE exists and cannot be opened for writing (rwpm, or the game
+; under `rwpm run`, has it open).
+!macro CheckFree FILE
+  !define ID ${__LINE__}
+  IfFileExists "${FILE}" 0 free_${ID}
+  ClearErrors
+  FileOpen $R9 "${FILE}" a
+  IfErrors busy_${ID}
+  FileClose $R9
+  Goto free_${ID}
+  busy_${ID}:
+    StrCpy $R8 1
+  free_${ID}:
+  !undef ID
+!macroend
+
+; Stops before any file is changed while rwpm or the game is running. Silent: exit code 2.
+!macro EnsureNotInUse UN
+  Function ${UN}EnsureNotInUse
+    retry:
+      StrCpy $R8 0
+      !insertmacro CheckFree "$INSTDIR\${EXE}"
+      !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.dll"
+      StrCmp $R8 0 done
+      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Close RimWorld and ${APP}, then press Retry." /SD IDCANCEL IDRETRY retry
+      SetErrorLevel 2
+      Quit
+    done:
+  FunctionEnd
+!macroend
+!insertmacro EnsureNotInUse ""
+!insertmacro EnsureNotInUse "un."
+
+Section "Install"
+  Call EnsureNotInUse
+  ; Upgrade only (rwpm.exe already there): files an older version shipped but this one
+  ; does not must not linger. A folder that is not an rwpm install is never emptied.
+  IfFileExists "$INSTDIR\${EXE}" 0 +4
+    RMDir /r "$INSTDIR\payload"
+    RMDir /r "$INSTDIR\doorstop"
+    RMDir /r "$INSTDIR\licenses"
+  SetOutPath "$INSTDIR"
+  File /r "${SRC}\*.*"
+  WriteUninstaller "$INSTDIR\uninstall.exe"
+  CreateShortcut "$SMPROGRAMS\${APP}.lnk" "$INSTDIR\${EXE}"
+
+  WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${APP}"
+  WriteRegStr HKCU "${UNINST_KEY}" "DisplayVersion" "${VERSION}"
+  WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "keyz182"
+  WriteRegStr HKCU "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${EXE}"
+  WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU "${UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
+  WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
+SectionEnd
+
+Section "Uninstall"
+  Call un.EnsureNotInUse
+  ; Only what the installer put there; the folder goes only if it is then empty.
+  Delete "$INSTDIR\${EXE}"
+  Delete "$INSTDIR\LICENSE"
+  IfFileExists "$INSTDIR\uninstall.exe" 0 +4
+    RMDir /r "$INSTDIR\payload"
+    RMDir /r "$INSTDIR\doorstop"
+    RMDir /r "$INSTDIR\licenses"
+  Delete "$INSTDIR\uninstall.exe"
+  RMDir "$INSTDIR"
+  Delete "$SMPROGRAMS\${APP}.lnk"
+  DeleteRegKey HKCU "${UNINST_KEY}"
+SectionEnd
