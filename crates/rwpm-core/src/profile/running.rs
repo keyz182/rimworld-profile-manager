@@ -34,8 +34,9 @@ impl RunningProbe for ProcessProbe {
     }
 }
 
-/// Executable names of the game on Linux and Windows.
-pub const GAME_PROCESS_NAMES: [&str; 2] = ["RimWorldLinux", "RimWorldWin64.exe"];
+/// Executable names of the game on Linux and Windows. `RimWorld`: the Linux 1.7 (Waylith)
+/// exe (V69), so the one-game check (V11) and the exit wait (V17) see 1.7 too.
+pub const GAME_PROCESS_NAMES: [&str; 3] = ["RimWorldLinux", "RimWorldWin64.exe", "RimWorld"];
 
 /// Is any RimWorld process alive (whatever its profile, launched by us or not)?
 /// V11: profiles share `temporaryCachePath`, so only one game may run at once.
@@ -84,5 +85,27 @@ mod tests {
     #[ignore = "spawned by process_probe_sees_child_with_matching_arg"]
     fn never_runs_just_sleeps() {
         std::thread::sleep(std::time::Duration::from_secs(10));
+    }
+
+    /// V69: a 1.7 game process is named `RimWorld`; `sleep` run through a symlink of that
+    /// name stands in for it (the name comes from the exec path). A symlink, not a copy:
+    /// a freshly written binary can be "text file busy" while other tests fork.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn v69_probe_sees_process_named_rimworld() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let exe = dir.path().join("RimWorld");
+        std::os::unix::fs::symlink("/bin/sleep", &exe).expect("symlink sleep");
+        let mut child = std::process::Command::new(&exe)
+            .arg("5")
+            .spawn()
+            .expect("spawn");
+        let seen = (0..50).any(|_| {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            any_game_running()
+        });
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(seen, "probe did not see a process named RimWorld");
     }
 }

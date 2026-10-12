@@ -4,6 +4,7 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
+use crate::discovery::{Engine, engine_of};
 use crate::profile::{Mode, Profile};
 
 pub const STEAM_APP_ID: &str = "294100";
@@ -13,6 +14,8 @@ pub const ENV_PAYLOAD_LOG: &str = "RWPM_PAYLOAD_LOG";
 pub const ENV_RESTART: &str = "RWPM_RESTART";
 pub const ENV_GAME_EXE: &str = "RWPM_GAME_EXE";
 /// A foreign Doorstop's own target assembly, started by our payload after the redirect.
+/// .NET's startup-hook list; the Waylith payload goes first (V64).
+pub const ENV_STARTUP_HOOKS: &str = "DOTNET_STARTUP_HOOKS";
 pub const ENV_CHAIN_TARGET: &str = "RWPM_CHAIN_TARGET";
 /// V29: first arg of the inner rwpm that takes the start script's place behind wrappers.
 pub const ARG_INNER: &str = "--rwpm-inner";
@@ -47,6 +50,8 @@ impl Os {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadFiles {
     pub dll: PathBuf,
+    /// The Waylith (1.7) startup hook, `Rwpm.Payload.Hook.dll` (V64).
+    pub hook: PathBuf,
     /// Linux: dir holding `libdoorstop.so`. macOS: dir holding `libdoorstop.dylib` (R26).
     /// Windows: unused (winhttp.dll lives in the game dir, T12).
     pub doorstop_dir: PathBuf,
@@ -58,10 +63,11 @@ pub struct PayloadFiles {
 }
 
 impl PayloadFiles {
-    /// `<app>/payload/Rwpm.Payload.dll`, `<app>/doorstop/`.
+    /// `<app>/payload/Rwpm.Payload.dll`, `<app>/payload/Rwpm.Payload.Hook.dll`, `<app>/doorstop/`.
     pub fn beside(app_dir: &Path) -> Self {
         Self {
             dll: app_dir.join("payload").join("Rwpm.Payload.dll"),
+            hook: app_dir.join("payload").join("Rwpm.Payload.Hook.dll"),
             doorstop_dir: app_dir.join("doorstop"),
             trampoline: None,
             chain_target: None,
@@ -90,6 +96,8 @@ pub enum LaunchError {
     MissingFile(PathBuf),
     #[error("`{}` contains `:`, which breaks the Linux library path", .0.display())]
     PathHasColon(PathBuf),
+    #[error("`{}` contains `{sep}`, which breaks the .NET startup-hook list", .0.display(), sep = .1)]
+    HookPathHasSeparator(PathBuf, char),
     #[error("profile `{0}` is OFFLINE but has no Mods folder")]
     NoModsDir(String),
     #[error(
@@ -109,6 +117,10 @@ pub fn build(
     env: &dyn Fn(&str) -> Option<OsString>,
 ) -> Result<LaunchPlan, LaunchError> {
     let (program, rest) = command.split_first().ok_or(LaunchError::NoCommand)?;
+    // V62: the engine decides the launch shape; Waylith never gets Doorstop.
+    if waylith_program(command).is_some() {
+        return build_waylith(profile, command, payload, os, env);
+    }
     if os == Os::Linux
         && profile.mode == Mode::Offline
         && let Some(at) = rest.iter().position(is_start_script)
@@ -147,12 +159,63 @@ fn is_start_script(arg: &OsString) -> bool {
     Path::new(arg).file_name() == Some(OsStr::new(LINUX_START_SCRIPT))
 }
 
-/// The game's own program in `%command%`: the start script behind any wrappers, else the first.
+/// The game's own program in `%command%`: the start script or the Waylith exe behind any
+/// wrappers (V69), else the first.
 pub fn game_program(command: &[OsString]) -> Option<&OsString> {
     command
         .iter()
         .find(|a| is_start_script(a))
+        .or_else(|| waylith_program(command))
         .or_else(|| command.first())
+}
+
+/// V69: the entry of `%command%` that is a file beside `Waylith.dll` (RimWorld 1.7+).
+fn waylith_program(command: &[OsString]) -> Option<&OsString> {
+    command.iter().find(|a| {
+        let path = Path::new(a);
+        path.is_file()
+            && path
+                .parent()
+                .is_some_and(|dir| !dir.as_os_str().is_empty() && engine_of(dir) == Engine::Waylith)
+    })
+}
+
+/// RimWorld 1.7 (Waylith, R37). Steam's wrapper chain stays as given: the env reaches the
+/// game through it (R39). No Doorstop, no restart trampoline, no `-logFile` (the engine
+/// ignores it, V67); OFFLINE adds the startup hook (V64).
+fn build_waylith(
+    profile: &Profile,
+    command: &[OsString],
+    payload: &PayloadFiles,
+    os: Os,
+    env: &dyn Fn(&str) -> Option<OsString>,
+) -> Result<LaunchPlan, LaunchError> {
+    let (program, rest) = command.split_first().ok_or(LaunchError::NoCommand)?;
+    let (game_args, replaced) = strip_profile_args(rest);
+    let mut plan = LaunchPlan {
+        program: PathBuf::from(program),
+        replaced,
+        ..LaunchPlan::default()
+    };
+    set(&mut plan, "SteamAppId", STEAM_APP_ID);
+    if profile.mode == Mode::Offline {
+        let mods = profile
+            .mods_dir()
+            .ok_or_else(|| LaunchError::NoModsDir(profile.id.to_string()))?;
+        // V62: fail closed; the game must not start on the install's Mods folder.
+        require(&payload.hook)?;
+        let sep = if os == Os::Windows { ';' } else { ':' };
+        if payload.hook.to_string_lossy().contains(sep) {
+            return Err(LaunchError::HookPathHasSeparator(payload.hook.clone(), sep));
+        }
+        set(&mut plan, ENV_PAYLOAD_LOG, mods.with_file_name(PAYLOAD_LOG));
+        set(&mut plan, ENV_MODS_DIR, mods);
+        let hooks = prepend_with(payload.hook.as_os_str(), env(ENV_STARTUP_HOOKS), sep);
+        set(&mut plan, ENV_STARTUP_HOOKS, hooks);
+    }
+    plan.args.extend(game_args);
+    plan.args.extend(profile.savedatafolder_arg());
+    Ok(plan)
 }
 
 /// V29 / B3: wrappers before the start script (Steam Linux Runtime, gamemoderun) are
@@ -372,19 +435,24 @@ fn require(path: &Path) -> Result<(), LaunchError> {
 }
 
 fn prepend(head: &OsStr, existing: Option<OsString>) -> OsString {
+    prepend_with(head, existing, ':')
+}
+
+/// `head` + `sep` + `existing`, unless `existing` already lists `head`.
+fn prepend_with(head: &OsStr, existing: Option<OsString>, sep: char) -> OsString {
     let existing = existing.filter(|v| !v.is_empty());
     // A restart child inherits our earlier prepend; never list the head twice.
     if let Some(rest) = &existing
         && rest
             .to_string_lossy()
-            .split(':')
+            .split(sep)
             .any(|e| e == head.to_string_lossy())
     {
         return rest.clone();
     }
     let mut value = head.to_os_string();
     if let Some(rest) = existing {
-        value.push(":");
+        value.push(sep.to_string());
         value.push(rest);
     }
     value
@@ -430,6 +498,7 @@ mod tests {
         let p = PayloadFiles::beside(tmp);
         std::fs::create_dir_all(p.dll.parent().expect("parent")).expect("payload dir");
         std::fs::write(&p.dll, b"").expect("dll");
+        std::fs::write(&p.hook, b"").expect("hook");
         std::fs::create_dir_all(&p.doorstop_dir).expect("doorstop dir");
         std::fs::write(p.doorstop_dir.join(LINUX_DOORSTOP_LIB), b"").expect("so");
         std::fs::write(p.doorstop_dir.join(MACOS_DOORSTOP_LIB), b"").expect("dylib");
@@ -1199,5 +1268,161 @@ mod tests {
             &no_env,
         );
         assert!(matches!(r, Err(LaunchError::NoCommand)));
+    }
+
+    /// A 1.7 install under `tmp` (`RimWorld` + `Waylith.dll`) and Steam's Linux `%command%`
+    /// for it: launch wrapper, reaper, runtime entry point, then the game (R37, R39).
+    fn waylith_chain(tmp: &Path, extra: &[&str]) -> (PathBuf, Vec<OsString>) {
+        let game = tmp.join("game");
+        std::fs::create_dir_all(&game).expect("game dir");
+        std::fs::write(game.join("RimWorld"), b"").expect("exe");
+        std::fs::write(game.join("Waylith.dll"), b"").expect("marker");
+        let exe = game.join("RimWorld");
+        let mut parts = vec![
+            "/steam/ubuntu12_32/steam-launch-wrapper".to_owned(),
+            "--".into(),
+            "/steam/ubuntu12_32/reaper".into(),
+            "SteamLaunch".into(),
+            "AppId=294100".into(),
+            "--".into(),
+            "/steam/steamapps/common/SteamLinuxRuntime_soldier/_v2-entry-point".into(),
+            "--verb=waitforexitandrun".into(),
+            "--".into(),
+            exe.display().to_string(),
+        ];
+        parts.extend(extra.iter().map(|s| (*s).to_owned()));
+        (exe, parts.iter().map(OsString::from).collect())
+    }
+
+    fn env_keys(plan: &LaunchPlan) -> Vec<String> {
+        plan.env_set
+            .iter()
+            .map(|(k, _)| k.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn v62_waylith_chain_gets_no_doorstop() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &["-popupwindow"]);
+        let p = payload(tmp.path());
+        for os in [Os::Linux, Os::Windows] {
+            let plan = build(&stored(Mode::Offline), &command, &p, os, &no_env).expect("plan");
+            let keys = env_keys(&plan);
+            assert!(
+                !keys.iter().any(|k| k.starts_with("DOORSTOP_")
+                    || k == "LD_PRELOAD"
+                    || k == "LD_LIBRARY_PATH"
+                    || k == ENV_RESTART
+                    || k == ENV_GAME_EXE),
+                "{os:?}: {keys:?}"
+            );
+            assert!(plan.arg0.is_none() && plan.cwd.is_none(), "{plan:?}");
+            assert!(!has_arg(&plan, "--doorstop-enabled"), "{plan:?}");
+            // The whole chain is kept, the game last before its own args.
+            assert_eq!(plan.program, PathBuf::from(&command[0]));
+            assert_eq!(plan.args[..command.len() - 1], command[1..]);
+        }
+    }
+
+    #[test]
+    fn v64_waylith_offline_sets_startup_hook() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        let plan = build(&stored(Mode::Offline), &command, &p, Os::Linux, &no_env).expect("plan");
+        assert_eq!(
+            env_get(&plan, ENV_STARTUP_HOOKS),
+            Some(&p.hook.clone().into_os_string())
+        );
+        assert_eq!(
+            env_get(&plan, ENV_MODS_DIR),
+            Some(&OsString::from("/profiles/run/Mods"))
+        );
+        assert_eq!(
+            env_get(&plan, ENV_PAYLOAD_LOG),
+            Some(&OsString::from("/profiles/run/payload.log"))
+        );
+        assert_eq!(
+            env_get(&plan, "SteamAppId"),
+            Some(&OsString::from(STEAM_APP_ID))
+        );
+    }
+
+    #[test]
+    fn v64_waylith_hook_prepends_existing() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        let hook = p.hook.display().to_string();
+        for (os, sep, other) in [
+            (Os::Linux, ':', "/x/other.dll"),
+            (Os::Windows, ';', r"C:\x\other.dll"),
+        ] {
+            let existing = OsString::from(other);
+            let env = |k: &str| (k == ENV_STARTUP_HOOKS).then(|| existing.clone());
+            let plan = build(&stored(Mode::Offline), &command, &p, os, &env).expect("plan");
+            let want = OsString::from(format!("{hook}{sep}{other}"));
+            assert_eq!(env_get(&plan, ENV_STARTUP_HOOKS), Some(&want), "{os:?}");
+            // A Restart child inherits that value: our hook is not listed twice.
+            let again = |k: &str| (k == ENV_STARTUP_HOOKS).then(|| want.clone());
+            let plan = build(&stored(Mode::Offline), &command, &p, os, &again).expect("plan");
+            assert_eq!(
+                env_get(&plan, ENV_STARTUP_HOOKS),
+                Some(&want),
+                "{os:?} restart"
+            );
+        }
+    }
+
+    #[test]
+    fn v62_waylith_offline_missing_hook_fails_closed() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        std::fs::remove_file(&p.hook).expect("remove hook");
+        let err = build(&stored(Mode::Offline), &command, &p, Os::Linux, &no_env)
+            .expect_err("must refuse");
+        assert!(
+            matches!(err, LaunchError::MissingFile(ref f) if *f == p.hook),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn v67_waylith_never_gets_logfile() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &["-logFile", "/x/Player.log"]);
+        let p = payload(tmp.path());
+        for profile in [stored(Mode::Live), stored(Mode::Offline), default_profile()] {
+            let plan = build(&profile, &command, &p, Os::Linux, &no_env).expect("plan");
+            assert!(
+                !plan
+                    .args
+                    .iter()
+                    .any(|a| a.to_string_lossy().eq_ignore_ascii_case("-logfile")),
+                "{:?}: {plan:?}",
+                profile.mode
+            );
+            assert_eq!(plan.replaced, cmd(&["-logFile", "/x/Player.log"]));
+        }
+    }
+
+    #[test]
+    fn waylith_live_sets_no_hook() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (_, command) = waylith_chain(tmp.path(), &[]);
+        let p = payload(tmp.path());
+        let plan = build(&stored(Mode::Live), &command, &p, Os::Linux, &no_env).expect("plan");
+        assert_eq!(env_keys(&plan), vec!["SteamAppId".to_owned()]);
+        let last = plan.args.last().expect("savedatafolder").to_string_lossy();
+        assert!(last.to_lowercase().contains("savedatafolder"), "{plan:?}");
+    }
+
+    #[test]
+    fn v69_game_program_finds_waylith_exe() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (exe, command) = waylith_chain(tmp.path(), &["-popupwindow"]);
+        assert_eq!(game_program(&command), Some(&exe.into_os_string()));
     }
 }

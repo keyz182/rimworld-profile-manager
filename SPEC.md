@@ -183,6 +183,7 @@ V65: hook ! load in any .NET ≥ 6 process + no-op unless process = RimWorld (en
 V66: Waylith in-game Restart → redirect holds in restarted process (payload log 2× patched, 2 pids) (?waylith_restart)
 V67: Waylith launch ⊥ `-logFile`; OFFLINE: hook calls `FileLog.SetDirectory(<profile>)` before Main ∴ log = `<profile>/Logs/Player.log`, Default's `Logs/` untouched (R41, B10); LIVE per ?live_log_17; Default: `<default save dir>/Logs/Player.log`; Open log / Copy log / health / last-run read the per-engine path
 V68: Waylith: `rwpm run` ! wait for the Restart replacement (process w/ `-WaitForExitingPid=<child pid>`, R40) before releasing `run.lock` \| writing last-run `exit`; test: fixture parent exits + replacement lives → lock held until replacement exits (B11)
+V69: Waylith install = `<dir>/Waylith.dll` beside game exe (Linux `<dir>/RimWorld`) ! accepted by discovery (exe = `<dir>/RimWorld`, engine = Waylith); `game_program` ! pick that exe from a wrapped `%command%`; process probe ! count `RimWorld` as a game (V11, V17)
 
 ## §T TASKS
 id|status|task|cites
@@ -250,7 +251,7 @@ T61|.|`rwpm run` engine detect: Waylith ∧ OFFLINE → refuse w/ plain reason; 
 T62|x|grill 1.7 Waylith support — done 2026-10-12: full parity Linux + Windows, startup hooks fallback refuse, macOS parked; decompile → R38; spike + build = T63-T69|R37,R38
 T63|x|spike Linux (captured 1.7 build): minimal startup hook → runs before `ModLister` cctor? sets `modsFolderPath`? (?startup_hooks_waylith); Restart re-launch + env carry (?waylith_restart); net8 helper w/ env (V65); Prepatcher/Harmony on 1.7 (?prepatcher_17) — W1-W4 pass 2026-10-12 (R39); restart detaches (R40 → V68); log ignores `-savedatafolder` (R41 → V67)|V64,V65,V66
 T64|x|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
-T65|.|core: engine detect + Waylith launch branch (⊥ `-logFile`, ⊥ Doorstop, `DOTNET_STARTUP_HOOKS` + `RWPM_*`, `SteamAppId`, `-savedatafolder`); lift V62 refusal when shipped|V62,V64,V67
+T65|x|core: engine detect + Waylith launch branch (⊥ `-logFile`, ⊥ Doorstop, `DOTNET_STARTUP_HOOKS` + `RWPM_*`, `SteamAppId`, `-savedatafolder`); lift V62 refusal when shipped; discovery + process probe + game_program know Waylith (B12)|V62,V64,V67,V69
 T66|.|core+gui: per-engine log path for Open/Copy log, health, last-run; LIVE 1.7 log per ?live_log_17|V67
 T67|.|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows)|V64,V65,V66
 T68|.|e2e Linux + Windows 1.7: app/Steam/RimSort × LIVE/OFFLINE, Restart, helpers unbroken, 1.6 + 1.7 side by side via builds|V50,V51,V64,V65,V66,V67
@@ -270,3 +271,4 @@ B8|2026-10-12|build key = `Version.txt` text but file lags binary (R35) ∴ hotf
 B9|2026-10-12|Steam Play on 1.7 w/o rwpm (Default, no launch options) → game reset Default `ModsConfig.xml` (R37); outside rwpm ∴ ⊥ V; help text for T59 should warn|-
 B10|2026-10-12|V67 assumed Waylith log follows `-savedatafolder` → `<save data>/Logs`; it ignores it (R41) ∴ spike profile log landed in Default's `Logs/Player.log`|V67
 B11|2026-10-12|Waylith Restart replacement detaches (`setsid`, reparented, R40) ∴ launcher's wait ends at first exit → `rwpm run` would drop `run.lock` + write last-run exit mid-session|V68
+B12|2026-10-12|1.7 install has ⊥ `RimWorldLinux` (R37): discovery rejects game dir (guard + app can't find game), process probe misses `RimWorld` ∴ V11 one-game check + V17 exit wait blind on 1.7|V69

@@ -66,6 +66,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
 
     let payload = PayloadFiles {
         dll: bundle.join("Contents/MacOS/payload/Rwpm.Payload.dll"),
+        hook: bundle.join("Contents/MacOS/payload/Rwpm.Payload.Hook.dll"),
         doorstop_dir: bundle.join("Contents/MacOS/doorstop"),
         trampoline: None,
         chain_target: None,

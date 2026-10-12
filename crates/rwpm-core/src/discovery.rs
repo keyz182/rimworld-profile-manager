@@ -16,6 +16,26 @@ pub const GAME_EXE: &str = "RimWorldMac.app";
 pub const GAME_EXE: &str = "RimWorldLinux";
 
 const VERSION_FILE: &str = "Version.txt";
+/// R37: RimWorld 1.7+ runs on Waylith (CoreCLR); its engine assembly sits beside the exe.
+const WAYLITH_MARKER: &str = "Waylith.dll";
+/// R37: the Linux Waylith exe (no `RimWorldLinux`, no start script).
+pub const WAYLITH_LINUX_EXE: &str = "RimWorld";
+
+/// The game engine of an install: Unity/Mono (≤ 1.6) or Waylith/CoreCLR (1.7+, R37).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Engine {
+    Unity,
+    Waylith,
+}
+
+/// V69: `<dir>/Waylith.dll` marks a Waylith install, on any OS.
+pub fn engine_of(dir: &Path) -> Engine {
+    if dir.join(WAYLITH_MARKER).is_file() {
+        Engine::Waylith
+    } else {
+        Engine::Unity
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameInstall {
@@ -28,6 +48,10 @@ pub struct GameInstall {
 }
 
 impl GameInstall {
+    pub fn engine(&self) -> Engine {
+        engine_of(&self.game_dir)
+    }
+
     /// Is `exe` a macOS `.app` bundle (R29), rather than a flat Linux/Windows binary?
     /// Decided by `exe`'s own shape, not the host running this code — so a Linux-style
     /// fixture behaves like Linux everywhere, including in `cargo test` on a Mac.
@@ -149,7 +173,11 @@ pub fn from_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
 }
 
 fn read_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
-    let exe = dir.join(GAME_EXE);
+    let mut exe = dir.join(GAME_EXE);
+    // V69 / B12: a Linux 1.7 install has `RimWorld` + `Waylith.dll`, no `RimWorldLinux`.
+    if cfg!(target_os = "linux") && !exe.is_file() && engine_of(dir) == Engine::Waylith {
+        exe = dir.join(WAYLITH_LINUX_EXE);
+    }
     // macOS: GAME_EXE is the `.app` bundle, a directory, not a file (R29).
     let exists = if cfg!(target_os = "macos") {
         exe.is_dir()
@@ -431,5 +459,35 @@ mod tests {
         eprintln!("{gi:#?}");
         let s = gi.steam.expect("steam");
         assert!(s.workshop_dir.is_dir(), "{s:?}");
+    }
+
+    #[test]
+    fn v69_unity_dir_is_unity() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        write_game_exe(tmp.path());
+        let gi = from_game_dir(tmp.path()).expect("game dir");
+        assert_eq!(gi.engine(), Engine::Unity);
+        assert_eq!(gi.exe, tmp.path().join(GAME_EXE));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn v69_discovery_accepts_waylith_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join(WAYLITH_LINUX_EXE), b"").expect("exe");
+        std::fs::write(tmp.path().join(WAYLITH_MARKER), b"").expect("marker");
+        std::fs::write(tmp.path().join(VERSION_FILE), "1.7.4976 rev1043\n").expect("version");
+        let gi = from_game_dir(tmp.path()).expect("1.7 game dir");
+        assert_eq!(gi.engine(), Engine::Waylith);
+        assert_eq!(gi.exe, tmp.path().join(WAYLITH_LINUX_EXE));
+        assert_eq!(gi.version.as_deref(), Some("1.7.4976 rev1043"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn v69_rimworld_file_without_waylith_is_not_a_game_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join(WAYLITH_LINUX_EXE), b"").expect("exe");
+        assert!(from_game_dir(tmp.path()).is_err());
     }
 }
