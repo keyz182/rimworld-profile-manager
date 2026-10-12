@@ -116,6 +116,7 @@ R41|Waylith log|`Waylith.Logging.FileLog`: first `SetDirectory(dir)` wins, later
 R42|Waylith stdout|`WaylithLogFormatter`: console line = ANSI colour (unconditional, ⊥ TTY/`NO_COLOR` check) + `HH:mm:ss` + level + message; ⊥ date, ⊥ category, ⊥ header; same messages → `FileLog`|Waylith.dll decompile 1.7.4976 rev1043; spike w2-stdout.log
 R43|1.7 smoke (T64-T66)|branch build `0339d97`, Linux, 1.7.4976 rev1043, `rwpm run <id> -- <install>/RimWorld` (app-style, ⊥ Steam Play): OFFLINE → hook in RimWorld, log dir set, `patched` ~60 ms later, log `<profile>/Logs/Player.log`; LIVE → hook log dir only, ⊥ `patched`, ⊥ `Mods/` created; both: Default `Logs/Player.log` mtime + size unchanged, last-run ok exit 0; game console (ANSI) → `rwpm run` stdout|live 2026-10-12, spike-offline + spike-live
 R44|Windows 1.7 layout (T67)|1.7.4976 rev1043 buildid 25885806 `unstable`: `RimWorld.exe` + `Waylith.dll` + own `coreclr.dll`/`hostfxr.dll` + `steam_api64.dll`; ⊥ `RimWorldWin64.exe`, ⊥ `RimWorldWin64_Data`; runtimeconfig = Linux; default save dir unchanged (LocalLow)|VM win11 2026-10-12
+R45|Windows 1.7 run (T67)|VM win11, branch `793430f` via Steam Launch Options `rwpm.exe run <id> -- %command%`: `%command%` = `"<install>\RimWorld.exe"` (⊥ wrappers), Steam env SteamAppId/SteamGameId=294100; OFFLINE: hook patched + log dir ×2 across in-game Restart (replacement `-WaitForExitingPid=<old>`, R40 holds), last-run ok exit 0 after replacement; LIVE: log dir only, ⊥ `Mods\`; Default `Logs\` untouched; overlay works|live 2026-10-12, t67-off + t67-live
 
 ## §V INVARIANTS
 V1: payload ! clear `DOORSTOP_INITIALIZED` + `DOORSTOP_DISABLE` in-process @ start, ∀ OS ∴ `GenCommandLine.Restart` child re-runs Doorstop & keeps redirect (R18, GenCommandLine.cs:56-57)
@@ -257,7 +258,7 @@ T63|x|spike Linux (captured 1.7 build): minimal startup hook → runs before `Mo
 T64|x|payload: startup-hook build (shared redirect logic, any .NET ≥ 6), RimWorld-process guard, `FileLog.SetDirectory(<profile>)` log redirect; package beside app|V64,V65,V67
 T65|x|core: engine detect + Waylith launch branch (⊥ `-logFile`, ⊥ Doorstop, `DOTNET_STARTUP_HOOKS` + `RWPM_*`, `SteamAppId`, `-savedatafolder`); lift V62 refusal when shipped; discovery + process probe + game_program know Waylith (B12)|V62,V64,V67,V69
 T66|x|payload+core+gui: `RWPM_LOG_DIR` channel (hook redirects log iff set); Waylith launch sets it ∀ stored profile, LIVE adds hook w/o mods env (missing hook ⊥ fatal); per-engine log path for Open log + Copy support info|V67
-T67|~|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows)|V64,V65,V66
+T67|x|spike Windows VM 1.7: exe name, layout, `%command%`, startup hooks, Steam init (?waylith_windows) — done 2026-10-12 (R44, R45; B13, B14)|V64,V65,V66
 T68|.|e2e Linux + Windows 1.7: app/Steam/RimSort × LIVE/OFFLINE, Restart, helpers unbroken, 1.6 + 1.7 side by side via builds|V50,V51,V64,V65,V66,V67
 T69|.|docs + help: 1.7 support, B9 warning (Steam Play on 1.7 w/o rwpm resets Default mod list)|-
 T70|x|`rwpm run` Waylith restart wait: find replacement by `-WaitForExitingPid=<child pid>`, hold `run.lock` + last-run until it exits; fixture test|V68
