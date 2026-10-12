@@ -28,20 +28,23 @@ impl App {
         .padding([6, 12])
         .style(theme::primary)
         .on_press(Message::CopyLaunchOptions);
+        // V38: no working launcher → no line to show or copy, only why.
+        let first: Element<'a, Message> = if self.ctx.launcher_failed {
+            text(t::NO_LAUNCHER).style(theme::error).into()
+        } else {
+            column![
+                text(t::GUIDE_COPY),
+                container(text(line).size(13))
+                    .padding(10)
+                    .width(Length::Fill)
+                    .style(theme::surface),
+                copy
+            ]
+            .spacing(8)
+            .into()
+        };
         let steps = column![
-            step(
-                1,
-                column![
-                    text(t::GUIDE_COPY),
-                    container(text(line).size(13))
-                        .padding(10)
-                        .width(Length::Fill)
-                        .style(theme::surface),
-                    copy
-                ]
-                .spacing(8)
-                .into()
-            ),
+            step(1, first),
             step(2, text(t::GUIDE_OPEN).into()),
             step(3, text(t::GUIDE_PASTE).into()),
             step(4, text(t::GUIDE_START).into()),

@@ -598,6 +598,14 @@ fn failed_launcher_copy_refuses_launch_line_and_rimsort() {
     let _ = app.export_job(sb.path("rimsort/settings.json"));
     assert_eq!(app.notice, Some(Notice::Error(text::NO_LAUNCHER.into())));
     assert!(app.job.is_none(), "no RimSort job started");
+    // The Steam guide shows why, not a line that would not work.
+    app.notice = None;
+    let line = app.launch_options().expect("line");
+    app.drill = Some(super::message::Drill::SteamGuide);
+    let mut ui = iced_test::simulator(app.view());
+    ui.find(text::NO_LAUNCHER).expect("guide explains");
+    assert!(ui.find(line.as_str()).is_err(), "no launch line shown");
+    assert!(ui.find(text::COPY_STEAM).is_err(), "no Copy button");
 }
 
 /// V34 B5: set up a Steam launch in ≤ 3 steps (select, Set up Steam, Copy line).
