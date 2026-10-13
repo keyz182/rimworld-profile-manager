@@ -312,7 +312,7 @@ impl<T: Trash> ProfileStore<T> {
             return Err(ProfileError::DefaultImmutable("pinned to a game version"));
         }
         if let Some(key) = key {
-            BuildKey::parse(key)?;
+            BuildKey::parse(key).map_err(|_| ProfileError::InvalidBuildKey(key.to_owned()))?;
         }
         let dir = self
             .get(id)?
@@ -806,7 +806,11 @@ mod tests {
         let path = s.root().join(p.id.as_str()).join(FILE_NAME);
         let before = std::fs::read(&path).expect("read");
         for bad in ["../x", "", "1.6 rev598", "UPPER"] {
-            assert!(s.set_pin(&p.id, Some(bad)).is_err(), "{bad:?} was pinned");
+            // #14 F2: says the name is wrong, not that the version is missing.
+            assert!(
+                matches!(s.set_pin(&p.id, Some(bad)), Err(ProfileError::InvalidBuildKey(k)) if k == bad),
+                "{bad:?} was pinned or gave the wrong error"
+            );
         }
         assert_eq!(std::fs::read(&path).expect("read"), before);
 

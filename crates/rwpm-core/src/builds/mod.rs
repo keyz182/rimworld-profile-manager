@@ -10,6 +10,7 @@
 
 pub mod acf;
 pub mod capture;
+pub mod downgrade;
 pub mod effective;
 pub mod file;
 
@@ -23,6 +24,7 @@ use crate::profile::lock::{take_run_lock, try_run_lock};
 use crate::profile::running::RunningProbe;
 use crate::profile::store::{ProfileStore, Trash};
 
+pub use downgrade::pin_warns;
 pub use effective::{EffectiveGame, GameSource, effective_game};
 pub use file::{BuildFile, dlc_folders};
 
@@ -176,7 +178,9 @@ impl BuildStore {
         })
     }
 
-    /// V54: refused while a profile pins the build. V59: refused while the game runs.
+    /// V54: refused while a profile pins the build, or might (its `profile.toml` cannot be
+    /// read at all). V59: refused while the game runs. Needs only the build's folder, not a
+    /// readable `build.toml`, so a broken build can still be removed (T56 D28).
     pub fn delete<T: Trash>(
         &self,
         profiles: &ProfileStore<T>,
@@ -187,15 +191,24 @@ impl BuildStore {
         if probe.any_game() {
             return Err(ProfileError::GameRunning);
         }
-        let build = self.get(key)?;
-        let pinned = pinned_by(profiles, key)?;
-        if !pinned.is_empty() {
+        let dir = self.dir_of(key);
+        if !dir.is_dir() {
+            return Err(ProfileError::BuildNotFound(key.to_string()));
+        }
+        let pins = pinned_by(profiles, key)?;
+        if !pins.profiles.is_empty() {
             return Err(ProfileError::BuildInUse {
                 key: key.to_string(),
-                profiles: pinned,
+                profiles: pins.profiles,
             });
         }
-        profiles.trash_path(&build.dir)
+        if !pins.unchecked.is_empty() {
+            return Err(ProfileError::BuildUseUnknown {
+                key: key.to_string(),
+                profiles: pins.unchecked,
+            });
+        }
+        profiles.trash_path(&dir)
     }
 
     /// Clears what an interrupted capture left behind. Steps aside when another process
@@ -235,35 +248,83 @@ impl BuildStore {
     }
 }
 
-/// Display names of the profiles pinned to `key` (V54). A `profile.toml` that fails to
-/// load (unknown field, newer schema, bad value) is still read as plain TOML: if its
-/// `game_build` names this build, it blocks too. A file that is not TOML at all cannot
-/// name a build and is passed over.
-fn pinned_by<T: Trash>(
+/// Who uses a build (V54).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PinnedBy {
+    /// Display names of the profiles pinned to it.
+    pub profiles: Vec<String>,
+    /// Ids of profiles whose `profile.toml` cannot be read at all (permissions, I/O), so
+    /// nobody can tell whether they pin it. They block Delete too (T56 D27).
+    pub unchecked: Vec<String>,
+}
+
+impl PinnedBy {
+    pub fn is_empty(&self) -> bool {
+        self.profiles.is_empty() && self.unchecked.is_empty()
+    }
+}
+
+/// The profiles pinned to `key` (V54). A `profile.toml` that fails to load (unknown
+/// field, newer schema, bad value) is still read as plain TOML: if its `game_build` names
+/// this build, it blocks too. A file that is not TOML at all cannot name a build and is
+/// passed over. A file that cannot be read at all is `unchecked`: it fails closed.
+pub fn pinned_by<T: Trash>(
     profiles: &ProfileStore<T>,
     key: &BuildKey,
-) -> Result<Vec<String>, ProfileError> {
+) -> Result<PinnedBy, ProfileError> {
     let listing = profiles.list()?;
-    let mut names: Vec<String> = listing
-        .profiles
-        .into_iter()
-        .filter(|p| p.game_build.as_deref() == Some(key.as_str()))
-        .map(|p| p.name)
-        .collect();
+    let mut pins = PinnedBy {
+        profiles: listing
+            .profiles
+            .into_iter()
+            .filter(|p| p.game_build.as_deref() == Some(key.as_str()))
+            .map(|p| p.name)
+            .collect(),
+        unchecked: Vec::new(),
+    };
     for (id, _) in &listing.unreadable {
         let path = profiles.root().join(id.as_str()).join(PROFILE_FILE);
-        let Some(table) = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| text.parse::<toml::Table>().ok())
-        else {
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            // Gone since the listing: it pins nothing now.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => {
+                pins.unchecked.push(id.to_string());
+                continue;
+            }
+        };
+        let Ok(table) = text.parse::<toml::Table>() else {
             continue;
         };
         if table.get("game_build").and_then(toml::Value::as_str) == Some(key.as_str()) {
             let name = table.get("name").and_then(toml::Value::as_str);
-            names.push(name.unwrap_or(id.as_str()).to_owned());
+            pins.profiles.push(name.unwrap_or(id.as_str()).to_owned());
         }
     }
-    Ok(names)
+    Ok(pins)
+}
+
+/// Pins profile `id` to the stored build `key`, or back to the Steam install with `None`.
+/// Takes `run.lock`, so it never races Delete build or a capture (V59), and refuses while
+/// a game runs. A key that is not a build key, or names no stored build, is refused
+/// before `profile.toml` is touched.
+pub fn pin<T: Trash>(
+    profiles: &ProfileStore<T>,
+    app_dir: &Path,
+    id: &crate::profile::ProfileId,
+    key: Option<&str>,
+    probe: &dyn RunningProbe,
+) -> Result<crate::profile::Profile, ProfileError> {
+    let _lock = take_run_lock(app_dir)?;
+    if probe.any_game() {
+        return Err(ProfileError::GameRunning);
+    }
+    if let Some(key) = key {
+        let key =
+            BuildKey::parse(key).map_err(|_| ProfileError::InvalidBuildKey(key.to_owned()))?;
+        BuildStore::open(profiles.root(), app_dir)?.get(&key)?;
+    }
+    profiles.set_pin(id, key)
 }
 
 #[cfg(test)]

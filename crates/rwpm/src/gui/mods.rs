@@ -35,7 +35,7 @@ impl App {
             Err(e) => {
                 self.mods = Some(ModList {
                     profile: id,
-                    rows: Err(e),
+                    rows: Err(e.to_string()),
                 });
                 return Task::none();
             }

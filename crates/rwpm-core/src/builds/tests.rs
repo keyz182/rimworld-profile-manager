@@ -347,6 +347,134 @@ fn delete_refused_while_an_unreadable_profile_pins_the_build() {
     assert!(!f.builds().dir_of(&key(KEY)).exists());
 }
 
+/// #14 F3 (B21): a newer schema blocks like an unknown field; a file that is not TOML at
+/// all cannot name a build and does not block.
+#[test]
+fn delete_raw_scan_covers_newer_schema_and_non_toml() {
+    let f = Fixture::new("19234567", "4", &["Core"]);
+    f.capture().expect("capture");
+    let newer = f.profiles().create("Newer Schema").expect("create");
+    let junk = f.profiles().create("Junk").expect("create");
+    let file_of = |id: &ProfileId| f.profiles_root().join(id.as_str()).join(FILE_NAME);
+    std::fs::write(
+        file_of(&newer.id),
+        format!("schema = 99\nname = \"Newer Schema\"\ngame_build = \"{KEY}\"\n"),
+    )
+    .expect("write");
+    std::fs::write(file_of(&junk.id), "this is [[[ not toml").expect("write");
+
+    let pins = pinned_by(&f.profiles(), &key(KEY)).expect("scan");
+    assert_eq!(pins.profiles, ["Newer Schema"]);
+    assert!(pins.unchecked.is_empty());
+
+    std::fs::remove_file(file_of(&newer.id)).expect("remove");
+    f.builds()
+        .delete(&f.profiles(), &key(KEY), &FakeProbe(false))
+        .expect("non-TOML file pins nothing");
+}
+
+/// #14 F1, T56 D27: a `profile.toml` that cannot be read at all fails closed. Delete names
+/// the profile as one it cannot check.
+#[cfg(unix)]
+#[test]
+fn delete_refused_while_a_profile_file_cannot_be_read() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new("19234567", "4", &["Core"]);
+    f.capture().expect("capture");
+    let locked = f.profiles().create("Locked").expect("create");
+    let path = f.profiles_root().join(locked.id.as_str()).join(FILE_NAME);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+    if std::fs::read(&path).is_ok() {
+        // Running as root: permissions do not stop reads, so there is nothing to test.
+        return;
+    }
+
+    let out = f
+        .builds()
+        .delete(&f.profiles(), &key(KEY), &FakeProbe(false));
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+    let Err(ProfileError::BuildUseUnknown { key: k, profiles }) = out else {
+        panic!("delete was allowed: {out:?}");
+    };
+    assert_eq!(k, KEY);
+    assert_eq!(profiles, [locked.id.to_string()]);
+    assert!(f.builds().dir_of(&key(KEY)).exists());
+}
+
+/// T56 D28: a build whose `build.toml` cannot be read can still be deleted; the pin guard
+/// still applies.
+#[test]
+fn delete_removes_a_build_with_a_broken_build_toml() {
+    let f = Fixture::new("19234567", "4", &["Core"]);
+    f.capture().expect("capture");
+    let dir = f.builds().dir_of(&key(KEY));
+    std::fs::write(dir.join(file::FILE_NAME), "schema = 99\n").expect("break");
+    assert_eq!(f.builds().list().expect("list").unreadable.len(), 1);
+
+    let pinned = f.pin("Pinned", KEY);
+    assert!(matches!(
+        f.builds()
+            .delete(&f.profiles(), &key(KEY), &FakeProbe(false)),
+        Err(ProfileError::BuildInUse { .. })
+    ));
+    f.profiles().set_pin(&pinned, None).expect("unpin");
+    f.builds()
+        .delete(&f.profiles(), &key(KEY), &FakeProbe(false))
+        .expect("delete");
+    assert!(!dir.exists());
+}
+
+/// T56 (#14 F4): pinning takes `run.lock`, so it cannot slip in between Delete's check and
+/// its move to the recycle bin; and it refuses keys that name no stored build.
+#[test]
+fn pin_is_locked_and_checks_the_build() {
+    let f = Fixture::new("19234567", "4", &["Core"]);
+    f.capture().expect("capture");
+    let p = f.profiles().create("Run").expect("create");
+    let file = f.profiles_root().join(p.id.as_str()).join(FILE_NAME);
+    let before = std::fs::read(&file).expect("read");
+    let try_pin =
+        |k: Option<&str>, probe: bool| pin(&f.profiles(), &f.app(), &p.id, k, &FakeProbe(probe));
+
+    {
+        let _held = take_run_lock(&f.app()).expect("lock");
+        assert!(matches!(
+            try_pin(Some(KEY), false),
+            Err(ProfileError::GameRunning)
+        ));
+    }
+    assert!(matches!(
+        try_pin(Some(KEY), true),
+        Err(ProfileError::GameRunning)
+    ));
+    assert!(
+        matches!(try_pin(Some("9.9"), false), Err(ProfileError::BuildNotFound(k)) if k == "9.9")
+    );
+    assert!(
+        matches!(try_pin(Some("../x"), false), Err(ProfileError::InvalidBuildKey(k)) if k == "../x")
+    );
+    assert_eq!(std::fs::read(&file).expect("read"), before);
+
+    assert_eq!(
+        try_pin(Some(KEY), false)
+            .expect("pin")
+            .game_build
+            .as_deref(),
+        Some(KEY)
+    );
+    assert_eq!(try_pin(None, false).expect("unpin").game_build, None);
+    assert!(matches!(
+        pin(
+            &f.profiles(),
+            &f.app(),
+            &ProfileId::default_id(),
+            Some(KEY),
+            &FakeProbe(false)
+        ),
+        Err(ProfileError::DefaultImmutable(_))
+    ));
+}
+
 #[test]
 fn delete_removes_an_unpinned_build() {
     let f = Fixture::new("19234567", "4", &["Core"]);
