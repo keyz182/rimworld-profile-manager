@@ -266,8 +266,9 @@ impl PinnedBy {
 
 /// The profiles pinned to `key` (V54). A `profile.toml` that fails to load (unknown
 /// field, newer schema, bad value) is still read as plain TOML: if its `game_build` names
-/// this build, it blocks too. A file that is not TOML at all cannot name a build and is
-/// passed over. A file that cannot be read at all is `unchecked`: it fails closed.
+/// this build, it blocks too. A file that reads as text but is not TOML cannot name a build
+/// and is passed over. A file that cannot be read as text at all (permissions, I/O, not
+/// UTF-8) is `unchecked`: it fails closed.
 pub fn pinned_by<T: Trash>(
     profiles: &ProfileStore<T>,
     key: &BuildKey,

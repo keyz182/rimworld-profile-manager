@@ -104,7 +104,9 @@ impl Ctx {
     }
 
     /// The game `profile` plays (V55): its stored build when pinned, else `live`, the
-    /// Steam install. A missing build reads the same in every action.
+    /// Steam install. A pinned profile whose build is gone or cannot be used (broken
+    /// `build.toml`, store folder taken) reads as "build missing" in every action, like
+    /// health and `rwpm run`; only a bad settings file keeps its own reason (#15 N1).
     pub fn effective_game(
         &self,
         profile: &Profile,
@@ -114,10 +116,12 @@ impl Ctx {
             .settings()
             .map_err(|e| GameError::Other(e.to_string()))?
             .profiles_root(&self.app_dir);
-        effective_game(profile, live, &root, &self.app_dir).map_err(|e| match e {
-            ProfileError::NoGame => GameError::NoGame,
-            ProfileError::BuildNotFound(key) => GameError::BuildMissing(key),
-            e => GameError::Other(e.to_string()),
+        effective_game(profile, live, &root, &self.app_dir).map_err(|e| {
+            match (e, profile.game_build.as_deref()) {
+                (ProfileError::NoGame, _) => GameError::NoGame,
+                (_, Some(key)) => GameError::BuildMissing(key.to_owned()),
+                (e, None) => GameError::Other(e.to_string()),
+            }
         })
     }
 }

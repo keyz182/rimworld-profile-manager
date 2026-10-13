@@ -8,12 +8,12 @@ use super::super::message::Drill;
 use super::*;
 use crate::gui::Job;
 
-const VERSION: &str = "1.6.4871 rev598";
-const KEY: &str = "1.6.4871-rev598";
+pub(super) const VERSION: &str = "1.6.4871 rev598";
+pub(super) const KEY: &str = "1.6.4871-rev598";
 
 impl Sandbox {
     /// Makes the sandbox game a Steam install Capture accepts (V58: `StateFlags` 4).
-    fn steam_install(&self, buildid: &str) {
+    pub(super) fn steam_install(&self, buildid: &str) {
         let acf = self.path("lib/steamapps/appmanifest_294100.acf");
         std::fs::write(
             acf,
@@ -31,12 +31,12 @@ impl Sandbox {
         .expect("version");
     }
 
-    fn builds(&self) -> BuildStore {
+    pub(super) fn builds(&self) -> BuildStore {
         self.ctx().build_store().expect("builds")
     }
 
     /// Stores the install as a build, through core (what the job thread does).
-    fn stored_build(&self) {
+    pub(super) fn stored_build(&self) {
         let app = self.app();
         let plan = plan_capture(&self.builds(), app.game.as_ref().expect("game")).expect("plan");
         rwpm_core::builds::capture::apply_capture(
@@ -48,7 +48,7 @@ impl Sandbox {
         .expect("capture");
     }
 
-    fn pin(&self, name: &str) -> ProfileId {
+    pub(super) fn pin(&self, name: &str) -> ProfileId {
         let store = self.ctx().store().expect("store");
         let p = store.create(name).expect("create");
         store.set_pin(&p.id, Some(KEY)).expect("pin");
@@ -56,18 +56,18 @@ impl Sandbox {
     }
 }
 
-fn open_versions(sb: &Sandbox) -> App {
+pub(super) fn open_versions(sb: &Sandbox) -> App {
     let mut app = sb.app();
     let _ = app.update(Message::Drill(Some(Drill::GameVersions)));
     let _ = app.update(Message::BuildsRead(sb.ctx().read_builds()));
     app
 }
 
-fn found(app: &App, label: &str) -> bool {
+pub(super) fn found(app: &App, label: &str) -> bool {
     iced_test::simulator(app.view()).find(label).is_ok()
 }
 
-fn clicked(app: &App, label: &str) -> Vec<Message> {
+pub(super) fn clicked(app: &App, label: &str) -> Vec<Message> {
     let mut ui = iced_test::simulator(app.view());
     ui.click(label).unwrap_or_else(|e| panic!("{label}: {e:?}"));
     ui.into_messages().collect()
