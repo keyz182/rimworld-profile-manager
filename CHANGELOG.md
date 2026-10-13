@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.5.1](https://github.com/keyz182/rimworld-profile-manager/compare/20f0fcded4b1dcfc362270a99d7eb80b28834430..v1.5.1) - 2026-10-13
+#### Bug Fixes
+- (**gui**) T57 pinned RimSort export close-out, same missing-build text (#16) - ([20f0fcd](https://github.com/keyz182/rimworld-profile-manager/commit/20f0fcded4b1dcfc362270a99d7eb80b28834430)) - Kieran Evans
+
+- - -
+
 ## [v1.5.0](https://github.com/keyz182/rimworld-profile-manager/compare/6b9ae6aa290a457830ec5bef24df0659cdda5cda..v1.5.0) - 2026-10-13
 #### Features
 - (**core**) T60 effective-game resolver (#15) - ([6b9ae6a](https://github.com/keyz182/rimworld-profile-manager/commit/6b9ae6aa290a457830ec5bef24df0659cdda5cda)) - Kieran Evans
