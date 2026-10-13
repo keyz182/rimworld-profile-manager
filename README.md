@@ -31,6 +31,17 @@ Get the newest version from [Releases](https://github.com/keyz182/rimworld-profi
 
 The [wiki](https://github.com/keyz182/rimworld-profile-manager/wiki) tells you how to install the app, set up Steam and RimSort, and fix problems. It has screenshots of each step.
 
+## Game versions
+
+A game version is a full copy of RimWorld that the app keeps. A profile can play one, so it stays on 1.6 while Steam moves to 1.7.
+
+1. In Steam, switch RimWorld to the version to store. Wait for the update to finish.
+2. In the app, choose "Game versions", then "Capture current game", then "Store it".
+3. In Steam, switch back to the version that you normally play.
+4. On a profile, choose "Change…" in the "Game version" section and pick the stored version.
+
+Each game version takes about as much disk space as the game. A file system with copy-on-write, such as btrfs or APFS, shares the data until Steam changes the original. Windows game versions of 1.6 have no Steam overlay ([issue 5](https://github.com/keyz182/rimworld-profile-manager/issues/5)). See [Game versions](docs/game-versions.md) for the full steps, the disk numbers and the limits.
+
 ## How it works
 
 - Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.
@@ -39,6 +50,7 @@ The [wiki](https://github.com/keyz182/rimworld-profile-manager/wiki) tells you h
 - On RimWorld 1.7, an OFFLINE profile loads the payload as a .NET startup hook (`DOTNET_STARTUP_HOOKS`), not through Doorstop. Windows needs no `winhttp.dll` for 1.7.
 - On 1.7, the game log of a profile is `<profile>/Logs/Player.log`.
 - The first time a profile starts on 1.7, the game clears its mod list. A 1.6 mod list does not carry over. Keep separate profiles for 1.6 and 1.7. If you press Play in Steam without the launch options, Steam starts Default, and the game clears the mod list of Default.
+- A profile with a stored game version starts that game version. `rwpm run` swaps the game in the launch line, and keeps any Steam wrappers before it. Steam's own Play button, without this app's launch options, starts the Steam version.
 - The app does not change your load order. RimSort or the in-game mod menu does that.
 
 ## Build from source
