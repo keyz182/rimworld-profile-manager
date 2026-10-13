@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
 use crate::fs_copy::{copy_tree, same_tree};
+use crate::profile::file::FILE_NAME;
 use crate::profile::id::{BUILDS_DIR, ProfileId};
 use crate::profile::lock::take_run_lock;
 use crate::profile::running::RunningProbe;
-use crate::profile::file::FILE_NAME;
 use crate::profile::store::{ProfileStore, Trash};
 use crate::settings::AppSettings;
 use crate::space;

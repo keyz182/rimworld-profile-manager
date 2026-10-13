@@ -44,6 +44,16 @@ pub enum ProfileError {
     },
     #[error("cannot read `{path}`: {message}")]
     Parse { path: PathBuf, message: String },
+    #[error("a profile already uses the folder `{}`; rename that profile before storing game versions", .0.display())]
+    BuildsFolderTaken(PathBuf),
+    #[error("no stored game version `{0}`")]
+    BuildNotFound(String),
+    #[error("game version `{key}` is used by: {}", .profiles.join(", "))]
+    BuildInUse { key: String, profiles: Vec<String> },
+    #[error("rwpm cannot tell which game build `{}` is; storing a game version needs a Steam install", .0.display())]
+    NotSteamInstall(PathBuf),
+    #[error("not enough room in `{}`: the copy needs {need} bytes and {free} are free", .path.display())]
+    NotEnoughSpace { path: PathBuf, need: u64, free: u64 },
     #[error("cannot {op} `{path}`: {source}")]
     Io {
         op: &'static str,

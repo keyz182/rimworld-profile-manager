@@ -3,6 +3,7 @@
 //! All behaviour lives here; the `rwpm` binary (GUI and `rwpm run`) is a thin front end.
 
 pub mod appimage;
+pub mod builds;
 pub mod consent;
 pub mod discovery;
 pub mod error;
