@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.5.0](https://github.com/keyz182/rimworld-profile-manager/compare/6b9ae6aa290a457830ec5bef24df0659cdda5cda..v1.5.0) - 2026-10-13
+#### Features
+- (**core**) T60 effective-game resolver (#15) - ([6b9ae6a](https://github.com/keyz182/rimworld-profile-manager/commit/6b9ae6aa290a457830ec5bef24df0659cdda5cda)) - Kieran Evans
+
+- - -
+
 ## [v1.4.2](https://github.com/keyz182/rimworld-profile-manager/compare/4f8c02a4d734526a0b572772f0860c47958e67b9..v1.4.2) - 2026-10-13
 #### Bug Fixes
 - (**profile**) backprop §B.16 + §V.71: leave 1.7 logs out of a Default clone - ([a269cac](https://github.com/keyz182/rimworld-profile-manager/commit/a269cacf26cbe30910fb2ef73b818889647a9bbb)) - [@keyz182](https://github.com/keyz182)
