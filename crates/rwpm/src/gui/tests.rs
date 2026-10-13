@@ -293,7 +293,7 @@ fn offline_plan_opens_dialog_and_conflicts_gate_confirm() {
     let plan = rwpm_core::profile::offline::plan_offline(
         &sb.ctx().store().expect("store"),
         &sb.offline_profile("P", &["brrainz.harmony"]),
-        app.game.as_ref().expect("game"),
+        &app.effective_game().expect("game"),
         false,
     )
     .expect("plan");
@@ -419,7 +419,7 @@ fn render_screens_manual() {
     let _ = app.update(Message::Launch);
     shot(&app, "06-guard-dialog");
     let _ = app.update(Message::Cancel);
-    let game = app.game.clone().expect("game");
+    let game = app.effective_game().expect("game");
     let plan = rwpm_core::profile::offline::plan_offline(
         &sb.ctx().store().expect("store"),
         &id,
@@ -455,7 +455,7 @@ fn render_screens_manual() {
     app.notice = None;
     app.game = Err("no Steam library has RimWorld".into());
     shot(&app, "13-no-game");
-    app.game = Ok(game);
+    app.game = Ok(game.install().clone());
     app.menu_open = true;
     shot(&app, "15-more-menu");
     app.menu_open = false;
@@ -463,7 +463,7 @@ fn render_screens_manual() {
     shot(&app, "20-steam-guide");
     app.drill = Some(super::message::Drill::Mods);
     let profile = app.current().cloned().expect("p");
-    let rows = rwpm_core::profile::mod_list::mod_list(&profile, app.game.as_ref().expect("g"));
+    let rows = rwpm_core::profile::mod_list::mod_list(&profile, &app.effective_game().expect("g"));
     app.mods = Some(super::mods::ModList {
         profile: profile.id.clone(),
         rows,
@@ -1008,7 +1008,7 @@ fn mod_list_shows_load_order_sources_and_flags() {
         .expect("reading");
     // What the background read hands back.
     let profile = app.current().cloned().expect("p");
-    let rows = rwpm_core::profile::mod_list::mod_list(&profile, app.game.as_ref().expect("g"));
+    let rows = rwpm_core::profile::mod_list::mod_list(&profile, &app.effective_game().expect("g"));
     let _ = app.update(Message::ModsRead(super::mods::ModList {
         profile: id,
         rows,
@@ -1089,10 +1089,10 @@ fn guard_dialog_names_mods() {
 /// What the background health check would hand back for the selected profile.
 fn health_now(app: &mut App, sb: &Sandbox) {
     let p = app.current().cloned().expect("p");
-    let problems = rwpm_core::profile::health::check(
+    let problems = rwpm_core::profile::health::check_profile(
         &sb.ctx().store().expect("s"),
         &p,
-        app.game.as_ref().expect("g"),
+        app.game.as_ref().ok(),
         &sb.path("app"),
         None,
         rwpm_core::launch::Os::Linux,
@@ -1223,7 +1223,7 @@ fn go_offline_in_three_steps() {
     let plan = rwpm_core::profile::offline::plan_offline(
         &sb.ctx().store().expect("s"),
         &p.id,
-        app.game.as_ref().expect("g"),
+        &app.effective_game().expect("g"),
         false,
     )
     .expect("plan");
@@ -1251,7 +1251,7 @@ fn new_profile_goes_offline_without_asking() {
     let plan = rwpm_core::profile::offline::plan_offline(
         &sb.ctx().store().expect("s"),
         &p.id,
-        app.game.as_ref().expect("g"),
+        &app.effective_game().expect("g"),
         false,
     )
     .expect("a new profile plans an empty freeze");
@@ -1429,4 +1429,22 @@ fn empty_profile_gets_a_health_line_that_opens_copy_settings() {
         .expect("Health says the profile is empty");
     click(&mut app, text::COPY_SETTINGS_MENU);
     assert!(matches!(app.dialog, Some(Dialog::CopySettings(_))));
+}
+
+/// V55: Open log and Copy log refuse for a pinned profile whose build is gone, rather
+/// than fall back to another game's log.
+#[test]
+fn v55_logs_refuse_when_the_pinned_build_is_missing() {
+    let sb = Sandbox::new();
+    let store = sb.ctx().store().expect("store");
+    let p = store.create("Pinned").expect("create");
+    store.set_pin(&p.id, Some("1.5.4409-rev1118")).expect("pin");
+    let mut app = sb.app();
+    let _ = app.update(Message::Select(p.id.clone()));
+    let refused = |app: &App| matches!(&app.notice, Some(Notice::Error(e)) if *e == text::build_missing("1.5.4409-rev1118"));
+    let _ = app.update(Message::OpenLog);
+    assert!(refused(&app), "{:?}", app.notice);
+    app.notice = None;
+    let _ = app.update(Message::CopyLog);
+    assert!(refused(&app), "{:?}", app.notice);
 }

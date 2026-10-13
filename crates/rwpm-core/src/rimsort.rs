@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
+use crate::builds::EffectiveGame;
 use crate::consent::{Consent, Scope};
-use crate::discovery::GameInstall;
 use crate::profile::{Mode, Profile};
 
 const DIR: &str = "RimSort";
@@ -81,7 +81,7 @@ pub struct ExportPlan {
 /// Prepares the instance for `profile`. Reads only.
 pub fn plan_export(
     profile: &Profile,
-    game: &GameInstall,
+    game: &EffectiveGame,
     rwpm_exe: &Path,
     settings: &Path,
 ) -> Result<ExportPlan, RimSortError> {
@@ -163,7 +163,7 @@ pub fn apply_export(
 struct Fields<'a> {
     name: &'a str,
     profile: &'a Profile,
-    game: &'a GameInstall,
+    game: &'a EffectiveGame,
     run_args: String,
     instance_dir: PathBuf,
 }

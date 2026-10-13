@@ -2,7 +2,7 @@
 //! wrong with it (T29, read-only). OFFLINE profiles load from their own frozen copies,
 //! so anything else is flagged the way the launch guard (V5) would see it.
 
-use crate::discovery::GameInstall;
+use crate::builds::EffectiveGame;
 use crate::mods::{ModIndex, Origin, read_active_mods};
 
 use super::{Mode, Profile};
@@ -39,7 +39,7 @@ pub struct ModRow {
 }
 
 /// The mods turned on in `profile`, in load order. No mod list yet → empty.
-pub fn mod_list(profile: &Profile, game: &GameInstall) -> Result<Vec<ModRow>, String> {
+pub fn mod_list(profile: &Profile, game: &EffectiveGame) -> Result<Vec<ModRow>, String> {
     let config = profile
         .save_data_dir()
         .join("Config")
@@ -109,7 +109,7 @@ pub fn matches(row: &ModRow, needle: &str) -> bool {
 mod tests {
     use super::*;
     use crate::discovery::Engine;
-    use crate::discovery::SteamInfo;
+    use crate::discovery::{GameInstall, SteamInfo};
     use crate::profile::{Location, ProfileId};
 
     struct World {
@@ -139,8 +139,8 @@ mod tests {
             .expect("about");
         }
 
-        fn game(&self) -> GameInstall {
-            GameInstall {
+        fn game(&self) -> EffectiveGame {
+            EffectiveGame::steam(GameInstall {
                 game_dir: self.path("game"),
                 exe: self.path("game/RimWorldLinux"),
                 version: None,
@@ -149,7 +149,7 @@ mod tests {
                     library_dir: self.path("library"),
                     workshop_dir: self.path("workshop"),
                 }),
-            }
+            })
         }
 
         fn profile(&self, mode: Mode, active: &[&str]) -> Profile {

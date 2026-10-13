@@ -256,6 +256,15 @@ pub fn from_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
     Ok(install)
 }
 
+/// A stored build's game folder (§C "effective game"). The copy sits outside
+/// `steamapps`, so its Steam library comes from `source_dir`, the install it was
+/// captured from: workshop items stay in that library.
+pub fn from_build_dir(dir: &Path, source_dir: &Path) -> Result<GameInstall, DiscoveryError> {
+    let mut install = read_game_dir(dir)?;
+    install.steam = library_of(source_dir).map(steam_info);
+    Ok(install)
+}
+
 /// The game's exe in `dir`, by name. Precedence is fixed: the Unity exe first, the
 /// Waylith exe second (V69 / B12 / B13). A folder can hold both — Steam leaves the old
 /// bundle behind as a husk when it switches version — so "the first one that is actually

@@ -60,7 +60,11 @@ fn real_offline_launch_through_the_packaged_bundle() {
     let profile = store.create(PROFILE_NAME).expect("create profile");
 
     // V36: no mod list yet on a brand-new profile → nothing to freeze, trivial OFFLINE.
-    let plan = plan_offline(&store, &profile.id, &game, false).expect("plan_offline");
+    let app_dir = paths::app_data_dir().expect("app data dir");
+    let effective =
+        rwpm_core::builds::effective_game(&profile, Some(&game), store.root(), &app_dir)
+            .expect("effective game");
+    let plan = plan_offline(&store, &profile.id, &effective, false).expect("plan_offline");
     let profile =
         apply_offline(&store, &plan, &[], &ProcessProbe, &mut |_| {}).expect("apply_offline");
 

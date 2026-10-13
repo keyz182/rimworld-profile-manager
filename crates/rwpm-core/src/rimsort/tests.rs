@@ -1,7 +1,7 @@
 use super::*;
 use crate::consent::ConsentStore;
 use crate::discovery::Engine;
-use crate::discovery::SteamInfo;
+use crate::discovery::{GameInstall, SteamInfo};
 use crate::profile::{Location, ProfileId};
 
 struct Probe(bool);
@@ -70,8 +70,8 @@ impl Fixture {
         self.tmp.path().join("RimSort/settings.json")
     }
 
-    fn game(&self, steam: bool) -> GameInstall {
-        GameInstall {
+    fn game(&self, steam: bool) -> EffectiveGame {
+        EffectiveGame::steam(GameInstall {
             game_dir: PathBuf::from("/games/RimWorld"),
             exe: PathBuf::from("/games/RimWorld/RimWorldLinux"),
             version: None,
@@ -80,7 +80,7 @@ impl Fixture {
                 library_dir: PathBuf::from("/steam"),
                 workshop_dir: PathBuf::from("/steam/steamapps/workshop/content/294100"),
             }),
-        }
+        })
     }
 
     fn consent(&self) -> Consent {
@@ -445,7 +445,7 @@ fn real_settings_copy_export() {
     let copy = tmp.path().join("RimSort/settings.json");
     std::fs::create_dir_all(copy.parent().expect("dir")).expect("dir");
     std::fs::copy(&real, &copy).expect("copy");
-    let game = crate::discovery::discover(None).expect("discover");
+    let game = EffectiveGame::steam(crate::discovery::discover(None).expect("discover"));
     let plan = plan_export(
         &profile("Smoke Run", Mode::Offline),
         &game,
@@ -490,4 +490,49 @@ fn runs_profile_knows_every_form_this_tool_wrote() {
     ));
     assert!(!runs_profile("gamemoderun %command%", "beta"));
     assert!(!runs_profile("'/r/rwpm' run beta -- %command% -x", "beta"));
+}
+
+/// V55 (+ T57): a pinned profile's instance names the build — its game folder and, LIVE,
+/// its `Mods` — while the workshop stays Steam's.
+#[test]
+fn v55_pinned_export_points_at_the_build() {
+    use crate::builds::effective::test_support::Games;
+    use crate::builds::effective_game;
+    let f = Fixture::new();
+    let games = Games::new(f.tmp.path(), &f.tmp.path().join("profiles"));
+    let resolve = |p: &Profile| {
+        effective_game(
+            p,
+            Some(&games.live),
+            &f.tmp.path().join("profiles"),
+            f.tmp.path(),
+        )
+        .expect("resolve")
+    };
+    let pinned = Profile {
+        game_build: Some(games.build_key.to_string()),
+        ..profile("Pinned Run", Mode::Live)
+    };
+    let plain = profile("Plain Run", Mode::Live);
+    for p in [&pinned, &plain] {
+        let plan =
+            plan_export(p, &resolve(p), Path::new("/opt/rwpm/rwpm"), &f.settings()).expect("plan");
+        f.apply(&plan).expect("apply");
+    }
+    let json = f.json();
+    let field = |inst: &str, k: &str| PathBuf::from(json["instances"][inst][k].as_str().expect(k));
+    let build = resolve(&pinned);
+    assert_eq!(
+        field("Pinned Run", "game_folder"),
+        build.rimsort_game_folder()
+    );
+    assert_eq!(field("Pinned Run", "local_folder"), build.mods_dir());
+    assert!(field("Pinned Run", "local_folder").starts_with(&games.build_dir));
+    assert_eq!(
+        field("Plain Run", "game_folder"),
+        games.live.rimsort_game_folder()
+    );
+    assert_eq!(field("Plain Run", "local_folder"), games.live.mods_dir());
+    let workshop = &games.live.steam.as_ref().expect("steam").workshop_dir;
+    assert_eq!(&field("Pinned Run", "workshop_folder"), workshop);
 }

@@ -2,7 +2,7 @@ use crate::discovery::Engine;
 use std::path::PathBuf;
 
 use super::*;
-use crate::discovery::SteamInfo;
+use crate::discovery::{GameInstall, SteamInfo};
 
 struct NoTrash;
 
@@ -45,8 +45,8 @@ impl Fixture {
         ProfileStore::open(self.path("profiles"), self.path("game-save"), NoTrash).expect("store")
     }
 
-    fn game(&self) -> GameInstall {
-        GameInstall {
+    fn game(&self) -> EffectiveGame {
+        EffectiveGame::steam(GameInstall {
             game_dir: self.path("install"),
             exe: self.path("install/RimWorldLinux"),
             version: None,
@@ -55,7 +55,7 @@ impl Fixture {
                 library_dir: self.path("lib"),
                 workshop_dir: self.path("ws"),
             }),
-        }
+        })
     }
 
     fn add_mod(&self, rel: &str, id: &str) -> PathBuf {

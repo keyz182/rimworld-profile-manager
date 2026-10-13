@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use crate::discovery::GameInstall;
+use crate::builds::EffectiveGame;
 use crate::error::ProfileError;
 use crate::mods::{
     ModIndex, ModsError, Origin, STEAM_POSTFIX, read_active_mods, rewrite_active_mods,
@@ -57,7 +57,7 @@ impl GuardReport {
 pub fn check_offline<T: Trash>(
     store: &ProfileStore<T>,
     id: &ProfileId,
-    game: &GameInstall,
+    game: &EffectiveGame,
 ) -> Result<GuardReport, ProfileError> {
     let profile = store.get(id)?;
     let Location::Stored { dir } = &profile.location else {

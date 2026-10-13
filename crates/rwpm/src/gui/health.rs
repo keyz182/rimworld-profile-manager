@@ -16,19 +16,20 @@ use super::{App, text as t, theme};
 impl App {
     /// Starts checking the selected profile; the answer comes back as `HealthRead`.
     pub(super) fn check_health(&self) -> Task<Message> {
-        let (Some(profile), Ok(game)) = (self.current().cloned(), self.game.clone()) else {
+        let Some(profile) = self.current().cloned() else {
             return Task::none();
         };
+        let live = self.game.clone().ok();
         let ctx = self.ctx.clone();
         let id = profile.id.clone();
         Task::perform(
             async move {
                 let settings = rimsort::settings_path().filter(|s| s.is_file());
                 match ctx.store() {
-                    Ok(store) => health::check(
+                    Ok(store) => health::check_profile(
                         &store,
                         &profile,
-                        &game,
+                        live.as_ref(),
                         &ctx.app_dir,
                         settings.as_deref(),
                         Os::current(),
@@ -42,8 +43,9 @@ impl App {
 
     /// "Freeze them": copies the mods that would load from Steam into the profile.
     pub(super) fn freeze_unfrozen(&mut self) -> Task<Message> {
-        let Ok(game) = self.game.clone() else {
-            return self.fail(t::NO_GAME);
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
         };
         let report = self
             .ctx
@@ -104,6 +106,7 @@ impl App {
                     t::ONLY_GAME_CONTENT.to_owned(),
                     Some((t::COPY_SETTINGS_MENU, Message::OpenCopySettings)),
                 ),
+                Problem::BuildMissing(key) => (t::build_missing(key), None),
                 Problem::RimSortStale(name) => (
                     t::rimsort_stale(name),
                     Some((t::FIX_RIMSORT, Message::Export)),

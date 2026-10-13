@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::discovery::GameInstall;
+use crate::builds::EffectiveGame;
 use crate::error::ProfileError;
 use crate::fs_copy::copy_tree;
 use crate::mods::{ModIndex, ModsError, STEAM_POSTFIX, read_active_mods};
@@ -57,7 +57,7 @@ pub struct OfflinePlan {
 pub fn plan_offline<T: Trash>(
     store: &ProfileStore<T>,
     id: &ProfileId,
-    game: &GameInstall,
+    game: &EffectiveGame,
     refresh: bool,
 ) -> Result<OfflinePlan, ProfileError> {
     let dir = stored_dir(&store.get(id)?, "made OFFLINE")?;

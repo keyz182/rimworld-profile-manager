@@ -10,6 +10,7 @@
 
 pub mod acf;
 pub mod capture;
+pub mod effective;
 pub mod file;
 
 use std::fmt;
@@ -22,6 +23,7 @@ use crate::profile::lock::{take_run_lock, try_run_lock};
 use crate::profile::running::RunningProbe;
 use crate::profile::store::{ProfileStore, Trash};
 
+pub use effective::{EffectiveGame, GameSource, effective_game};
 pub use file::{BuildFile, dlc_folders};
 
 /// A capture in flight. Never a build: it is swapped into place under its real key.
