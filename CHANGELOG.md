@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.4.0](https://github.com/keyz182/rimworld-profile-manager/compare/c6b50badbee302737c00e7fede7e187cfd62659d..v1.4.0) - 2026-10-13
+#### Features
+- (**core**) T53 game build store — capture, update, delete (#10) - ([c6b50ba](https://github.com/keyz182/rimworld-profile-manager/commit/c6b50badbee302737c00e7fede7e187cfd62659d)) - Kieran Evans
+
+- - -
+
 ## [v1.3.0](https://github.com/keyz182/rimworld-profile-manager/compare/a214fe2af287146c95865a0265721f66032fc521..v1.3.0) - 2026-10-12
 #### Features
 - (**launch**) T65 launch RimWorld 1.7 (Waylith) profiles - ([e9a5d82](https://github.com/keyz182/rimworld-profile-manager/commit/e9a5d82e87575802da2f3d5818ac8c19a8a7bcc5)) - [@keyz182](https://github.com/keyz182)
