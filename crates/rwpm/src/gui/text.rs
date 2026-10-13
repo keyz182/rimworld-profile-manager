@@ -109,7 +109,7 @@ pub const TIP_GO_LIVE: &str =
 
 // Help.
 pub const HELP_TITLE: &str = "How profiles work";
-pub const HELP_SECTIONS: [(&str, &str); 6] = [
+pub const HELP_SECTIONS: [(&str, &str); 7] = [
     (
         "Profiles",
         "Each profile has its own saves, settings and mod list. Playing one never touches another.",
@@ -133,6 +133,10 @@ pub const HELP_SECTIONS: [(&str, &str); 6] = [
     (
         "RimWorld 1.7",
         "Profiles work on 1.7 (Steam's unstable branch) as on 1.6. The first time a profile starts on 1.7, the game clears its mod list, because a 1.6 list does not carry over. Keep separate profiles for 1.6 and 1.7. Pressing Play in Steam without this tool's launch options starts Default, so Default's list is cleared too.",
+    ),
+    (
+        "Game versions",
+        "A game version is a full copy of RimWorld. A profile can play one, so it stays on 1.6 while Steam runs 1.7. Use \"Game versions\" at the top to store or delete copies. Each copy takes about as much disk space as the game, unless your file system shares data. Steam's own Play button, without this tool's launch options, starts the Steam version. Windows copies of 1.6 have no Steam overlay.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";

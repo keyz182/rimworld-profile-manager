@@ -1,7 +1,7 @@
 //! The dialogs shown on top of the main window, one at a time.
 
-use iced::Element;
-use iced::widget::{button, column, row, space, text, text_input};
+use iced::widget::{Column, button, column, row, scrollable, space, text, text_input};
+use iced::{Element, Length};
 use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
 use rwpm_core::profile::offline::OfflinePlan;
@@ -75,19 +75,30 @@ fn heading(words: &str) -> iced::widget::Text<'_> {
     text(words).size(18).font(UI_BOLD)
 }
 
+/// The help sections scroll; the title and OK stay put, so OK is always on screen even
+/// in the smallest window (V33, T59 D36). The sections once filled 600 px on their own.
 fn help_dialog() -> Element<'static, Message> {
-    let mut body = column![heading(t::HELP_TITLE)].spacing(12);
+    let mut sections = Column::new()
+        .spacing(12)
+        .padding(iced::Padding::ZERO.right(16));
     for (title, words) in t::HELP_SECTIONS {
-        body = body.push(column![text(title).font(UI_BOLD), text(words).size(14)].spacing(2));
+        sections =
+            sections.push(column![text(title).font(UI_BOLD), text(words).size(14)].spacing(2));
     }
-    body.push(text(t::ICON_CREDIT).size(12).style(theme::muted))
-        .push(row![
+    let sections = sections.push(text(t::ICON_CREDIT).size(12).style(theme::muted));
+    column![
+        heading(t::HELP_TITLE),
+        scrollable(sections).height(Length::Fill),
+        row![
             space::horizontal(),
             button(t::OK)
                 .on_press(Message::Cancel)
                 .style(theme::primary)
-        ])
-        .into()
+        ]
+    ]
+    .spacing(12)
+    .height(Length::Fill)
+    .into()
 }
 
 /// Cancel and the main button; the main button is disabled until `ok` is set.

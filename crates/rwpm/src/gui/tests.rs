@@ -14,6 +14,7 @@ use super::message::{Field, GuardChoice, Message, NameFor, Outcome};
 use super::*;
 
 mod builds;
+mod docs;
 mod gating;
 mod picker;
 
@@ -1555,4 +1556,28 @@ fn log_game_is_decided_by_error_kind() {
     let store_root = sb.ctx().settings().is_err();
     assert!(store_root, "settings are unreadable");
     assert!(matches!(app.log_game(), Err(GameError::Other(_))));
+}
+
+/// T59 D36: the Help dialog keeps its OK button on screen at the smallest window the
+/// layout is designed for (V33), however many sections it has.
+#[test]
+fn help_keeps_ok_on_screen_at_the_smallest_window() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    let _ = app.update(Message::Help);
+    let settings = iced::Settings {
+        fonts: super::icon::fonts(),
+        default_font: super::icon::UI,
+        ..iced::Settings::default()
+    };
+    let mut ui = iced_test::Simulator::with_size(settings, (960.0, 600.0), app.view());
+    let ok = ui.find(text::OK).expect("OK is found");
+    let bounds = ok.visible_bounds().expect("OK is inside the window");
+    assert!(
+        bounds.y + bounds.height <= 600.0,
+        "OK ends at {}",
+        bounds.y + bounds.height
+    );
+    ui.find(text::HELP_SECTIONS[0].1)
+        .expect("the first section is visible");
 }

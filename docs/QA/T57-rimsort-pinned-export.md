@@ -25,7 +25,7 @@ The setup helper stores a full copy of your Steam RimWorld folder in the app's p
 
 ## Setup: store a build and pin a profile
 
-The app has no capture button yet (task T56), so a test helper runs the real capture code.
+This setup uses a test helper that runs the real capture code. It does not use the app's "Capture current game" button, so the checks below do not depend on the screen.
 
 1. In the repository, run:
    `RWPM_T57_E2E=1 cargo test -p rwpm-core t57_e2e_capture_and_pin -- --ignored --nocapture`
