@@ -200,8 +200,14 @@ impl App {
                     _ => {}
                 }
             }
-            Message::BuildsRead(Ok(view)) => self.builds = Some(view),
-            Message::BuildsRead(Err(e)) => return self.fail(e),
+            Message::BuildsRead(Ok(view)) => {
+                self.builds = Some(view);
+                self.builds_error = None;
+            }
+            Message::BuildsRead(Err(e)) => {
+                self.builds_error = Some(e.clone());
+                return self.fail(e);
+            }
             Message::CaptureBuild => return self.capture_build(),
             Message::DeleteBuild(key) => self.ask_delete_build(&key),
             Message::ChangeGameVersion => return self.change_game_version(),
@@ -315,7 +321,14 @@ impl App {
                 self.selected = id;
                 return self.loader_then_play();
             }
-            Err(e) => self.notice = Some(Notice::Error(e)),
+            Err(e) => {
+                self.notice = Some(Notice::Error(e));
+                // A failed Delete or Capture may mean the list is out of date (a profile
+                // pinned the version meanwhile): read it again.
+                if self.drill == Some(super::message::Drill::GameVersions) {
+                    return self.read_builds_task();
+                }
+            }
         }
         Task::none()
     }
@@ -344,6 +357,10 @@ impl App {
                 ..
             }) => return self.save_settings(game, steam, move_to),
             Some(Dialog::ConfirmMove(plan)) => return self.apply_move(plan),
+            Some(Dialog::ConfirmCapture(plan)) if !super::builds::fits(&plan) => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::ConfirmCapture(plan));
+            }
             Some(Dialog::ConfirmCapture(plan)) => return self.apply_capture(plan),
             Some(Dialog::PickVersion { chosen, .. }) => return self.confirm_pick(chosen),
             Some(Dialog::ConfirmDowngrade { to, .. }) => {

@@ -4,7 +4,7 @@
 
 use iced::widget::{Column, button, column, container, row, scrollable, space, text};
 use iced::{Alignment, Element, Length, Task};
-use rwpm_core::builds::capture::{CaptureKind, apply_capture, plan_capture};
+use rwpm_core::builds::capture::{CaptureKind, CapturePlan, apply_capture, plan_capture};
 use rwpm_core::builds::{BuildKey, BuildStore, pinned_by};
 use rwpm_core::discovery::{Engine, engine_of};
 use rwpm_core::profile::ProcessProbe;
@@ -17,15 +17,22 @@ use super::{App, Ctx, Notice, text as t, theme};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildRow {
     pub key: String,
-    /// `None` when `build.toml` cannot be read; then `problem` says why.
     pub waylith: bool,
     pub size: u64,
+    /// The date stored; `None` when `build.toml` cannot be read.
     pub stored: Option<String>,
+    /// Why `build.toml` cannot be read, if it cannot.
     pub problem: Option<String>,
     /// Display names of profiles pinned to it (V54).
     pub used_by: Vec<String>,
     /// Profiles whose `profile.toml` could not be read, so their pin is unknown (D27).
     pub unchecked: Vec<String>,
+}
+
+/// Will the copy fit in the free space (when it is known)? The dialog and its Confirm use
+/// the same answer, so Enter cannot start what the disabled button refuses.
+pub fn fits(plan: &CapturePlan) -> bool {
+    plan.free_bytes.is_none_or(|free| free >= plan.bytes)
 }
 
 impl BuildRow {
@@ -177,7 +184,10 @@ impl App {
         .style(theme::ghost)
         .on_press(Message::Drill(None));
         let list: Element<'_, Message> = match &self.builds {
-            None => text(t::GV_READING).style(theme::muted).into(),
+            None => match &self.builds_error {
+                Some(e) => text(t::gv_unreadable(e)).style(theme::error).into(),
+                None => text(t::GV_READING).style(theme::muted).into(),
+            },
             Some(view) if view.rows.is_empty() => text(t::GV_EMPTY).style(theme::muted).into(),
             Some(view) => scrollable(
                 Column::with_children(view.rows.iter().map(|r| self.build_row(r)))

@@ -299,7 +299,7 @@ fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
             t::STORE_IT,
         ),
     };
-    let fits = plan.free_bytes.is_none_or(|free| free >= plan.bytes);
+    let fits = super::builds::fits(plan);
     let mut body = column![text(words)].spacing(12);
     if !fits {
         body = body.push(text(t::NOT_ENOUGH_ROOM).style(theme::error));

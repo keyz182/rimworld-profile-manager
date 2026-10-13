@@ -765,6 +765,10 @@ pub fn game_version_changed(profile: &str, label: &str) -> String {
     format!("“{profile}” now plays {label}.")
 }
 
+pub fn gv_unreadable(reason: &str) -> String {
+    format!("The stored game versions cannot be read: {reason}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

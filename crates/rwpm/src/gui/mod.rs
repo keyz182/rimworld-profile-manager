@@ -196,6 +196,8 @@ pub struct App {
     pub other_profiles: Option<PathBuf>,
     /// The stored game versions, once read (T56).
     pub builds: Option<builds::BuildsView>,
+    /// Why the stored game versions could not be read, if they could not.
+    pub builds_error: Option<String>,
 }
 
 impl App {
@@ -222,6 +224,7 @@ impl App {
             health: HashMap::new(),
             other_profiles: None,
             builds: None,
+            builds_error: None,
         };
         app.reload();
         app.decide_setup();

@@ -11,6 +11,20 @@ use crate::gui::Job;
 pub(super) const VERSION: &str = "1.6.4871 rev598";
 pub(super) const KEY: &str = "1.6.4871-rev598";
 
+/// No RimWorld running, whatever is on this machine (the job-thread test is the one that
+/// uses the real probe).
+struct NoGameRunning;
+
+impl rwpm_core::profile::RunningProbe for NoGameRunning {
+    fn is_running(&self, _: &std::path::Path) -> bool {
+        false
+    }
+
+    fn any_game(&self) -> bool {
+        false
+    }
+}
+
 impl Sandbox {
     /// Makes the sandbox game a Steam install Capture accepts (V58: `StateFlags` 4).
     pub(super) fn steam_install(&self, buildid: &str) {
@@ -47,7 +61,7 @@ impl Sandbox {
         rwpm_core::builds::capture::apply_capture(
             &self.builds(),
             &plan,
-            &rwpm_core::profile::ProcessProbe,
+            &NoGameRunning,
             &mut |_| {},
         )
         .expect("capture");
@@ -319,4 +333,87 @@ fn capture_without_a_game_says_why() {
     let _ = app.update(Message::CaptureBuild);
     assert_eq!(app.notice, Some(Notice::Error(text::GV_NO_GAME.to_owned())));
     assert!(app.job.is_none());
+}
+
+/// Review F1: Enter sends Confirm for any dialog; a copy that will not fit must stay
+/// refused, like the disabled "Store it" button.
+#[test]
+fn enter_cannot_store_a_copy_that_will_not_fit() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let mut app = sb.app();
+    let mut plan = plan_capture(&sb.builds(), app.game.as_ref().expect("game")).expect("plan");
+    plan.bytes = 1000;
+    plan.free_bytes = Some(10);
+    let _ = app.update(Message::Done(Ok(Outcome::CapturePlanned(Box::new(plan)))));
+    let _ = app.update(Message::Confirm);
+    assert!(
+        matches!(app.dialog, Some(Dialog::ConfirmCapture(_))),
+        "the question stays"
+    );
+    assert!(app.job.is_none(), "nothing started");
+}
+
+/// Review F2: a failed job re-reads the open list; a first read that fails shows why
+/// instead of "Reading…" for ever.
+#[test]
+fn failures_do_not_leave_the_list_stale_or_reading() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    // Health is one task; the list read is the second.
+    let closed = app.update(Message::Done(Err("in use".into()))).units();
+    let _ = app.update(Message::Drill(Some(Drill::GameVersions)));
+    let open = app.update(Message::Done(Err("in use".into()))).units();
+    assert_eq!(open, closed + 1, "the open list is read again");
+
+    let mut app = sb.app();
+    let _ = app.update(Message::Drill(Some(Drill::GameVersions)));
+    let _ = app.update(Message::BuildsRead(Err("boom".into())));
+    assert!(found(&app, &text::gv_unreadable("boom")));
+    assert!(!found(&app, text::GV_READING));
+}
+
+/// Review F6: a stored, deleted or updated version re-reads the list.
+#[test]
+fn a_finished_capture_or_delete_reads_the_list_again() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    let other = app.update(Message::Done(Err("x".into()))).units();
+    let changed = app
+        .update(Message::Done(Ok(Outcome::BuildsChanged("done".into()))))
+        .units();
+    assert_eq!(changed, other + 1);
+}
+
+/// Review F6: Confirm on the new dialogs waits for a running job or game, like the rest.
+#[test]
+fn confirm_on_capture_and_delete_dialogs_waits_for_a_job_or_game() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let mut app = sb.app();
+    let plan = plan_capture(&sb.builds(), app.game.as_ref().expect("game")).expect("plan");
+    let capture = Dialog::ConfirmCapture(Box::new(plan));
+    let delete = Dialog::ConfirmDeleteBuild {
+        key: KEY.into(),
+        bytes: 1,
+    };
+    for dialog in [capture, delete] {
+        app.dialog = Some(dialog);
+        app.game_running = true;
+        let _ = app.update(Message::Confirm);
+        assert!(
+            app.dialog.is_some() && app.job.is_none(),
+            "a game is running"
+        );
+        app.game_running = false;
+        app.job = Some(Job {
+            label: "Busy".into(),
+            done: 0,
+            total: 1,
+        });
+        let _ = app.update(Message::Confirm);
+        assert!(app.dialog.is_some(), "a job is running");
+        assert_eq!(app.job.as_ref().map(|j| j.label.as_str()), Some("Busy"));
+        app.job = None;
+    }
 }
