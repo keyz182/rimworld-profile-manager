@@ -21,6 +21,7 @@ mod watch;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use rwpm_core::builds::{EffectiveGame, effective_game};
 use rwpm_core::discovery::GameInstall;
 use rwpm_core::paths::Layout;
 use rwpm_core::profile::{LastRun, OsTrash, Profile, ProfileId, ProfileStore};
@@ -99,6 +100,23 @@ impl Ctx {
     pub fn store(&self) -> Result<ProfileStore<OsTrash>, ProfileError> {
         let root = self.settings()?.profiles_root(&self.app_dir);
         ProfileStore::open(root, self.game_save_dir.clone(), OsTrash)
+    }
+
+    /// The game `profile` plays (V55): its stored build when pinned, else `live`, the
+    /// Steam install. Errors in plain words.
+    pub fn effective_game(
+        &self,
+        profile: &Profile,
+        live: Option<&GameInstall>,
+    ) -> Result<EffectiveGame, String> {
+        let root = self
+            .settings()
+            .map_err(|e| e.to_string())?
+            .profiles_root(&self.app_dir);
+        effective_game(profile, live, &root, &self.app_dir).map_err(|e| match e {
+            ProfileError::NoGame => text::NO_GAME.to_owned(),
+            e => e.to_string(),
+        })
     }
 }
 
@@ -258,6 +276,12 @@ impl App {
         } else {
             None
         }
+    }
+
+    /// The selected profile's game (V55). Every per-profile game action goes through it.
+    pub fn effective_game(&self) -> Result<EffectiveGame, String> {
+        let profile = self.current().ok_or_else(|| text::NO_GAME.to_owned())?;
+        self.ctx.effective_game(profile, self.game.as_ref().ok())
     }
 
     pub fn current(&self) -> Option<&Profile> {

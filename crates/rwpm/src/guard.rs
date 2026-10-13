@@ -9,11 +9,13 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use rwpm_core::builds::{EffectiveGame, effective_game};
 use rwpm_core::discovery::{self, GameInstall};
-use rwpm_core::launch;
+use rwpm_core::error::ProfileError;
 use rwpm_core::profile::guard::{self, Fix, GuardReport};
 use rwpm_core::profile::offline::now_datetime;
 use rwpm_core::profile::{OsTrash, ProcessProbe, Profile, ProfileStore};
+use rwpm_core::{launch, paths};
 
 /// Test and headless override: `add`, `off`, `launch`, `cancel` or `unavailable`.
 pub const CHOICE_ENV: &str = "RWPM_GUARD_CHOICE";
@@ -44,7 +46,9 @@ enum Choice {
 /// the game launches, except a failed fix, which is shown and cancels the launch.
 pub fn run(store: &ProfileStore<OsTrash>, profile: &Profile, command: &[OsString]) -> Outcome {
     let log = |msg: &str| append_log(profile, msg);
-    let report = match find_game(command)
+    let report = match paths::app_data_dir()
+        .ok_or_else(|| "no user data folder".to_owned())
+        .and_then(|app_dir| guard_game(profile, command, store.root(), &app_dir))
         .and_then(|game| guard::check_offline(store, &profile.id, &game).map_err(|e| e.to_string()))
     {
         Ok(report) => report,
@@ -99,6 +103,23 @@ pub fn run(store: &ProfileStore<OsTrash>, profile: &Profile, command: &[OsString
             Outcome::Cancel
         }
     }
+}
+
+/// The game the guard checks: the profile's effective game (V55). For an unpinned profile
+/// that is the game folder holding the launched program, else the Steam install.
+fn guard_game(
+    profile: &Profile,
+    command: &[OsString],
+    profiles_root: &Path,
+    app_dir: &Path,
+) -> Result<EffectiveGame, String> {
+    let live = find_game(command);
+    effective_game(profile, live.as_ref().ok(), profiles_root, app_dir).map_err(|e| {
+        match (e, live) {
+            (ProfileError::NoGame, Err(why)) => why,
+            (e, _) => e.to_string(),
+        }
+    })
 }
 
 /// The game folder holding the launched program, else the Steam install.
@@ -414,6 +435,60 @@ pub(crate) fn append_log(profile: &Profile, msg: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A Unity game folder: the platform exe and `Version.txt`.
+    fn write_game(dir: &Path, version: &str) {
+        let exe = dir.join(discovery::GAME_EXE);
+        if discovery::is_bundle_path(&exe) {
+            std::fs::create_dir_all(exe.join("Contents/MacOS")).expect("bundle");
+            std::fs::write(exe.join("Contents/Info.plist"), "<plist/>").expect("plist");
+            std::fs::write(exe.join("Contents/MacOS/RimWorldMac"), b"").expect("bin");
+        } else {
+            std::fs::create_dir_all(dir).expect("dir");
+            std::fs::write(&exe, b"").expect("exe");
+        }
+        std::fs::write(dir.join("Version.txt"), version).expect("version");
+    }
+
+    /// V55: the guard of `rwpm run` checks the pinned build, whatever the command names.
+    #[test]
+    fn v55_run_guard_checks_the_pinned_build() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (root, app) = (tmp.path().join("profiles"), tmp.path().join("app"));
+        let live = tmp.path().join("steam/steamapps/common/RimWorld");
+        write_game(&live, "1.6.4871 rev598");
+        let build = root.join("builds/1.5.4409-rev1118");
+        write_game(&build, "1.5.4409 rev1118");
+        std::fs::write(
+            build.join("build.toml"),
+            format!(
+                "schema = 1\nversion = \"1.5.4409 rev1118\"\nbuildid = \"1\"\nbeta = \"\"\n\
+                 dlc = []\ncaptured_at = 2026-10-13T00:00:00Z\nsource_dir = {:?}\nsize = 0\n",
+                live.display().to_string()
+            ),
+        )
+        .expect("build.toml");
+        let store =
+            ProfileStore::open(root.clone(), tmp.path().join("save"), OsTrash).expect("store");
+        let plain = store.create("Plain").expect("create");
+        let pinned = store.create("Pinned").expect("create");
+        let pinned = store
+            .set_pin(&pinned.id, Some("1.5.4409-rev1118"))
+            .expect("pin");
+        let command = [live.join(discovery::GAME_EXE).into_os_string()];
+
+        let game = guard_game(&plain, &command, &root, &app).expect("plain");
+        assert_eq!(game.game_dir, live);
+        let game = guard_game(&pinned, &command, &root, &app).expect("pinned");
+        assert_eq!(game.game_dir, build);
+        let workshop = tmp.path().join("steam/steamapps/workshop/content/294100");
+        let workshop_of = |g: &EffectiveGame| g.steam.as_ref().map(|s| s.workshop_dir.clone());
+        assert_eq!(workshop_of(&game), Some(workshop.clone()));
+
+        std::fs::remove_dir_all(&build).expect("lose build");
+        let err = guard_game(&pinned, &command, &root, &app).expect_err("missing");
+        assert!(err.contains("1.5.4409-rev1118"), "{err}");
+    }
 
     #[test]
     fn windows_dialog_exit_codes_map_to_choices() {

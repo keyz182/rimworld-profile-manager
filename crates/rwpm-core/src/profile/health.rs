@@ -4,7 +4,9 @@
 
 use std::path::Path;
 
+use crate::builds::{EffectiveGame, effective_game};
 use crate::discovery::GameInstall;
+use crate::error::ProfileError;
 use crate::launch::{self, Os};
 use crate::profile::{Mode, Profile, ProfileStore, Trash, guard};
 use crate::{rimsort, winhttp};
@@ -24,6 +26,9 @@ pub enum Problem {
     LoaderForeign,
     /// RimSort's entry points at this profile's old folder (after a Move). Fix: add again.
     RimSortStale(String),
+    /// Pinned to a stored game version that is gone (V55). Every game action refuses
+    /// until the profile is pinned again. No fix here.
+    BuildMissing(String),
 }
 
 /// Does `profile` turn on anything beyond the game's own content (`ludeon.rimworld*`)?
@@ -37,11 +42,28 @@ fn has_own_mods(profile: &Profile) -> bool {
         .is_ok_and(|ids| ids.iter().any(|id| !id.starts_with("ludeon.rimworld")))
 }
 
+/// Checks `profile` against its effective game (V55). A pinned build that is gone is the
+/// one problem reported; with no game at all there is nothing to check.
+pub fn check_profile<T: Trash>(
+    store: &ProfileStore<T>,
+    profile: &Profile,
+    live: Option<&GameInstall>,
+    app_dir: &Path,
+    rimsort_settings: Option<&Path>,
+    os: Os,
+) -> Vec<Problem> {
+    match effective_game(profile, live, store.root(), app_dir) {
+        Ok(game) => check(store, profile, &game, app_dir, rimsort_settings, os),
+        Err(ProfileError::BuildNotFound(key)) => vec![Problem::BuildMissing(key)],
+        Err(_) => Vec::new(),
+    }
+}
+
 /// Checks `profile`. `rimsort_settings`: RimSort's settings file, if RimSort is installed.
 pub fn check<T: Trash>(
     store: &ProfileStore<T>,
     profile: &Profile,
-    game: &GameInstall,
+    game: &EffectiveGame,
     app_dir: &Path,
     rimsort_settings: Option<&Path>,
     os: Os,
@@ -127,8 +149,8 @@ mod tests {
             .expect("about");
         }
 
-        fn game(&self) -> GameInstall {
-            GameInstall {
+        fn game(&self) -> EffectiveGame {
+            EffectiveGame::steam(GameInstall {
                 game_dir: self.path("game"),
                 exe: self.path("game/RimWorldWin64.exe"),
                 version: None,
@@ -137,7 +159,7 @@ mod tests {
                     library_dir: self.path("lib"),
                     workshop_dir: self.path("workshop"),
                 }),
-            }
+            })
         }
 
         fn offline(&self, active: &[&str]) -> Profile {
@@ -256,10 +278,10 @@ mod tests {
         let p = w.offline(&[]);
         // The engine is resolved when the install is read, so a 1.7 install is a
         // `GameInstall` that says Waylith, not a marker file found later.
-        let game = GameInstall {
+        let game = EffectiveGame::steam(GameInstall {
             engine: Engine::Waylith,
-            ..w.game()
-        };
+            ..w.game().install().clone()
+        });
         let problems = check(&w.store(), &p, &game, &w.path("app"), None, Os::Windows);
         assert!(problems.is_empty(), "{problems:?}");
     }

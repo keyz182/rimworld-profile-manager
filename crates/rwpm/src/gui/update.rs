@@ -379,8 +379,9 @@ impl App {
     }
 
     fn plan_offline(&mut self, refresh: bool) -> Task<Message> {
-        let Ok(game) = self.game.clone() else {
-            return self.no_game();
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
         };
         let (ctx, id) = (self.ctx.clone(), self.selected.clone());
         self.start(t::JOB_CHECKING.into(), 0, move |_| {
@@ -420,8 +421,9 @@ impl App {
 
     /// Play: the OFFLINE guard (V5) first, then the Windows loader, then start.
     fn launch(&mut self) -> Task<Message> {
-        let Ok(game) = self.game.clone() else {
-            return self.no_game();
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
         };
         if self.current().is_some_and(|p| p.mode == Mode::Offline) {
             let report = self
@@ -473,8 +475,9 @@ impl App {
 
     /// Windows OFFLINE needs the loader beside the game (T12); ask before installing it.
     fn loader_then_play(&mut self) -> Task<Message> {
-        let Ok(game) = self.game.clone() else {
-            return self.no_game();
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
         };
         let mode = self.current().map_or(Mode::Live, |p| p.mode);
         if launch::needs_game_folder_loader(mode, Os::current(), game.engine()) {
@@ -490,7 +493,11 @@ impl App {
                 }
             }
         }
-        self.play(&game.exe);
+        // The Steam install's exe: `rwpm run` swaps in a pinned build's own (T55).
+        let Ok(live) = self.game.clone() else {
+            return self.no_game();
+        };
+        self.play(&live.exe);
         Task::none()
     }
 
@@ -547,8 +554,9 @@ impl App {
         if self.ctx.launcher_failed {
             return self.fail(t::NO_LAUNCHER);
         }
-        let Ok(game) = self.game.clone() else {
-            return self.no_game();
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
         };
         let Some(profile) = self.current().cloned() else {
             return Task::none();
@@ -581,8 +589,9 @@ impl App {
                 }
             }
             Ask::Loader { then_play } => {
-                let Ok(game) = self.game.clone() else {
-                    return self.no_game();
+                let game = match self.effective_game() {
+                    Ok(g) => g,
+                    Err(e) => return self.fail(e),
                 };
                 let dll = game.game_dir.join(winhttp::DLL);
                 let consent = match store.record(Scope::WinhttpDll, &dll) {
@@ -610,9 +619,12 @@ impl App {
     }
 
     fn remove_loader(&mut self) {
-        let Ok(game) = self.game.clone() else {
-            let _ = self.no_game();
-            return;
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => {
+                let _ = self.fail(e);
+                return;
+            }
         };
         self.notice = Some(match winhttp::remove(&game.game_dir, &self.ctx.app_dir) {
             Ok(()) => Notice::Info(t::LOADER_REMOVED.into()),
@@ -621,7 +633,8 @@ impl App {
     }
 
     fn open_log(&mut self) {
-        let engine = super::support::engine(self.game.as_ref().ok());
+        let game = self.effective_game().ok();
+        let engine = super::support::engine(game.as_deref());
         let Some(log) = self.current().map(|p| p.log_path(engine)) else {
             return;
         };
@@ -649,7 +662,8 @@ impl App {
         let Some(profile) = self.current() else {
             return Task::none();
         };
-        let report = super::support::support_text(profile, self.game.as_ref().ok());
+        let game = self.effective_game().ok();
+        let report = super::support::support_text(profile, game.as_deref());
         self.notice = Some(Notice::Info(t::LOG_COPIED.into()));
         iced::clipboard::write(report)
     }

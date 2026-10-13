@@ -48,6 +48,8 @@ pub enum ProfileError {
     BuildsFolderTaken(PathBuf),
     #[error("no stored game version `{0}`")]
     BuildNotFound(String),
+    #[error("RimWorld was not found")]
+    NoGame,
     #[error("game version `{key}` is used by: {}", .profiles.join(", "))]
     BuildInUse { key: String, profiles: Vec<String> },
     #[error("rwpm cannot tell which game build `{}` is; storing a game version needs a Steam install", .0.display())]

@@ -2,7 +2,7 @@ use crate::discovery::Engine;
 use std::cell::RefCell;
 
 use super::*;
-use crate::discovery::SteamInfo;
+use crate::discovery::{GameInstall, SteamInfo};
 
 #[derive(Default)]
 struct RecordingTrash(RefCell<Vec<PathBuf>>);
@@ -54,8 +54,8 @@ impl Fixture {
             .expect("store")
     }
 
-    fn game(&self) -> GameInstall {
-        GameInstall {
+    fn game(&self) -> EffectiveGame {
+        EffectiveGame::steam(GameInstall {
             game_dir: self.path("install"),
             exe: self.path("install/RimWorldLinux"),
             version: None,
@@ -64,7 +64,7 @@ impl Fixture {
                 library_dir: self.path("lib"),
                 workshop_dir: self.path("ws"),
             }),
-        }
+        })
     }
 
     /// `<rel>/About/About.xml` with the id, plus one payload file.
@@ -475,7 +475,7 @@ fn copied_at_formats_utc() {
 #[test]
 #[ignore = "reads the real RimWorld install and copies real mods into a temp dir"]
 fn real_install_offline_round_trip() {
-    let game = crate::discovery::discover(None).expect("discover");
+    let game = EffectiveGame::steam(crate::discovery::discover(None).expect("discover"));
     let f = Fixture::new();
     let id = f.store().create("Real").expect("create").id;
     let config = f.profile_dir(&id).join(MODS_CONFIG);

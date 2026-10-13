@@ -30,12 +30,15 @@ impl App {
             return Task::none();
         };
         let id = profile.id.clone();
-        let Ok(game) = self.game.clone() else {
-            self.mods = Some(ModList {
-                profile: id,
-                rows: Err(t::NO_GAME.to_owned()),
-            });
-            return Task::none();
+        let game = match self.effective_game() {
+            Ok(g) => g,
+            Err(e) => {
+                self.mods = Some(ModList {
+                    profile: id,
+                    rows: Err(e),
+                });
+                return Task::none();
+            }
         };
         Task::perform(
             async move { mod_list::mod_list(&profile, &game) },
