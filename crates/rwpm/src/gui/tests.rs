@@ -1448,3 +1448,27 @@ fn v55_logs_refuse_when_the_pinned_build_is_missing() {
     let _ = app.update(Message::CopyLog);
     assert!(refused(&app), "{:?}", app.notice);
 }
+
+/// V55 (T57): Add to RimSort refuses for a pinned profile whose build is gone, in the
+/// same words as every other game action, and leaves RimSort's settings alone.
+#[test]
+fn v55_rimsort_export_refuses_when_the_pinned_build_is_missing() {
+    let sb = Sandbox::new();
+    let store = sb.ctx().store().expect("store");
+    let p = store.create("Pinned").expect("create");
+    store.set_pin(&p.id, Some("1.5.4409-rev1118")).expect("pin");
+    let settings = sb.path("rimsort/settings.json");
+    std::fs::create_dir_all(settings.parent().expect("dir")).expect("dir");
+    std::fs::write(&settings, br#"{"instances": {}}"#).expect("settings");
+    let mut app = sb.app();
+    let _ = app.update(Message::Select(p.id.clone()));
+    let missing = text::build_missing("1.5.4409-rev1118");
+    assert_eq!(app.effective_game().map(|_| ()), Err(missing.clone()));
+    let _ = app.export_job(settings.clone());
+    assert_eq!(app.notice, Some(Notice::Error(missing)));
+    assert!(app.job.is_none(), "no RimSort job started");
+    assert_eq!(
+        std::fs::read(&settings).expect("read"),
+        br#"{"instances": {}}"#
+    );
+}

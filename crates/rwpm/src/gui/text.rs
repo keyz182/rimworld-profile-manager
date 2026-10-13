@@ -399,7 +399,7 @@ pub fn not_installed_mods(ids: &[String]) -> String {
 pub fn build_missing(key: &str) -> String {
     format!(
         "This profile uses the stored game version “{key}”, which is gone or cannot be read. \
-         It cannot start or change its mods until it uses a game version that is stored."
+         It cannot be used until it uses a game version that is stored."
     )
 }
 
