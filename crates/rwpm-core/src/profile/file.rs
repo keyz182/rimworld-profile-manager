@@ -6,8 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
 
-/// Highest schema this build reads and the one it writes.
-pub const SCHEMA: u32 = 1;
+/// Highest schema this build reads. Written only when `game_build` is set (§I.file);
+/// without a pin the file stays schema 1, so an older rwpm can still read it.
+pub const SCHEMA: u32 = 2;
+/// The schema a profile with no pinned game build is written as.
+pub const SCHEMA_UNPINNED: u32 = 1;
 pub const FILE_NAME: &str = "profile.toml";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,6 +43,9 @@ pub struct ProfileFile {
     pub schema: u32,
     pub name: String,
     pub mode: Mode,
+    /// Key of the stored game build this profile is pinned to; absent = the Steam install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_build: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frozen_mods: Vec<FrozenMod>,
 }
@@ -47,9 +53,10 @@ pub struct ProfileFile {
 impl ProfileFile {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
-            schema: SCHEMA,
+            schema: SCHEMA_UNPINNED,
             name: name.into(),
             mode: Mode::Live,
+            game_build: None,
             frozen_mods: Vec::new(),
         }
     }
@@ -79,9 +86,21 @@ impl ProfileFile {
             .map_err(|e: toml::de::Error| parse_err(e.to_string()))
     }
 
+    /// §I.file: schema 2 only while a game build is pinned. Recomputed on every write, so
+    /// unpinning takes the file back to schema 1 instead of stranding it on 2.
+    fn to_write(&self) -> Self {
+        let mut out = self.clone();
+        out.schema = if out.game_build.is_some() {
+            SCHEMA
+        } else {
+            SCHEMA_UNPINNED
+        };
+        out
+    }
+
     /// Writes via a sibling temp file + rename, so readers never see a partial file.
     pub fn write_atomic(&self, path: &Path) -> Result<(), ProfileError> {
-        let text = toml::to_string_pretty(self).map_err(|e| ProfileError::Parse {
+        let text = toml::to_string_pretty(&self.to_write()).map_err(|e| ProfileError::Parse {
             path: path.to_path_buf(),
             message: e.to_string(),
         })?;
@@ -102,9 +121,10 @@ mod tests {
 
     fn sample() -> ProfileFile {
         ProfileFile {
-            schema: SCHEMA,
+            schema: SCHEMA_UNPINNED,
             name: "My Modded Run".into(),
             mode: Mode::Offline,
+            game_build: None,
             frozen_mods: vec![FrozenMod {
                 folder: "2009463077".into(),
                 package_id: "brrainz.harmony".into(),
@@ -129,13 +149,46 @@ mod tests {
         let path = dir.path().join(FILE_NAME);
         std::fs::write(
             &path,
-            "schema = 2\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
+            "schema = 3\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
         )
         .expect("write");
         assert!(matches!(
             ProfileFile::read(&path),
-            Err(ProfileError::SchemaTooNew { found: 2, .. })
+            Err(ProfileError::SchemaTooNew { found: 3, .. })
         ));
+    }
+
+    /// §I.file: 2 while pinned, back to 1 when the pin goes.
+    #[test]
+    fn schema_follows_the_pin_in_both_directions() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        let mut file = ProfileFile::new("Run");
+        file.write_atomic(&path).expect("write");
+        assert_eq!(ProfileFile::read(&path).expect("read").schema, 1);
+
+        file.game_build = Some("1.6.4871-rev598".into());
+        file.write_atomic(&path).expect("write");
+        let read = ProfileFile::read(&path).expect("read");
+        assert_eq!(read.schema, 2);
+        assert_eq!(read.game_build.as_deref(), Some("1.6.4871-rev598"));
+
+        file.game_build = None;
+        file.write_atomic(&path).expect("write");
+        assert_eq!(ProfileFile::read(&path).expect("read").schema, 1);
+        let text = std::fs::read_to_string(&path).expect("read");
+        assert!(!text.contains("game_build"), "{text}");
+    }
+
+    /// A schema-1 file written before pins existed still reads.
+    #[test]
+    fn reads_a_schema_one_file_without_a_pin() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        std::fs::write(&path, "schema = 1\nname = \"Old\"\nmode = \"live\"\n").expect("w");
+        let read = ProfileFile::read(&path).expect("read");
+        assert_eq!(read.game_build, None);
+        assert_eq!(read.schema, 1);
     }
 
     #[test]

@@ -275,11 +275,20 @@ fn move_carries_and_verifies_the_build_store() {
     let plan = plan_move(&f.store(), &f.target()).expect("plan");
     assert!(plan.builds, "build store not planned");
     assert_eq!(plan.profiles.len(), 2, "builds counted as a profile");
-    assert!(plan.bytes >= 250_000, "size estimate skipped builds: {}", plan.bytes);
+    assert!(
+        plan.bytes >= 250_000,
+        "size estimate skipped builds: {}",
+        plan.bytes
+    );
 
     f.apply(&plan).expect("move");
     let moved = f.target().join("builds/1.6.4871-rev598");
-    assert_eq!(std::fs::read(moved.join("Data/Core/About.xml")).expect("r").len(), 50_000);
+    assert_eq!(
+        std::fs::read(moved.join("Data/Core/About.xml"))
+            .expect("r")
+            .len(),
+        50_000
+    );
     assert!(!old.join("builds").exists(), "old build store left behind");
     // A pin names a key, not a path, so pinned profiles still resolve after the Move.
     assert!(moved.join("build.toml").is_file());
@@ -303,7 +312,10 @@ fn move_treats_a_legacy_builds_profile_as_a_profile() {
         .expect("toml");
 
     let plan = plan_move(&f.store(), &f.target()).expect("plan");
-    assert!(!plan.builds, "a legacy profile was taken for the build store");
+    assert!(
+        !plan.builds,
+        "a legacy profile was taken for the build store"
+    );
     assert_eq!(plan.profiles.len(), 3);
     f.apply(&plan).expect("move");
     assert!(f.target().join("builds/profile.toml").is_file());

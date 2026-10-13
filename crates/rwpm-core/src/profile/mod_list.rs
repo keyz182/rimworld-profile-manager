@@ -164,6 +164,7 @@ mod tests {
                 id: ProfileId::parse("p").expect("id"),
                 name: "P".into(),
                 mode,
+                game_build: None,
                 location: Location::Stored { dir },
             }
         }
@@ -220,6 +221,7 @@ mod tests {
             id: ProfileId::parse("p").expect("id"),
             name: "P".into(),
             mode: Mode::Live,
+            game_build: None,
             location: Location::Stored {
                 dir: w.path("nothing"),
             },
