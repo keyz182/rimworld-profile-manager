@@ -2,7 +2,8 @@
 
 Check that "Add to RimSort" points RimSort at the profile's stored game version, not at the Steam install.
 
-- **Platform:** Linux. The paths below are Linux paths.
+- **Platform:** Linux. The paths below are for native Steam.
+- **Flatpak Steam:** the app data is in `~/.var/app/com.valvesoftware.Steam/data/RimWorld Profile Manager/`, not in `~/.local/share/RimWorld Profile Manager/`. Steam's game and workshop folders are also inside `~/.var/app/com.valvesoftware.Steam/`. For the exact folders, use the `STEAM_GAME=`, `WORKSHOP=` and `BUILD_DIR=` lines that the setup helper prints. RimSort's own `settings.json` path does not change.
 - **Time:** about 20 minutes, plus the copy time.
 - **Scope:** the export, and RimSort reading the instance. Starting the game from RimSort is not in scope, because the pinned launch is task T55.
 
@@ -28,10 +29,12 @@ The app has no capture button yet (task T56), so a test helper runs the real cap
 
 1. In the repository, run:
    `RWPM_T57_E2E=1 cargo test -p rwpm-core t57_e2e_capture_and_pin -- --ignored --nocapture`
-2. Write down the `KEY=`, `BUILD_DIR=` and `PROFILE=` lines from the output.
+2. Write down the `STEAM_GAME=`, `WORKSHOP=`, `KEY=`, `BUILD_DIR=` and `PROFILE=` lines from the output.
 3. Expected: the test passes, and `BUILD_DIR` exists and holds a RimWorld game folder.
 
-Run the helper one time only. Each run adds one more "T57 Pinned" profile. A build that is already stored is not copied again. To start again, do the rollback first.
+If this game version is already stored, the helper stops with `REFUSED: a build <key> is already stored`. It does not pin or change that build, because the build is yours. Do not continue on this machine. Use a machine where this game version is not stored.
+
+Run the helper one time only. Each run adds one more "T57 Pinned" profile. To start again, do the rollback first.
 
 ## Steps
 
@@ -43,7 +46,7 @@ Run the helper one time only. Each run adds one more "T57 Pinned" profile. A bui
 | 4 | Close the app. Start RimSort. Select the instance "T57 Pinned". | RimSort shows no path error. "T57 Marker" is in the local mods list. Workshop mods are listed. The game version is the version in `KEY`. |
 | 5 | Close RimSort. In the app, select an unpinned LIVE profile. Click "Add to RimSort". | In `settings.json`, that instance has `local_folder` = `~/.local/share/Steam/steamapps/common/RimWorld/Mods`. |
 | 6 | Close the app. Rename `<BUILD_DIR>` to `<BUILD_DIR>.away`. Run `sha256sum ~/.local/share/RimSort/settings.json`. | You have a checksum. |
-| 7 | Start the app. Select "T57 Pinned". Click "Add to RimSort". | Error notice: "This profile uses the stored game version “<KEY>”, which is gone or cannot be read…". No job starts. |
+| 7 | Start the app. Select "T57 Pinned". Click "Add to RimSort". | Error notice: "This profile uses the stored game version “<KEY>”, which is gone or cannot be read. It cannot be used until it uses a game version that is stored." No job starts. |
 | 8 | Run `sha256sum ~/.local/share/RimSort/settings.json` again. Rename `<BUILD_DIR>.away` back to `<BUILD_DIR>`. | The checksum is the same as in step 6. |
 
 Pass: all expected results are true. Record the date, the app version and `KEY` in the PR or in task T68.
@@ -55,6 +58,6 @@ Do these steps in this order. The profile uses the build, so remove the profile 
 1. Close RimSort, RimWorld and the app.
 2. Restore RimSort's settings: `cp ~/t57-rimsort-settings.json.bak ~/.local/share/RimSort/settings.json`.
 3. Start the app. Delete the profile "T57 Pinned". Close the app.
-4. Remove the build: `trash "<BUILD_DIR>"`. If you renamed it in step 6, also remove `<BUILD_DIR>.away`.
-5. Check: `ls ~/".local/share/RimWorld Profile Manager/profiles/builds/"` does not show `<KEY>`.
+4. Remove the build only if the helper printed `BUILD_DIR=` in your setup run. The helper refuses when the version was already stored, so a printed `BUILD_DIR` is always a build that it made. Run `trash "<BUILD_DIR>"`. If you renamed it in step 6, remove `<BUILD_DIR>.away` instead. If the helper stopped with `REFUSED`, do not remove anything in `builds/`.
+5. If you removed the build, check: `ls ~/".local/share/RimWorld Profile Manager/profiles/builds/"` does not show `<KEY>`.
 6. Remove the backup copy: `trash ~/t57-rimsort-settings.json.bak`.

@@ -479,7 +479,8 @@ fn real_settings_copy_export() {
 
 /// Manual setup for the T57 e2e (docs/QA/T57-rimsort-pinned-export.md): stores a build
 /// of this machine's Steam RimWorld with the real capture code, then makes a profile
-/// "T57 Pinned" pinned to it. Writes to the REAL app data: the build is a full copy of
+/// "T57 Pinned" pinned to it. Refuses when that game version is already stored, so it
+/// only ever pins a build it made. Writes to the REAL app data: the build is a full copy of
 /// the game. Runs only with `RWPM_T57_E2E=1`, so a plain `--ignored` run cannot fill the
 /// disk.
 #[test]
@@ -498,7 +499,22 @@ fn t57_e2e_capture_and_pin() {
         .profiles_root(&app_dir);
     let builds = BuildStore::open(&root, &app_dir).expect("build store");
     let live = crate::discovery::discover(None).expect("Steam RimWorld");
+    println!(
+        "STEAM_GAME={} WORKSHOP={:?}",
+        live.game_dir.display(),
+        live.steam.as_ref().map(|s| &s.workshop_dir)
+    );
     let plan = plan_capture(&builds, &live).expect("plan capture");
+    // The key comes from Version.txt, so it cannot be made unique. A build already stored
+    // under it is the player's own: never pin, mark or let the rollback delete it.
+    let dir = builds.dir_of(&plan.key);
+    assert!(
+        std::fs::symlink_metadata(&dir).is_err(),
+        "REFUSED: a build {} is already stored at {}; it is not this helper's to use. \
+         Run the e2e where this game version is not stored yet.",
+        plan.key,
+        dir.display()
+    );
     println!(
         "KEY={} BYTES={} FREE={:?}",
         plan.key, plan.bytes, plan.free_bytes
