@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.4.2](https://github.com/keyz182/rimworld-profile-manager/compare/4f8c02a4d734526a0b572772f0860c47958e67b9..v1.4.2) - 2026-10-13
+#### Bug Fixes
+- (**profile**) backprop §B.16 + §V.71: leave 1.7 logs out of a Default clone - ([a269cac](https://github.com/keyz182/rimworld-profile-manager/commit/a269cacf26cbe30910fb2ef73b818889647a9bbb)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- (**spec**) link parked items to issues #6 #7, drop ?parity_fallback - ([33402c2](https://github.com/keyz182/rimworld-profile-manager/commit/33402c28a754f9a593b3df07392283169a01161d)) - [@keyz182](https://github.com/keyz182)
+- (**spec**) record macOS builds spike, close T52 (R47-R51, B16-B19) (#13) - ([f54c98b](https://github.com/keyz182/rimworld-profile-manager/commit/f54c98b2dc222db12d7f06a181216ec4f4be4938)) - Kieran Evans
+
+- - -
+
 ## [v1.4.1](https://github.com/keyz182/rimworld-profile-manager/compare/410ea72c74f11a18f790acd78ada5c10448d36d9..v1.4.1) - 2026-10-13
 #### Bug Fixes
 - (**core**) find RimWorld 1.7 on macOS, and reject the husk bundle (#12) - ([410ea72](https://github.com/keyz182/rimworld-profile-manager/commit/410ea72c74f11a18f790acd78ada5c10448d36d9)) - Kieran Evans
