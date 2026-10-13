@@ -6,6 +6,7 @@ pub mod guard;
 pub mod health;
 pub mod id;
 pub mod last_run;
+mod lock;
 pub mod mod_list;
 pub mod offline;
 pub mod relocate;

@@ -2,15 +2,14 @@
 //! copy byte for byte, switch `settings.toml`, then send the old folders to the recycle
 //! bin. Nothing old is removed before the copy is verified.
 
-use std::fs::{File, TryLockError};
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
-use crate::fs_copy::copy_tree;
+use crate::fs_copy::{copy_tree, same_tree};
 use crate::profile::id::ProfileId;
+use crate::profile::lock::take_run_lock;
 use crate::profile::running::RunningProbe;
 use crate::profile::store::{ProfileStore, Trash};
 use crate::settings::AppSettings;
@@ -18,7 +17,6 @@ use crate::space;
 
 /// Left in the target while a move runs, so an interrupted move can be retried (DA1).
 const MARKER: &str = ".rwpm-move";
-const RUN_LOCK: &str = "run.lock";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovePlan {
@@ -119,7 +117,7 @@ fn apply_with_hook<T: Trash>(
         after_copy(new);
         plan.profiles
             .iter()
-            .try_for_each(|id| same_tree(&plan.old_root.join(id.as_str()), &new.join(id.as_str())))
+            .try_for_each(|id| same_tree(&plan.old_root.join(id.as_str()), &new.join(id.as_str()), &|_| false))
     });
     if let Err(e) = copied {
         undo_copies(plan);
@@ -175,22 +173,6 @@ pub fn stale_rimsort(settings: &Path, old_root: &Path, profiles: &[ProfileId]) -
         })
         .map(|(name, _)| name.clone())
         .collect()
-}
-
-fn take_run_lock(app_dir: &Path) -> Result<File, ProfileError> {
-    let path = app_dir.join(RUN_LOCK);
-    std::fs::create_dir_all(app_dir).map_err(ProfileError::io("create", app_dir))?;
-    let file = File::options()
-        .create(true)
-        .write(true)
-        .truncate(false)
-        .open(&path)
-        .map_err(ProfileError::io("open", &path))?;
-    match file.try_lock() {
-        Ok(()) => Ok(file),
-        Err(TryLockError::WouldBlock) => Err(ProfileError::GameRunning),
-        Err(TryLockError::Error(e)) => Err(ProfileError::io("lock", &path)(e)),
-    }
 }
 
 /// Every profile-id folder under the old root, with or without `profile.toml`.
@@ -276,66 +258,6 @@ fn undo_copies(plan: &MovePlan) {
     }
     let _ = std::fs::remove_file(plan.new_root.join(MARKER));
     let _ = std::fs::remove_dir(&plan.new_root);
-}
-
-/// V14: same entries, kinds, link targets and bytes.
-fn same_tree(a: &Path, b: &Path) -> Result<(), ProfileError> {
-    let differs = || ProfileError::VerifyFailed(b.to_path_buf());
-    let list = |dir: &Path| -> Result<Vec<std::fs::DirEntry>, ProfileError> {
-        let mut v: Vec<_> = std::fs::read_dir(dir)
-            .map_err(ProfileError::io("list", dir))?
-            .collect::<Result<_, _>>()
-            .map_err(ProfileError::io("list", dir))?;
-        v.sort_by_key(std::fs::DirEntry::file_name);
-        Ok(v)
-    };
-    let (la, lb) = (list(a)?, list(b)?);
-    if la.len() != lb.len() {
-        return Err(differs());
-    }
-    for (ea, eb) in la.iter().zip(&lb) {
-        if ea.file_name() != eb.file_name() {
-            return Err(differs());
-        }
-        let (ta, tb) = (ea.file_type(), eb.file_type());
-        let (ta, tb) = (
-            ta.map_err(ProfileError::io("read", ea.path()))?,
-            tb.map_err(ProfileError::io("read", eb.path()))?,
-        );
-        if ta.is_symlink() || tb.is_symlink() {
-            if std::fs::read_link(ea.path()).ok() != std::fs::read_link(eb.path()).ok() {
-                return Err(ProfileError::VerifyFailed(eb.path()));
-            }
-        } else if ta.is_dir() && tb.is_dir() {
-            same_tree(&ea.path(), &eb.path())?;
-        } else if !(ta.is_file() && tb.is_file() && same_file(&ea.path(), &eb.path())?) {
-            return Err(ProfileError::VerifyFailed(eb.path()));
-        }
-    }
-    Ok(())
-}
-
-fn same_file(a: &Path, b: &Path) -> Result<bool, ProfileError> {
-    let open = |p: &Path| File::open(p).map_err(ProfileError::io("read", p));
-    let (mut fa, mut fb) = (open(a)?, open(b)?);
-    let (ma, mb) = (fa.metadata(), fb.metadata());
-    if ma.map(|m| m.len()).ok() != mb.map(|m| m.len()).ok() {
-        return Ok(false);
-    }
-    let (mut ba, mut bb) = (vec![0u8; 1 << 16], vec![0u8; 1 << 16]);
-    loop {
-        let na = fa.read(&mut ba).map_err(ProfileError::io("read", a))?;
-        let nb = fb
-            .read_exact(&mut bb[..na])
-            .map(|()| na)
-            .map_err(ProfileError::io("read", b))?;
-        if ba[..na] != bb[..nb] {
-            return Ok(false);
-        }
-        if na == 0 {
-            return Ok(true);
-        }
-    }
 }
 
 /// Canonical form of `p`, or of its nearest existing parent joined with the rest.
