@@ -18,7 +18,13 @@ const DEFAULT_NAME: &str = "Default";
 const MAX_SUFFIX: u32 = 999;
 /// Top-level files in the game's own save dir that a clone of Default leaves behind:
 /// Unity logs, and Steam Cloud's marker (the clone is not cloud-synced).
-const DEFAULT_CLONE_SKIP: [&str; 3] = ["Player.log", "Player-prev.log", "steam_autocloud.vdf"];
+/// V71: logs and the cloud marker are not save data. `Logs`: the 1.7 log folder (R41).
+const DEFAULT_CLONE_SKIP: [&str; 4] = [
+    "Player.log",
+    "Player-prev.log",
+    "steam_autocloud.vdf",
+    "Logs",
+];
 
 /// Moves a path to the OS recycle bin. A trait so tests never touch the real one.
 pub trait Trash {
@@ -508,6 +514,8 @@ mod tests {
             "Player.log",
             "Player-prev.log",
             "steam_autocloud.vdf",
+            "Logs/Player.log",
+            "Logs/Player-prev.log",
             "prefs",
         ] {
             write(&game.join(f), f);
@@ -525,7 +533,13 @@ mod tests {
         for kept in ["Config/Prefs.xml", "Saves/a.rws", "prefs"] {
             assert!(save.join(kept).is_file(), "{kept}");
         }
-        for gone in ["Player.log", "Player-prev.log", "steam_autocloud.vdf"] {
+        // V71: `Logs/` is the 1.7 game log of Default (R41), not save data.
+        for gone in [
+            "Player.log",
+            "Player-prev.log",
+            "steam_autocloud.vdf",
+            "Logs",
+        ] {
             assert!(!save.join(gone).exists(), "{gone}");
         }
         assert_eq!(c.mode, Mode::Live);
