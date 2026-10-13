@@ -103,7 +103,7 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
     let (from, id, command) = parse(args)?;
     // Before this process changes its environment (`SteamAppId` for the game).
     let by = last_run::started_by(&|k| std::env::var_os(k), from.as_deref());
-    let store = open_store()?;
+    let (store, settings) = open()?;
     let profile = store.get(&id).map_err(|e| match e {
         ProfileError::NotFound(_) => RunError::Usage(e.to_string()),
         other => RunError::Failed(other.to_string()),
@@ -113,7 +113,7 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
         path: LastRun::path(store.root(), &profile),
         by,
     };
-    let target = match pinned_command(store.root(), &profile, &command) {
+    let target = match pinned_command(store.root(), &profile, &command, &settings) {
         Ok(target) => target,
         Err(e) => {
             record.write(e.outcome(), e.message(), None);
@@ -123,7 +123,7 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
             return Err(e);
         }
     };
-    match launch(&store, &profile, &command, &target, &record) {
+    match launch(&store, &settings, &command, &target, &record) {
         Ok(Ended::Played(code)) => {
             record.write(RunOutcome::Ok, "", Some(code));
             Ok(code)
@@ -152,6 +152,7 @@ fn pinned_command(
     profiles_root: &Path,
     profile: &Profile,
     command: &[OsString],
+    settings: &AppSettings,
 ) -> Result<Vec<OsString>, RunError> {
     let Some(key) = profile.game_build.as_deref() else {
         return Ok(command.to_vec());
@@ -163,7 +164,7 @@ fn pinned_command(
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
     // Steam's install, for its workshop: the build sits outside `steamapps`.
-    let live = guard::live_game(profile, command).ok();
+    let live = guard::live_game(profile, command, settings).ok();
     let game = effective_game(profile, live.as_ref(), profiles_root, &app_dir)
         .map_err(|e| refuse(e.to_string(), text::build_missing(key)))?;
     launch::swap_target(command, &game)
@@ -175,11 +176,12 @@ const GUARD_CANCELLED: &str = "the player chose Cancel when asked about mods tha
 /// `incoming` is the command as given; `command` is the one to launch (`pinned_command`).
 fn launch(
     store: &ProfileStore<OsTrash>,
-    profile: &Profile,
+    settings: &AppSettings,
     incoming: &[OsString],
     command: &[OsString],
     record: &Record<'_>,
 ) -> Result<Ended, RunError> {
+    let profile = record.profile;
     let _lock = acquire_lock()?;
     if any_game_running() {
         return Err(RunError::Busy(
@@ -189,7 +191,7 @@ fn launch(
     // The guard resolves the effective game itself; the command as given keeps Steam's
     // live install, and with it the workshop, in view for a pinned profile.
     if profile.mode == Mode::Offline
-        && guard::run(store, profile, incoming) == guard::Outcome::Cancel
+        && guard::run(store, profile, incoming, settings) == guard::Outcome::Cancel
     {
         return Ok(Ended::Cancelled);
     }
@@ -256,14 +258,20 @@ fn parse(args: &[OsString]) -> Result<(Option<String>, ProfileId, Vec<OsString>)
 }
 
 pub(crate) fn open_store() -> Result<ProfileStore<OsTrash>, RunError> {
+    open().map(|(store, _)| store)
+}
+
+/// The profile store and the settings it was found through.
+fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
-    let root = AppSettings::load(&app_dir)
-        .map_err(|e| RunError::Failed(e.to_string()))?
-        .profiles_root(&app_dir);
+    let settings = AppSettings::load(&app_dir).map_err(|e| RunError::Failed(e.to_string()))?;
+    let root = settings.profiles_root(&app_dir);
     let save = paths::default_game_save_dir()
         .ok_or_else(|| RunError::Failed("no game save folder".into()))?;
-    ProfileStore::open(root, save, OsTrash).map_err(|e| RunError::Failed(e.to_string()))
+    let store =
+        ProfileStore::open(root, save, OsTrash).map_err(|e| RunError::Failed(e.to_string()))?;
+    Ok((store, settings))
 }
 
 /// V11: exclusive OS lock, released on drop or if rwpm dies.

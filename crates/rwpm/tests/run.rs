@@ -155,6 +155,7 @@ fn run_cli_contract_serial() {
     pinned_wrapped_offline_runs_the_build_inside_the_wrapper();
     pinned_guard_sees_the_live_workshop();
     pinned_guard_from_app_play_sees_the_live_workshop();
+    pinned_guard_uses_the_steam_chosen_in_settings();
 }
 
 fn records_who_started_each_run() {
@@ -1055,23 +1056,79 @@ fn pinned_guard_from_app_play_sees_the_live_workshop() {
         "brrainz.harmony",
     );
     // A Steam install where discovery looks (`$XDG_DATA_HOME/Steam`), listing `lib`.
-    let library = sb.path().join("lib");
-    let steamapps = sb.path().join("data/Steam/steamapps");
-    std::fs::create_dir_all(&steamapps).expect("steamapps");
-    std::fs::write(
-        steamapps.join("libraryfolders.vdf"),
-        format!(
-            "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t\t\"apps\"\n\t\t{{\n\t\t}}\n\t}}\n}}\n",
-            library.display()
-        ),
-    )
-    .expect("vdf");
-    std::fs::write(
-        library.join("steamapps/appmanifest_294100.acf"),
-        "\"AppState\"\n{\n\t\"appid\"\t\t\"294100\"\n\t\"name\"\t\t\"RimWorld\"\n\t\"installdir\"\t\t\"RimWorld\"\n}\n",
-    )
-    .expect("manifest");
+    sb.steam_root(&sb.path().join("data/Steam"), &sb.path().join("lib"));
     let (id, profile) = sb.pinned_profile(Mode::Offline, &UNFROZEN);
+    let status = Command::new(staged_rwpm(&sb))
+        .env("XDG_DATA_HOME", sb.path().join("data"))
+        .env("XDG_CONFIG_HOME", sb.path().join("config"))
+        .env("HOME", sb.path())
+        .env("RWPM_GUARD_CHOICE", "cancel")
+        .args(["run", &id, "--"])
+        .arg(build.join("RimWorldLinux"))
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0));
+    assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
+    let log = sb.rwpm_log(&profile);
+    assert!(
+        log.contains("brrainz.harmony; player chose Cancel"),
+        "{log}"
+    );
+}
+
+impl Sandbox {
+    /// A Steam install at `root` whose only library is `library`, holding RimWorld.
+    fn steam_root(&self, root: &Path, library: &Path) {
+        let steamapps = root.join("steamapps");
+        std::fs::create_dir_all(&steamapps).expect("steamapps");
+        std::fs::create_dir_all(library.join("steamapps")).expect("library");
+        std::fs::write(
+            steamapps.join("libraryfolders.vdf"),
+            format!(
+                "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t\t\"apps\"\n\t\t{{\n\t\t}}\n\t}}\n}}\n",
+                library.display()
+            ),
+        )
+        .expect("vdf");
+        std::fs::write(
+            library.join("steamapps/appmanifest_294100.acf"),
+            "\"AppState\"\n{\n\t\"appid\"\t\t\"294100\"\n\t\"name\"\t\t\"RimWorld\"\n\t\"installdir\"\t\t\"RimWorld\"\n}\n",
+        )
+        .expect("manifest");
+    }
+}
+
+/// T55 N1: with two Steams holding RimWorld (Flatpak, found first, and native), the
+/// guard reads the workshop of the one chosen in Settings, not the first one found.
+fn pinned_guard_uses_the_steam_chosen_in_settings() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let moved = sb.path().join("old-library/RimWorld");
+    let toml = std::fs::read_to_string(build.join("build.toml")).expect("build.toml");
+    let toml = toml.replace(&steam.display().to_string(), &moved.display().to_string());
+    std::fs::write(build.join("build.toml"), toml).expect("build.toml");
+    // First Steam (Flatpak path, searched first): RimWorld, no workshop items.
+    let flatpak_lib = sb.path().join("flatpak-lib");
+    sb.fake_install(&flatpak_lib.join("steamapps/common/RimWorld"), "flatpak");
+    sb.steam_root(
+        &sb.path()
+            .join(".var/app/com.valvesoftware.Steam/.local/share/Steam"),
+        &flatpak_lib,
+    );
+    // Second Steam (native), chosen in Settings: its library holds Harmony.
+    let native = sb.path().join("data/Steam");
+    sb.steam_root(&native, &sb.path().join("lib"));
+    about(
+        &sb.path()
+            .join("lib/steamapps/workshop/content/294100/2009463077"),
+        "brrainz.harmony",
+    );
+    let (id, profile) = sb.pinned_profile(Mode::Offline, &UNFROZEN);
+    std::fs::write(
+        sb.app_dir().join("settings.toml"),
+        format!("schema = 1\nsteam_dir = '{}'\n", native.display()),
+    )
+    .expect("settings");
     let status = Command::new(staged_rwpm(&sb))
         .env("XDG_DATA_HOME", sb.path().join("data"))
         .env("XDG_CONFIG_HOME", sb.path().join("config"))

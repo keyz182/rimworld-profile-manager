@@ -15,6 +15,7 @@ use rwpm_core::error::ProfileError;
 use rwpm_core::profile::guard::{self, Fix, GuardReport};
 use rwpm_core::profile::offline::now_datetime;
 use rwpm_core::profile::{OsTrash, ProcessProbe, Profile, ProfileStore};
+use rwpm_core::settings::AppSettings;
 use rwpm_core::{launch, paths};
 
 /// Test and headless override: `add`, `off`, `launch`, `cancel` or `unavailable`.
@@ -44,11 +45,16 @@ enum Choice {
 
 /// Runs the guard for an OFFLINE profile. Errors never block play: they are logged and
 /// the game launches, except a failed fix, which is shown and cancels the launch.
-pub fn run(store: &ProfileStore<OsTrash>, profile: &Profile, command: &[OsString]) -> Outcome {
+pub fn run(
+    store: &ProfileStore<OsTrash>,
+    profile: &Profile,
+    command: &[OsString],
+    settings: &AppSettings,
+) -> Outcome {
     let log = |msg: &str| append_log(profile, msg);
     let report = match paths::app_data_dir()
         .ok_or_else(|| "no user data folder".to_owned())
-        .and_then(|app_dir| guard_game(profile, command, store.root(), &app_dir))
+        .and_then(|app_dir| guard_game(profile, command, store.root(), &app_dir, settings))
         .and_then(|game| guard::check_offline(store, &profile.id, &game).map_err(|e| e.to_string()))
     {
         Ok(report) => report,
@@ -112,8 +118,9 @@ fn guard_game(
     command: &[OsString],
     profiles_root: &Path,
     app_dir: &Path,
+    settings: &AppSettings,
 ) -> Result<EffectiveGame, String> {
-    let live = live_game(profile, command);
+    let live = live_game(profile, command, settings);
     effective_game(profile, live.as_ref().ok(), profiles_root, app_dir).map_err(|e| {
         match (e, live) {
             (ProfileError::NoGame, Err(why)) => why,
@@ -124,15 +131,22 @@ fn guard_game(
 
 /// Steam's live install, as `effective_game` takes it. A pinned profile only needs its
 /// Steam library, for the workshop. App Play names the build itself, which sits outside
-/// every library, so when the command's game has none, Steam is asked instead. Without
-/// that, a library that moved since the capture would hide the workshop from the guard.
-pub(crate) fn live_game(profile: &Profile, command: &[OsString]) -> Result<GameInstall, String> {
+/// every library, so when the command's game has none, the install from Settings is
+/// used instead: its game folder, else its Steam folder, else the first Steam that has
+/// RimWorld (`AppSettings::game`). Without that, a library that moved since the capture
+/// would hide the workshop from the guard.
+pub(crate) fn live_game(
+    profile: &Profile,
+    command: &[OsString],
+    settings: &AppSettings,
+) -> Result<GameInstall, String> {
     let found = find_game(command);
     if profile.game_build.is_some()
         && found.as_ref().is_ok_and(|g| g.steam.is_none())
-        && let Ok(steam) = discovery::discover(None)
+        && let Ok(live) = settings.game()
+        && live.steam.is_some()
     {
-        return Ok(steam);
+        return Ok(live);
     }
     found
 }
@@ -492,16 +506,19 @@ mod tests {
             .expect("pin");
         let command = [live.join(discovery::GAME_EXE).into_os_string()];
 
-        let game = guard_game(&plain, &command, &root, &app).expect("plain");
+        let game =
+            guard_game(&plain, &command, &root, &app, &AppSettings::default()).expect("plain");
         assert_eq!(game.game_dir, live);
-        let game = guard_game(&pinned, &command, &root, &app).expect("pinned");
+        let game =
+            guard_game(&pinned, &command, &root, &app, &AppSettings::default()).expect("pinned");
         assert_eq!(game.game_dir, build);
         let workshop = tmp.path().join("steam/steamapps/workshop/content/294100");
         let workshop_of = |g: &EffectiveGame| g.steam.as_ref().map(|s| s.workshop_dir.clone());
         assert_eq!(workshop_of(&game), Some(workshop.clone()));
 
         std::fs::remove_dir_all(&build).expect("lose build");
-        let err = guard_game(&pinned, &command, &root, &app).expect_err("missing");
+        let err = guard_game(&pinned, &command, &root, &app, &AppSettings::default())
+            .expect_err("missing");
         assert!(err.contains("1.5.4409-rev1118"), "{err}");
     }
 
