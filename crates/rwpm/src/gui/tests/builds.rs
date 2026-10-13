@@ -14,6 +14,11 @@ pub(super) const KEY: &str = "1.6.4871-rev598";
 impl Sandbox {
     /// Makes the sandbox game a Steam install Capture accepts (V58: `StateFlags` 4).
     pub(super) fn steam_install(&self, buildid: &str) {
+        self.steam_install_as(buildid, VERSION);
+    }
+
+    /// The same, for a chosen `Version.txt` text.
+    pub(super) fn steam_install_as(&self, buildid: &str, version: &str) {
         let acf = self.path("lib/steamapps/appmanifest_294100.acf");
         std::fs::write(
             acf,
@@ -26,7 +31,7 @@ impl Sandbox {
         .expect("manifest");
         std::fs::write(
             self.game_dir().join("Version.txt"),
-            format!("{VERSION}\r\n"),
+            format!("{version}\r\n"),
         )
         .expect("version");
     }

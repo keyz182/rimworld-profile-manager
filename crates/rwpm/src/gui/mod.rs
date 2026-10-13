@@ -11,6 +11,7 @@ mod jobs;
 mod keys;
 mod message;
 mod mods;
+mod picker;
 mod setup;
 mod support;
 pub(crate) mod text;

@@ -15,6 +15,7 @@ use super::*;
 
 mod builds;
 mod gating;
+mod picker;
 
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings
 /// pointing at it, and a fake `rwpm` that records how it was started.

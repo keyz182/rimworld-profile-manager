@@ -64,6 +64,24 @@ pub fn check_profile<T: Trash>(
     }
 }
 
+/// Does RimSort's entry point somewhere other than where `profile` plays now: its config
+/// folder (after a Move) or its game and mod folders (after a game version change, V55)?
+/// A field the entry does not have is not compared.
+fn rimsort_entry_is_stale(entry: &rimsort::Entry, profile: &Profile, game: &EffectiveGame) -> bool {
+    let differs = |found: &str, ours: &Path| Path::new(found) != ours;
+    differs(
+        &entry.config_folder,
+        &profile.save_data_dir().join("Config"),
+    ) || entry
+        .game_folder
+        .as_deref()
+        .is_some_and(|f| differs(f, game.rimsort_game_folder()))
+        || entry
+            .local_folder
+            .as_deref()
+            .is_some_and(|f| differs(f, &rimsort::local_folder(profile, game)))
+}
+
 /// Checks `profile`. `rimsort_settings`: RimSort's settings file, if RimSort is installed.
 pub fn check<T: Trash>(
     store: &ProfileStore<T>,
@@ -100,12 +118,10 @@ pub fn check<T: Trash>(
         }
     }
     if let Some(settings) = rimsort_settings
-        && let Some((name, folder)) = rimsort::entry_for(settings, profile.id.as_str())
+        && let Some(entry) = rimsort::entry_for(settings, profile.id.as_str())
+        && rimsort_entry_is_stale(&entry, profile, game)
     {
-        let ours = profile.save_data_dir().join("Config");
-        if Path::new(&folder) != ours {
-            problems.push(Problem::RimSortStale(name));
-        }
+        problems.push(Problem::RimSortStale(entry.name));
     }
     problems
 }
@@ -275,6 +291,54 @@ mod tests {
             Os::Linux,
         );
         assert!(problems.is_empty());
+    }
+
+    /// T56 H1: the player changes a profile's game version after exporting it. RimSort's
+    /// `game_folder` / `local_folder` still name the old game, so health says so; a
+    /// current entry, or one without those fields, is fine.
+    #[test]
+    fn rimsort_entry_naming_another_game_is_stale() {
+        let w = World::new();
+        let p = w.offline(&[]);
+        let game = w.game();
+        let settings = w.path("RimSort/settings.json");
+        std::fs::create_dir_all(settings.parent().expect("p")).expect("dir");
+        let config = p.save_data_dir().join("Config").display().to_string();
+        let ours_game = game.rimsort_game_folder().display().to_string();
+        let ours_local = rimsort::local_folder(&p, &game).display().to_string();
+        let problems_with = |entry: serde_json::Value| {
+            let mut entry = entry;
+            entry["run_args"] = format!("'/r' run --from rimsort {} -- %command%", p.id).into();
+            let json = serde_json::json!({"instances": {"Sick": entry}});
+            std::fs::write(&settings, serde_json::to_vec(&json).expect("j")).expect("w");
+            check(
+                &w.store(),
+                &p,
+                &game,
+                &w.path("app"),
+                Some(&settings),
+                Os::Linux,
+            )
+        };
+        let stale = vec![Problem::RimSortStale("Sick".into())];
+
+        let current = serde_json::json!({
+            "config_folder": config, "game_folder": ours_game, "local_folder": ours_local
+        });
+        assert!(problems_with(current).is_empty());
+        let old_game = serde_json::json!({
+            "config_folder": config, "game_folder": "/old/build", "local_folder": ours_local
+        });
+        assert_eq!(problems_with(old_game), stale);
+        let old_local = serde_json::json!({
+            "config_folder": config, "game_folder": ours_game, "local_folder": "/old/build/Mods"
+        });
+        assert_eq!(problems_with(old_local), stale);
+        let no_fields = serde_json::json!({"config_folder": config});
+        assert!(
+            problems_with(no_fields).is_empty(),
+            "absent fields are not compared"
+        );
     }
 
     #[test]

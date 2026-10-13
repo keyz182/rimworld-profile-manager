@@ -173,10 +173,7 @@ impl Fields<'_> {
     /// may have changed in RimSort (steamcmd_*, instance_folder_override, initial_setup)
     /// are kept; new instances get RimSort's own defaults for them.
     fn build(&self, mut map: Map<String, Value>) -> Result<Map<String, Value>, RimSortError> {
-        let local = match (self.profile.mode, self.profile.mods_dir()) {
-            (Mode::Offline, Some(dir)) => dir,
-            _ => self.game.mods_dir(),
-        };
+        let local = local_folder(self.profile, self.game);
         let (workshop, integration) = match &self.game.steam {
             Some(s) => (text(&s.workshop_dir)?, true),
             None => (String::new(), false),
@@ -227,9 +224,29 @@ pub fn rimsort_run_args(rwpm: &Path, id: &str, windows: bool) -> Result<String, 
     )
 }
 
-/// RimSort's entry for profile `id`, if it has one: (instance name, its `config_folder`).
+/// RimSort's `local_folder` for `profile` playing `game`: its own `Mods` when OFFLINE, else
+/// the game's (V55). One rule for export and for the stale check.
+pub fn local_folder(profile: &Profile, game: &EffectiveGame) -> PathBuf {
+    match (profile.mode, profile.mods_dir()) {
+        (Mode::Offline, Some(dir)) => dir,
+        _ => game.mods_dir(),
+    }
+}
+
+/// The fields of RimSort's entry for a profile that say where its game and mods are.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry {
+    /// RimSort's instance name.
+    pub name: String,
+    pub config_folder: String,
+    /// `None` when the entry has no such field (or it is not text).
+    pub game_folder: Option<String>,
+    pub local_folder: Option<String>,
+}
+
+/// RimSort's entry for profile `id`, if it has one.
 /// Read only; an unreadable settings file means "none".
-pub fn entry_for(settings: &Path, id: &str) -> Option<(String, String)> {
+pub fn entry_for(settings: &Path, id: &str) -> Option<Entry> {
     let root: Value = serde_json::from_slice(&std::fs::read(settings).ok()?).ok()?;
     root.get(INSTANCES)?
         .as_object()?
@@ -240,8 +257,13 @@ pub fn entry_for(settings: &Path, id: &str) -> Option<(String, String)> {
                 .is_some_and(|a| runs_profile(a, id))
         })
         .map(|(name, v)| {
-            let folder = v.get("config_folder").and_then(Value::as_str);
-            (name.clone(), folder.unwrap_or_default().to_owned())
+            let field = |k: &str| v.get(k).and_then(Value::as_str).map(ToOwned::to_owned);
+            Entry {
+                name: name.clone(),
+                config_folder: field("config_folder").unwrap_or_default(),
+                game_folder: field("game_folder"),
+                local_folder: field("local_folder"),
+            }
         })
 }
 

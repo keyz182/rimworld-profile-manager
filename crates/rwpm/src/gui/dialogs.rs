@@ -56,6 +56,14 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         }
         Dialog::ConfirmMove(plan) => move_dialog(plan),
         Dialog::ConfirmCapture(plan) => capture_dialog(plan),
+        Dialog::PickVersion {
+            steam,
+            builds,
+            chosen,
+        } => super::picker::picker_view(steam, builds, chosen.as_deref()),
+        Dialog::ConfirmDowngrade { from, into, .. } => {
+            confirm(t::confirm_downgrade(from, into), t::KEEP_GOING, false)
+        }
         Dialog::ConfirmDeleteBuild { key, bytes } => {
             confirm(t::confirm_delete_version(key, *bytes), t::YES_DELETE, true)
         }
