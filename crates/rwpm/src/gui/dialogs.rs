@@ -56,6 +56,14 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         }
         Dialog::ConfirmMove(plan) => move_dialog(plan),
         Dialog::ConfirmCapture(plan) => capture_dialog(plan),
+        Dialog::PickVersion {
+            steam,
+            builds,
+            chosen,
+        } => super::picker::picker_view(steam, builds, chosen.as_deref()),
+        Dialog::ConfirmDowngrade { from, into, .. } => {
+            confirm(t::confirm_downgrade(from, into), t::KEEP_GOING, false)
+        }
         Dialog::ConfirmDeleteBuild { key, bytes } => {
             confirm(t::confirm_delete_version(key, *bytes), t::YES_DELETE, true)
         }
@@ -291,7 +299,7 @@ fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
             t::STORE_IT,
         ),
     };
-    let fits = plan.free_bytes.is_none_or(|free| free >= plan.bytes);
+    let fits = super::builds::fits(plan);
     let mut body = column![text(words)].spacing(12);
     if !fits {
         body = body.push(text(t::NOT_ENOUGH_ROOM).style(theme::error));

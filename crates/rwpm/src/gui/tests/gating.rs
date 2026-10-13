@@ -44,7 +44,7 @@ fn play_runs_the_build_with_no_steam_install() {
 }
 
 #[test]
-fn mod_list_and_rimsort_buttons_work_with_no_steam_install() {
+fn freeze_and_rimsort_buttons_work_with_no_steam_install() {
     let (_sb, app, _id) = pinned_without_steam();
     let go = clicked(&app, text::GO_OFFLINE);
     assert!(matches!(go.as_slice(), [Message::GoOffline]), "{go:?}");

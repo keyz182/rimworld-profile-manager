@@ -226,6 +226,7 @@ impl App {
         }
         let sections = scrollable(
             Column::new()
+                .push(self.game_version_section(p))
                 .push(self.health_section(p))
                 .push(self.mods_section(p))
                 .push(self.start_section())
@@ -481,7 +482,7 @@ fn mode_icon(p: &Profile) -> Icon {
     }
 }
 
-fn section_title(words: &str) -> iced::widget::Text<'_> {
+pub(super) fn section_title(words: &str) -> iced::widget::Text<'_> {
     text(words).size(16).font(UI_BOLD)
 }
 

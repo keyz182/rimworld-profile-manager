@@ -81,6 +81,12 @@ pub enum Message {
     CaptureBuild,
     /// Game versions: ask before moving this stored version to the recycle bin.
     DeleteBuild(String),
+    /// Profile row: open the game version picker (T56).
+    ChangeGameVersion,
+    /// The stored versions, read for the picker.
+    PickerRead(Result<super::builds::BuildsView, String>),
+    /// Picker: choose a stored version (`Some(key)`) or the Steam install (`None`).
+    PickBuild(Option<String>),
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -167,6 +173,18 @@ pub enum Dialog {
     ConfirmDeleteBuild {
         key: String,
         bytes: u64,
+    },
+    /// The game version picker: (key, label) per stored version, and the current choice.
+    PickVersion {
+        steam: String,
+        builds: Vec<(String, String)>,
+        chosen: Option<String>,
+    },
+    /// V61: the new version is older and the profile has saves.
+    ConfirmDowngrade {
+        to: Option<String>,
+        from: String,
+        into: String,
     },
     Help,
 }

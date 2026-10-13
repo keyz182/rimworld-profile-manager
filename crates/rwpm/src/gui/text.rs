@@ -413,7 +413,7 @@ pub fn build_target_unknown(key: &str) -> String {
 }
 
 pub fn rimsort_stale(name: &str) -> String {
-    format!("RimSort's “{name}” still points at this profile's old folder.")
+    format!("RimSort's “{name}” still points at this profile's old folder or game version.")
 }
 
 pub fn frozen_now(n: usize) -> String {
@@ -698,6 +698,75 @@ pub fn version_stored(key: &str) -> String {
 
 pub fn version_deleted(key: &str) -> String {
     format!("Moved game version “{key}” to the recycle bin.")
+}
+
+// Game version row and picker (T56).
+pub const GAME_VERSION: &str = "Game version";
+pub const CHANGE: &str = "Change…";
+pub const MANAGE: &str = "Manage…";
+pub const DEFAULT_GAME_VERSION: &str =
+    "The Default profile always plays the Steam install, because it shares the game's own saves.";
+pub const PICK_TITLE: &str = "Choose the game version";
+pub const PICK_ABOUT: &str =
+    "The profile starts this version of RimWorld. Its mods and saves stay as they are.";
+pub const USE_VERSION: &str = "Use it";
+pub const KEEP_GOING: &str = "Change it";
+
+pub fn steam_install_label(version: Option<&str>) -> String {
+    match version {
+        Some(v) => format!("Steam install ({v})"),
+        None => "Steam install (not found)".to_owned(),
+    }
+}
+
+pub fn stored_version_label(key: &str, waylith: bool, bytes: u64) -> String {
+    format!(
+        "{key} · RimWorld {} · {}",
+        engine_label(waylith),
+        size(bytes)
+    )
+}
+
+pub fn game_version_is(label: &str) -> String {
+    format!("Plays: {label}")
+}
+
+/// "1.7.4976 rev1043" → "1.7"; anything else is shown as it is.
+pub fn short_version(version: &str) -> String {
+    let mut parts = version
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .split('.');
+    match (parts.next(), parts.next()) {
+        (Some(a), Some(b)) if a.parse::<u32>().is_ok() && b.parse::<u32>().is_ok() => {
+            format!("{a}.{b}")
+        }
+        _ => version.trim().to_owned(),
+    }
+}
+
+pub const CONFIRM_DOWNGRADE_UNKNOWN: &str = "Saves made in the game version this profile plays now may not open in the one you chose. Change anyway?";
+
+/// V61/§C: names both versions; when either cannot be read (the question is asked for an
+/// unreadable version too) the words do not name one, rather than showing a blank.
+pub fn confirm_downgrade(from: &str, into: &str) -> String {
+    if from.trim().is_empty() || into.trim().is_empty() {
+        return CONFIRM_DOWNGRADE_UNKNOWN.to_owned();
+    }
+    format!(
+        "Saves made in {} may not open in {}. Change anyway?",
+        short_version(from),
+        short_version(into)
+    )
+}
+
+pub fn game_version_changed(profile: &str, label: &str) -> String {
+    format!("“{profile}” now plays {label}.")
+}
+
+pub fn gv_unreadable(reason: &str) -> String {
+    format!("The stored game versions cannot be read: {reason}")
 }
 
 #[cfg(test)]

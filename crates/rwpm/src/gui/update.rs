@@ -87,6 +87,7 @@ impl App {
                     | M::InstallLoader
                     | M::CaptureBuild
                     | M::DeleteBuild(_)
+                    | M::ChangeGameVersion
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -104,6 +105,7 @@ impl App {
                     | M::InstallLoader
                     | M::CaptureBuild
                     | M::DeleteBuild(_)
+                    | M::ChangeGameVersion
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -114,6 +116,8 @@ impl App {
                         | Dialog::ConfirmMove(_)
                         | Dialog::ConfirmCapture(_)
                         | Dialog::ConfirmDeleteBuild { .. }
+                        | Dialog::PickVersion { .. }
+                        | Dialog::ConfirmDowngrade { .. }
                 )
             }))
     }
@@ -196,10 +200,20 @@ impl App {
                     _ => {}
                 }
             }
-            Message::BuildsRead(Ok(view)) => self.builds = Some(view),
-            Message::BuildsRead(Err(e)) => return self.fail(e),
+            Message::BuildsRead(Ok(view)) => {
+                self.builds = Some(view);
+                self.builds_error = None;
+            }
+            Message::BuildsRead(Err(e)) => {
+                self.builds_error = Some(e.clone());
+                return self.fail(e);
+            }
             Message::CaptureBuild => return self.capture_build(),
             Message::DeleteBuild(key) => self.ask_delete_build(&key),
+            Message::ChangeGameVersion => return self.change_game_version(),
+            Message::PickerRead(Ok(view)) => self.picker_read(view),
+            Message::PickerRead(Err(e)) => return self.fail(e),
+            Message::PickBuild(key) => self.pick_build(key),
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -307,7 +321,14 @@ impl App {
                 self.selected = id;
                 return self.loader_then_play();
             }
-            Err(e) => self.notice = Some(Notice::Error(e)),
+            Err(e) => {
+                self.notice = Some(Notice::Error(e));
+                // A failed Delete or Capture may mean the list is out of date (a profile
+                // pinned the version meanwhile): read it again.
+                if self.drill == Some(super::message::Drill::GameVersions) {
+                    return self.read_builds_task();
+                }
+            }
         }
         Task::none()
     }
@@ -336,7 +357,18 @@ impl App {
                 ..
             }) => return self.save_settings(game, steam, move_to),
             Some(Dialog::ConfirmMove(plan)) => return self.apply_move(plan),
+            Some(Dialog::ConfirmCapture(plan)) if !super::builds::fits(&plan) => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::ConfirmCapture(plan));
+            }
             Some(Dialog::ConfirmCapture(plan)) => return self.apply_capture(plan),
+            Some(Dialog::PickVersion { chosen, .. }) => return self.confirm_pick(chosen),
+            Some(Dialog::ConfirmDowngrade { to, .. }) => {
+                let Some(p) = self.current().cloned() else {
+                    return Task::none();
+                };
+                return self.apply_pin(&p, to);
+            }
             Some(Dialog::ConfirmDeleteBuild { key, .. }) => return self.delete_build(key),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
