@@ -123,7 +123,7 @@ fn guard_game(
 }
 
 /// The game folder holding the launched program, else the Steam install.
-fn find_game(command: &[OsString]) -> Result<GameInstall, String> {
+pub(crate) fn find_game(command: &[OsString]) -> Result<GameInstall, String> {
     let program = launch::game_program(command).map(Path::new);
     if let Some(dir) = program.and_then(Path::parent)
         && let Ok(game) = discovery::from_game_dir(dir)
@@ -382,7 +382,7 @@ fn ask_zenity(text: &str) -> Result<Choice, String> {
 }
 
 /// Best effort: the failure is in the log either way.
-fn show_error(text: &str) {
+pub(crate) fn show_error(text: &str) {
     if std::env::var_os(CHOICE_ENV).is_some() {
         return;
     }

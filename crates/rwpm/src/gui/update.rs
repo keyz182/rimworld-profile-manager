@@ -493,11 +493,8 @@ impl App {
                 }
             }
         }
-        // The Steam install's exe: `rwpm run` swaps in a pinned build's own (T55).
-        let Ok(live) = self.game.clone() else {
-            return self.no_game();
-        };
-        self.play(&live.exe);
+        // The effective game's exe: a pinned profile's build, never Steam's (T55).
+        self.play(&game.exe);
         Task::none()
     }
 
@@ -755,10 +752,6 @@ impl App {
     pub(super) fn fail(&mut self, e: impl std::fmt::Display) -> Task<Message> {
         self.notice = Some(Notice::Error(e.to_string()));
         Task::none()
-    }
-
-    fn no_game(&mut self) -> Task<Message> {
-        self.fail(t::NO_GAME)
     }
 }
 

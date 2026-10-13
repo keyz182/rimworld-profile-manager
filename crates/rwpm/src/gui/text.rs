@@ -403,6 +403,15 @@ pub fn build_missing(key: &str) -> String {
     )
 }
 
+/// T55: a pinned launch where no single part of the command is the game (decision 2).
+pub fn build_target_unknown(key: &str) -> String {
+    format!(
+        "This profile uses the stored game version “{key}”, but rwpm cannot tell which part \
+         of the launch command starts RimWorld, so it started nothing. Check RimWorld's \
+         launch options in Steam, or press Play in the app."
+    )
+}
+
 pub fn rimsort_stale(name: &str) -> String {
     format!("RimSort's “{name}” still points at this profile's old folder.")
 }

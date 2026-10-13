@@ -1472,3 +1472,33 @@ fn v55_rimsort_export_refuses_when_the_pinned_build_is_missing() {
         br#"{"instances": {}}"#
     );
 }
+
+/// T55 decision 1: Play on a pinned profile hands `rwpm run` the stored build's exe, not
+/// the Steam install's.
+#[test]
+fn play_on_a_pinned_profile_passes_the_builds_exe() {
+    let sb = Sandbox::new();
+    let store = sb.ctx().store().expect("store");
+    let key = "1.5.4409-rev1118";
+    let build = store.root().join("builds").join(key);
+    about(&build.join("Data/Core"), "ludeon.rimworld");
+    std::fs::write(build.join("RimWorldLinux"), "").expect("exe");
+    std::fs::write(build.join("Version.txt"), "1.5.4409 rev1118\r\n").expect("version");
+    std::fs::write(
+        build.join("build.toml"),
+        format!(
+            "schema = 1\nversion = \"1.5.4409 rev1118\"\nbuildid = \"1\"\nbeta = \"\"\n\
+             dlc = [\"Core\"]\ncaptured_at = 2026-10-13T00:00:00Z\nsource_dir = '{}'\nsize = 0\n",
+            sb.game_dir().display()
+        ),
+    )
+    .expect("build.toml");
+    let p = store.create("Pinned").expect("create");
+    store.set_pin(&p.id, Some(key)).expect("pin");
+    let mut app = sb.app();
+    let _ = app.update(Message::Select(p.id.clone()));
+    let _ = app.update(Message::Launch);
+    let args = sb.launched().expect("fake rwpm ran");
+    let exe = build.join("RimWorldLinux").display().to_string();
+    assert_eq!(args[..4], ["run", p.id.as_str(), "--", exe.as_str()]);
+}
