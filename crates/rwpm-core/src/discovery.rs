@@ -256,23 +256,27 @@ pub fn from_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
     Ok(install)
 }
 
+/// The game's exe in `dir`, by name. Precedence is fixed: the Unity exe first, the
+/// Waylith exe second (V69 / B12 / B13). A folder can hold both — Steam leaves the old
+/// bundle behind as a husk when it switches version — so "the first one that is actually
+/// usable" decides, never the order the filesystem happens to answer in.
+///
+/// The names are parameters rather than the platform constants so the rules can be
+/// checked against every platform's shapes from any host.
+fn pick_exe(dir: &Path, unity: &str, waylith: &str) -> Option<PathBuf> {
+    let primary = dir.join(unity);
+    if is_game_exe(&primary) {
+        return Some(primary);
+    }
+    let waylith = dir.join(waylith);
+    (is_game_exe(&waylith) && engine_of_exe(&waylith) == Engine::Waylith).then_some(waylith)
+}
+
 fn read_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
-    // Precedence is fixed: the 1.6 exe first, the Waylith exe second (V69 / B12 / B13).
-    // A folder can hold both — Steam leaves the old bundle behind as a husk when it
-    // switches version — so "the first one that is actually usable" decides, never the
-    // order the filesystem happens to answer in.
-    let primary = dir.join(GAME_EXE);
-    let waylith = dir.join(WAYLITH_EXE);
-    let exe = if is_game_exe(&primary) {
-        primary
-    } else if is_game_exe(&waylith) && engine_of_exe(&waylith) == Engine::Waylith {
-        waylith
-    } else {
-        return Err(DiscoveryError::NotAGameDir {
-            dir: dir.to_path_buf(),
-            exe: primary,
-        });
-    };
+    let exe = pick_exe(dir, GAME_EXE, WAYLITH_EXE).ok_or_else(|| DiscoveryError::NotAGameDir {
+        dir: dir.to_path_buf(),
+        exe: dir.join(GAME_EXE),
+    })?;
     let mut install = GameInstall {
         game_dir: dir.to_path_buf(),
         engine: engine_of_exe(&exe),
@@ -383,22 +387,6 @@ mod tests {
             std::fs::write(bin.join("RimWorld"), b"").expect("binary");
         } else {
             std::fs::write(&exe, b"").expect("exe");
-        }
-    }
-
-    /// Writes `WAYLITH_EXE` under `dir` as this host's shape: a bundle holding its
-    /// binary and `Waylith.dll` on macOS, a flat file beside the marker elsewhere.
-    fn write_waylith_exe(dir: &Path) {
-        let exe = dir.join(WAYLITH_EXE);
-        if cfg!(target_os = "macos") {
-            let bin = exe.join(BUNDLE_BIN_DIR);
-            std::fs::create_dir_all(&bin).expect("bundle");
-            std::fs::write(exe.join(INFO_PLIST), plist("RimWorld")).expect("plist");
-            std::fs::write(bin.join("RimWorld"), b"").expect("binary");
-            std::fs::write(bin.join(WAYLITH_MARKER), b"").expect("marker");
-        } else {
-            std::fs::write(&exe, b"").expect("exe");
-            std::fs::write(dir.join(WAYLITH_MARKER), b"").expect("marker");
         }
     }
 
@@ -618,7 +606,8 @@ mod tests {
     #[test]
     fn v69_discovery_accepts_waylith_dir() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        write_waylith_exe(tmp.path());
+        std::fs::write(tmp.path().join(WAYLITH_EXE), b"").expect("exe");
+        std::fs::write(tmp.path().join(WAYLITH_MARKER), b"").expect("marker");
         std::fs::write(tmp.path().join(VERSION_FILE), "1.7.4976 rev1043\n").expect("version");
         let gi = from_game_dir(tmp.path()).expect("1.7 game dir");
         assert_eq!(gi.engine(), Engine::Waylith);
@@ -700,18 +689,35 @@ mod tests {
         std::fs::create_dir_all(bundle.join("bak")).expect("bak");
     }
 
+    const MAC_UNITY_EXE: &str = "RimWorldMac.app";
+    const MAC_WAYLITH_EXE: &str = "RimWorld.app";
+
+    /// A `GameInstall` for a macOS layout, built without going through `read_game_dir`,
+    /// whose exe names are chosen at compile time. The accessors under test decide on the
+    /// path's own shape, so these run on every host.
+    fn mac_install(root: &Path, bundle: &str, engine: Engine) -> GameInstall {
+        GameInstall {
+            game_dir: root.to_path_buf(),
+            exe: root.join(bundle),
+            version: None,
+            engine,
+            steam: None,
+        }
+    }
+
     /// The 1.7 macOS depot: Waylith, `RimWorld.app`, flat install around it.
     #[test]
     fn macos_1_7_install_is_found_as_waylith() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_install(tmp.path(), "RimWorld.app", true, true);
+        macos_install(tmp.path(), MAC_WAYLITH_EXE, true, true);
 
-        let gi = from_game_dir(tmp.path()).expect("1.7 macOS game dir");
-        assert_eq!(gi.exe, tmp.path().join("RimWorld.app"));
-        assert_eq!(gi.engine(), Engine::Waylith);
-        assert_eq!(gi.version.as_deref(), Some("1.7.4976 rev1043"));
-        assert_eq!(gi.version_file(), tmp.path().join(VERSION_FILE));
+        let exe = pick_exe(tmp.path(), MAC_UNITY_EXE, MAC_WAYLITH_EXE).expect("1.7 macOS exe");
+        assert_eq!(exe, tmp.path().join(MAC_WAYLITH_EXE));
+        assert_eq!(engine_of_exe(&exe), Engine::Waylith);
+
+        let gi = mac_install(tmp.path(), MAC_WAYLITH_EXE, Engine::Waylith);
         // Layout follows the version: flat, like Linux and Windows.
+        assert_eq!(gi.version_file(), tmp.path().join(VERSION_FILE));
         assert_eq!(gi.data_dir(), tmp.path().join("Data"));
         assert_eq!(gi.mods_dir(), tmp.path().join("Mods"));
         assert_eq!(gi.rimsort_game_folder(), tmp.path());
@@ -721,14 +727,15 @@ mod tests {
     #[test]
     fn macos_1_6_install_still_resolves_inside_the_bundle() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_install(tmp.path(), "RimWorldMac.app", false, false);
-        let bundle = tmp.path().join("RimWorldMac.app");
+        macos_install(tmp.path(), MAC_UNITY_EXE, false, false);
+        let bundle = tmp.path().join(MAC_UNITY_EXE);
 
-        let gi = from_game_dir(tmp.path()).expect("1.6 macOS game dir");
-        assert_eq!(gi.exe, bundle);
-        assert_eq!(gi.engine(), Engine::Unity);
+        let exe = pick_exe(tmp.path(), MAC_UNITY_EXE, MAC_WAYLITH_EXE).expect("1.6 macOS exe");
+        assert_eq!(exe, bundle);
+        assert_eq!(engine_of_exe(&exe), Engine::Unity);
+
+        let gi = mac_install(tmp.path(), MAC_UNITY_EXE, Engine::Unity);
         assert_eq!(gi.version_file(), bundle.join(VERSION_FILE));
-        assert_eq!(gi.version.as_deref(), Some("1.7.4976 rev1043"));
         assert_eq!(gi.data_dir(), bundle.join("Contents/Resources/Data"));
         assert_eq!(gi.mods_dir(), bundle.join("Mods"));
         assert_eq!(gi.rimsort_game_folder(), bundle);
@@ -738,44 +745,34 @@ mod tests {
     #[test]
     fn a_husk_bundle_is_not_a_game() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_husk(tmp.path(), "RimWorldMac.app");
+        macos_husk(tmp.path(), MAC_UNITY_EXE);
         std::fs::write(tmp.path().join(VERSION_FILE), "1.7.4976 rev1043\r\n").expect("version");
-        assert!(
-            matches!(
-                from_game_dir(tmp.path()),
-                Err(DiscoveryError::NotAGameDir { .. })
-            ),
-            "the husk was accepted as a game"
-        );
+        assert!(!is_game_exe(&tmp.path().join(MAC_UNITY_EXE)));
+        assert_eq!(pick_exe(tmp.path(), MAC_UNITY_EXE, MAC_WAYLITH_EXE), None);
     }
 
     /// 1.6 to 1.7: the old bundle is left behind, the new one is the game.
     #[test]
     fn a_husk_beside_a_real_bundle_does_not_win() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_husk(tmp.path(), "RimWorldMac.app");
-        macos_install(tmp.path(), "RimWorld.app", true, true);
+        macos_husk(tmp.path(), MAC_UNITY_EXE);
+        macos_install(tmp.path(), MAC_WAYLITH_EXE, true, true);
 
-        let gi = from_game_dir(tmp.path()).expect("game dir");
-        assert_eq!(gi.exe, tmp.path().join("RimWorld.app"));
-        assert_eq!(gi.engine(), Engine::Waylith);
-        assert_eq!(gi.data_dir(), tmp.path().join("Data"));
+        let exe = pick_exe(tmp.path(), MAC_UNITY_EXE, MAC_WAYLITH_EXE).expect("exe");
+        assert_eq!(exe, tmp.path().join(MAC_WAYLITH_EXE));
+        assert_eq!(engine_of_exe(&exe), Engine::Waylith);
     }
 
     /// 1.7 back to 1.6: the 1.6 bundle is restored and wins, husk or no husk.
     #[test]
     fn a_restored_1_6_bundle_beats_a_1_7_husk() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_install(tmp.path(), "RimWorldMac.app", false, false);
-        macos_husk(tmp.path(), "RimWorld.app");
+        macos_install(tmp.path(), MAC_UNITY_EXE, false, false);
+        macos_husk(tmp.path(), MAC_WAYLITH_EXE);
 
-        let gi = from_game_dir(tmp.path()).expect("game dir");
-        assert_eq!(gi.exe, tmp.path().join("RimWorldMac.app"));
-        assert_eq!(gi.engine(), Engine::Unity);
-        assert_eq!(
-            gi.version_file(),
-            tmp.path().join("RimWorldMac.app").join(VERSION_FILE)
-        );
+        let exe = pick_exe(tmp.path(), MAC_UNITY_EXE, MAC_WAYLITH_EXE).expect("exe");
+        assert_eq!(exe, tmp.path().join(MAC_UNITY_EXE));
+        assert_eq!(engine_of_exe(&exe), Engine::Unity);
     }
 
     /// Both present: the install root wins, so a stale bundle copy never shadows the
@@ -783,11 +780,37 @@ mod tests {
     #[test]
     fn version_file_prefers_the_install_root() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        macos_install(tmp.path(), "RimWorldMac.app", false, false);
+        macos_install(tmp.path(), MAC_UNITY_EXE, false, false);
         std::fs::write(tmp.path().join(VERSION_FILE), "1.6.4871 rev598\r\n").expect("version");
 
-        let gi = from_game_dir(tmp.path()).expect("game dir");
+        let gi = mac_install(tmp.path(), MAC_UNITY_EXE, Engine::Unity);
         assert_eq!(gi.version_file(), tmp.path().join(VERSION_FILE));
-        assert_eq!(gi.version.as_deref(), Some("1.6.4871 rev598"));
+    }
+
+    /// Both the Unity and the Waylith shapes of every other platform, from any host.
+    #[test]
+    fn pick_exe_honours_precedence_for_flat_layouts() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (unity, waylith) = ("RimWorldWin64.exe", "RimWorld.exe");
+        assert_eq!(pick_exe(tmp.path(), unity, waylith), None, "empty dir");
+
+        std::fs::write(tmp.path().join(waylith), b"").expect("exe");
+        assert_eq!(
+            pick_exe(tmp.path(), unity, waylith),
+            None,
+            "a Waylith exe with no marker is not the game"
+        );
+        std::fs::write(tmp.path().join(WAYLITH_MARKER), b"").expect("marker");
+        assert_eq!(
+            pick_exe(tmp.path(), unity, waylith),
+            Some(tmp.path().join(waylith))
+        );
+
+        // Both present: the Unity exe wins.
+        std::fs::write(tmp.path().join(unity), b"").expect("exe");
+        assert_eq!(
+            pick_exe(tmp.path(), unity, waylith),
+            Some(tmp.path().join(unity))
+        );
     }
 }
