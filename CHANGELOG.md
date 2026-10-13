@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.8.0](https://github.com/keyz182/rimworld-profile-manager/compare/72d32de5ce12683e95ecdd53f763b7938b11a7bc..v1.8.0) - 2026-10-13
+#### Features
+- (**gui**) game versions screen with capture and delete (#19) - ([72d32de](https://github.com/keyz182/rimworld-profile-manager/commit/72d32de5ce12683e95ecdd53f763b7938b11a7bc)) - Kieran Evans
+
+- - -
+
 ## [v1.7.0](https://github.com/keyz182/rimworld-profile-manager/compare/99aa87e83c179840fd06a52ec7ef1131b40c3c84..v1.7.0) - 2026-10-13
 #### Features
 - (**gui**) pin under the run lock, play a pinned build without Steam (#18) - ([99aa87e](https://github.com/keyz182/rimworld-profile-manager/commit/99aa87e83c179840fd06a52ec7ef1131b40c3c84)) - Kieran Evans
