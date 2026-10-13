@@ -103,22 +103,42 @@ impl Ctx {
     }
 
     /// The game `profile` plays (V55): its stored build when pinned, else `live`, the
-    /// Steam install. Errors in plain words; a missing build reads the same in every
-    /// action.
+    /// Steam install. A missing build reads the same in every action.
     pub fn effective_game(
         &self,
         profile: &Profile,
         live: Option<&GameInstall>,
-    ) -> Result<EffectiveGame, String> {
+    ) -> Result<EffectiveGame, GameError> {
         let root = self
             .settings()
-            .map_err(|e| e.to_string())?
+            .map_err(|e| GameError::Other(e.to_string()))?
             .profiles_root(&self.app_dir);
         effective_game(profile, live, &root, &self.app_dir).map_err(|e| match e {
-            ProfileError::NoGame => text::NO_GAME.to_owned(),
-            ProfileError::BuildNotFound(key) => text::build_missing(&key),
-            e => e.to_string(),
+            ProfileError::NoGame => GameError::NoGame,
+            ProfileError::BuildNotFound(key) => GameError::BuildMissing(key),
+            e => GameError::Other(e.to_string()),
         })
+    }
+}
+
+/// Why a profile has no game to play (#15 N1: typed, so callers never compare text).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameError {
+    /// Unpinned, and RimWorld was not found.
+    NoGame,
+    /// Pinned to a stored game version that is gone or cannot be read.
+    BuildMissing(String),
+    /// Anything else (settings or build store unreadable), in core's plain words.
+    Other(String),
+}
+
+impl std::fmt::Display for GameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoGame => f.write_str(text::NO_GAME),
+            Self::BuildMissing(key) => f.write_str(&text::build_missing(key)),
+            Self::Other(reason) => f.write_str(reason),
+        }
     }
 }
 
@@ -281,22 +301,40 @@ impl App {
     }
 
     /// The selected profile's game (V55). Every per-profile game action goes through it.
-    pub fn effective_game(&self) -> Result<EffectiveGame, String> {
-        let profile = self.current().ok_or_else(|| text::NO_GAME.to_owned())?;
+    pub fn effective_game(&self) -> Result<EffectiveGame, GameError> {
+        let profile = self.current().ok_or(GameError::NoGame)?;
         self.ctx.effective_game(profile, self.game.as_ref().ok())
     }
 
     /// The game whose log Open log / Copy log read (V55, V67). A pinned profile whose
-    /// build cannot be used refuses in plain words; an unpinned one with no game found
-    /// gets `None` (Unity's log path).
-    pub fn log_game(&self) -> Result<Option<EffectiveGame>, String> {
+    /// build cannot be used refuses; an unpinned one with no game found gets `None`
+    /// (Unity's log path). Other errors keep their own reason (#15 N1).
+    pub fn log_game(&self) -> Result<Option<EffectiveGame>, GameError> {
         match self.effective_game() {
             Ok(game) => Ok(Some(game)),
-            Err(e) => match self.current().and_then(|p| p.game_build.as_deref()) {
-                Some(key) => Err(text::build_missing(key)),
-                None if e == text::NO_GAME => Ok(None),
-                None => Err(e),
-            },
+            Err(GameError::NoGame) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Why `p` cannot play right now, without touching the disk (the view calls it each
+    /// frame). An unpinned profile needs the Steam install; a pinned one needs only its
+    /// build, which health checks off the window thread (T56, deferred from T55/T60).
+    pub fn game_problem(&self, p: &Profile) -> Option<String> {
+        match p.game_build.as_deref() {
+            None => self
+                .game
+                .is_err()
+                .then(|| text::TIP_PLAY_NO_GAME.to_owned()),
+            Some(key) => self
+                .health
+                .get(&p.id)
+                .is_some_and(|found| {
+                    found
+                        .iter()
+                        .any(|f| matches!(f, rwpm_core::profile::health::Problem::BuildMissing(_)))
+                })
+                .then(|| text::build_missing(key)),
         }
     }
 

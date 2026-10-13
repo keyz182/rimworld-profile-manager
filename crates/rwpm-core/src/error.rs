@@ -52,6 +52,13 @@ pub enum ProfileError {
     NoGame,
     #[error("game version `{key}` is used by: {}", .profiles.join(", "))]
     BuildInUse { key: String, profiles: Vec<String> },
+    #[error(
+        "cannot check whether these profiles use game version `{key}`, because their profile.toml cannot be read: {}",
+        .profiles.join(", ")
+    )]
+    BuildUseUnknown { key: String, profiles: Vec<String> },
+    #[error("`{0}` is not a game version name")]
+    InvalidBuildKey(String),
     #[error("rwpm cannot tell which game build `{}` is; storing a game version needs a Steam install", .0.display())]
     NotSteamInstall(PathBuf),
     #[error("not enough room in `{}`: the copy needs {need} bytes and {free} are free", .path.display())]

@@ -250,12 +250,11 @@ impl App {
     }
 
     fn play_row(&self) -> Element<'_, Message> {
-        let wait = self.blocked();
-        let why = match (&self.game, &wait) {
-            (Err(_), _) => Some(t::TIP_PLAY_NO_GAME.to_owned()),
-            (Ok(_), Some(reason)) => Some(reason.clone()),
-            (Ok(_), None) => None,
-        };
+        // A pinned profile plays its build, so a missing Steam install does not stop it.
+        let why = self
+            .current()
+            .and_then(|p| self.game_problem(p))
+            .or_else(|| self.blocked());
         let status = why.clone().or_else(|| {
             let run = self.last_runs.get(&self.selected)?;
             Some(t::last_run(
@@ -294,7 +293,7 @@ impl App {
             return body.push(text(t::DEFAULT_MODS)).push(view_list).into();
         }
         // M9: these need RimWorld; without it they wait, with the reason on Play.
-        let wait = self.blocked().is_some() || self.game.is_err();
+        let wait = self.blocked().is_some() || self.game_problem(p).is_some();
         let (about, buttons) = if p.mode == Mode::Offline {
             (
                 t::OFFLINE_ABOUT,
@@ -364,7 +363,8 @@ impl App {
             }
             body = body.push(steam);
         }
-        let wait = self.blocked().is_some() || self.game.is_err();
+        let wait =
+            self.blocked().is_some() || self.current().and_then(|p| self.game_problem(p)).is_some();
         body.push(
             column![
                 text(t::RIMSORT).font(UI_BOLD),

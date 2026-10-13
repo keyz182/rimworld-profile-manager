@@ -957,7 +957,7 @@ fn pinned_missing_build_is_refused() {
     assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("\nrwpm run: This profile uses the stored game version"),
+        stderr.contains("\nrwpm run: This profile plays the stored game version"),
         "{stderr}"
     );
     let run = sb.last_run(&id);

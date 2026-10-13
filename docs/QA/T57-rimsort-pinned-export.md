@@ -46,7 +46,7 @@ Run the helper one time only. Each run adds one more "T57 Pinned" profile. To st
 | 4 | Close the app. Start RimSort. Select the instance "T57 Pinned". | RimSort shows no path error. "T57 Marker" is in the local mods list. Workshop mods are listed. The game version is the version in `KEY`. |
 | 5 | Close RimSort. In the app, select an unpinned LIVE profile. Click "Add to RimSort". | In `settings.json`, that instance has `local_folder` = `~/.local/share/Steam/steamapps/common/RimWorld/Mods`. |
 | 6 | Close the app. Rename `<BUILD_DIR>` to `<BUILD_DIR>.away`. Run `sha256sum ~/.local/share/RimSort/settings.json`. | You have a checksum. |
-| 7 | Start the app. Select "T57 Pinned". Click "Add to RimSort". | Error notice: "This profile uses the stored game version “<KEY>”, which is gone or cannot be read. It cannot be used until it uses a game version that is stored." No job starts. |
+| 7 | Start the app. Select "T57 Pinned". Click "Add to RimSort". | Error notice: "This profile plays the stored game version “<KEY>”, which is gone or cannot be read. Choose another game version for it under Game version." No job starts. |
 | 8 | Run `sha256sum ~/.local/share/RimSort/settings.json` again. Rename `<BUILD_DIR>.away` back to `<BUILD_DIR>`. | The checksum is the same as in step 6. |
 
 Pass: all expected results are true. Record the date, the app version and `KEY` in the PR or in task T68.

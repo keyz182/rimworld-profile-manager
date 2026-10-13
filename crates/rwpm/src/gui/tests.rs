@@ -1463,7 +1463,10 @@ fn v55_rimsort_export_refuses_when_the_pinned_build_is_missing() {
     let mut app = sb.app();
     let _ = app.update(Message::Select(p.id.clone()));
     let missing = text::build_missing("1.5.4409-rev1118");
-    assert_eq!(app.effective_game().map(|_| ()), Err(missing.clone()));
+    assert_eq!(
+        app.effective_game().map(|_| ()),
+        Err(GameError::BuildMissing("1.5.4409-rev1118".into()))
+    );
     let _ = app.export_job(settings.clone());
     assert_eq!(app.notice, Some(Notice::Error(missing)));
     assert!(app.job.is_none(), "no RimSort job started");
@@ -1501,4 +1504,51 @@ fn play_on_a_pinned_profile_passes_the_builds_exe() {
     let args = sb.launched().expect("fake rwpm ran");
     let exe = build.join("RimWorldLinux").display().to_string();
     assert_eq!(args[..4], ["run", p.id.as_str(), "--", exe.as_str()]);
+}
+
+/// T56 (deferred from T55/T60): a pinned profile with a good build plays without a Steam
+/// install; an unpinned one still needs it; a pinned one with a missing build says why.
+#[test]
+fn play_gating_follows_the_effective_game() {
+    use rwpm_core::profile::health::Problem;
+    let sb = Sandbox::new();
+    let store = sb.ctx().store().expect("store");
+    let key = "1.5.4409-rev1118";
+    let pinned = store.create("Pinned").expect("create");
+    store.set_pin(&pinned.id, Some(key)).expect("pin");
+    let loose = store.create("Loose").expect("create");
+    let mut app = sb.app();
+    app.game = Err("gone".to_owned());
+    let of = |app: &App, id: &ProfileId| {
+        let p = app
+            .profiles
+            .iter()
+            .find(|p| p.id == *id)
+            .expect("profile")
+            .clone();
+        app.game_problem(&p)
+    };
+    assert_eq!(of(&app, &loose.id), Some(text::TIP_PLAY_NO_GAME.to_owned()));
+    assert_eq!(
+        of(&app, &pinned.id),
+        None,
+        "pinned build needs no Steam install"
+    );
+    app.health
+        .insert(pinned.id.clone(), vec![Problem::BuildMissing(key.into())]);
+    assert_eq!(of(&app, &pinned.id), Some(text::build_missing(key)));
+}
+
+/// #15 N1: the log game is decided by error kind, not by comparing text. No game found →
+/// Unity's log path; a bad settings file keeps its own reason, never "build missing".
+#[test]
+fn log_game_is_decided_by_error_kind() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.game = Err("gone".to_owned());
+    assert!(matches!(app.log_game(), Ok(None)));
+    std::fs::write(sb.path("app/settings.toml"), "schema = 99\n").expect("settings");
+    let store_root = sb.ctx().settings().is_err();
+    assert!(store_root, "settings are unreadable");
+    assert!(matches!(app.log_game(), Err(GameError::Other(_))));
 }
