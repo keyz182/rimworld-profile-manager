@@ -103,7 +103,8 @@ impl Ctx {
     }
 
     /// The game `profile` plays (V55): its stored build when pinned, else `live`, the
-    /// Steam install. Errors in plain words.
+    /// Steam install. Errors in plain words; a missing build reads the same in every
+    /// action.
     pub fn effective_game(
         &self,
         profile: &Profile,
@@ -115,6 +116,7 @@ impl Ctx {
             .profiles_root(&self.app_dir);
         effective_game(profile, live, &root, &self.app_dir).map_err(|e| match e {
             ProfileError::NoGame => text::NO_GAME.to_owned(),
+            ProfileError::BuildNotFound(key) => text::build_missing(&key),
             e => e.to_string(),
         })
     }
