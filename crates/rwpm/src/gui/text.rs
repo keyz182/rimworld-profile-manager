@@ -136,7 +136,7 @@ pub const HELP_SECTIONS: [(&str, &str); 7] = [
     ),
     (
         "Game versions",
-        "A game version is a full copy of RimWorld. A profile can play one, so it stays on 1.6 while Steam runs 1.7. Use \"Game versions\" at the top to store or delete copies. Each copy takes about as much disk space as the game, unless your file system shares data. Steam's own Play button, without this tool's launch options, starts the Steam version. Windows copies of 1.6 have no Steam overlay.",
+        "A game version is a full copy of RimWorld. A profile can play one, so it stays on 1.6 while Steam runs 1.7. Use \"Game versions\" at the top to store or delete game versions. Each game version takes about as much disk space as the game, unless your file system shares data. Steam's own Play button, without this tool's launch options, starts the Steam version. Windows game versions of 1.6 have no Steam overlay.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";

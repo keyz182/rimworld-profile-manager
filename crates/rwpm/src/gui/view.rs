@@ -4,15 +4,15 @@
 
 use iced::widget::text::Wrapping;
 use iced::widget::{
-    Button, Column, button, center, column, container, mouse_area, opaque, progress_bar, row, rule,
-    scrollable, space, stack, text, text_input, tooltip,
+    Button, Column, button, center, column, container, mouse_area, opaque, progress_bar,
+    responsive, row, rule, scrollable, space, stack, text, text_input, tooltip,
 };
 use iced::{Alignment, Element, Length};
 use rwpm_core::launch::Os;
 use rwpm_core::profile::{LastRun, Mode, Profile, RunOutcome, StartedBy};
 
 use super::icon::{Icon, UI_BOLD, icon};
-use super::message::{Drill, Message};
+use super::message::{Dialog, Drill, Message};
 use super::{App, Notice, dialogs, keys, setup, text as t, theme};
 
 const GAP: u32 = 10;
@@ -39,6 +39,12 @@ impl App {
         .width(Length::Fill)
         .height(Length::Fill);
         match &self.dialog {
+            // Help sizes its list to the window, so its OK button stays on screen (T59).
+            Some(Dialog::Help) => stack![
+                main,
+                opaque(responsive(|size| dialogs::help_layer(size.height)))
+            ]
+            .into(),
             Some(dialog) => stack![
                 main,
                 opaque(

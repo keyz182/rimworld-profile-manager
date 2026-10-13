@@ -1558,10 +1558,9 @@ fn log_game_is_decided_by_error_kind() {
     assert!(matches!(app.log_game(), Err(GameError::Other(_))));
 }
 
-/// T59 D36: the Help dialog keeps its OK button on screen at the smallest window the
-/// layout is designed for (V33), however many sections it has.
-#[test]
-fn help_keeps_ok_on_screen_at_the_smallest_window() {
+/// Lays out the Help dialog in a window `height` tall and returns the layout bounds (not
+/// clipped to the window) of its OK button and of the first section.
+fn help_bounds(height: f32) -> (iced::Rectangle, iced::Rectangle) {
     let sb = Sandbox::new();
     let mut app = sb.app();
     let _ = app.update(Message::Help);
@@ -1570,14 +1569,43 @@ fn help_keeps_ok_on_screen_at_the_smallest_window() {
         default_font: super::icon::UI,
         ..iced::Settings::default()
     };
-    let mut ui = iced_test::Simulator::with_size(settings, (960.0, 600.0), app.view());
-    let ok = ui.find(text::OK).expect("OK is found");
-    let bounds = ok.visible_bounds().expect("OK is inside the window");
+    let mut ui = iced_test::Simulator::with_size(settings, (960.0, height), app.view());
+    let ok = ui.find(text::OK).expect("OK is laid out").bounds();
+    let first = ui
+        .find(text::HELP_SECTIONS[0].1)
+        .expect("the first section is laid out")
+        .bounds();
+    (ok, first)
+}
+
+/// T59 D36: the Help dialog keeps its OK button inside the smallest window the layout is
+/// designed for (V33), however many sections it has.
+#[test]
+fn help_keeps_ok_on_screen_at_the_smallest_window() {
+    let (ok, first) = help_bounds(600.0);
+    assert!(ok.y + ok.height <= 600.0, "OK ends at {}", ok.y + ok.height);
     assert!(
-        bounds.y + bounds.height <= 600.0,
-        "OK ends at {}",
-        bounds.y + bounds.height
+        first.y >= 0.0 && first.y < ok.y,
+        "first section at {}",
+        first.y
     );
-    ui.find(text::HELP_SECTIONS[0].1)
-        .expect("the first section is visible");
+}
+
+/// The dialog is as tall as its text needs, up to the window: in a tall window it is centred,
+/// not stretched to the bottom edge.
+#[test]
+fn help_grows_only_as_tall_as_its_text() {
+    let (tall_ok, _) = help_bounds(1400.0);
+    let (short_ok, _) = help_bounds(600.0);
+    // Centred, with the dialog as tall as its text: well clear of the window's bottom edge
+    // (it sat at y=1350 when the dialog filled the window).
+    assert!(
+        tall_ok.y + tall_ok.height < 1200.0,
+        "OK sits at {} in a 1400 px window",
+        tall_ok.y
+    );
+    assert!(
+        tall_ok.y > short_ok.y,
+        "a taller window shows more of the text"
+    );
 }

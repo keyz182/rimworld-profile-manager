@@ -1,7 +1,9 @@
 //! The dialogs shown on top of the main window, one at a time.
 
-use iced::widget::{Column, button, column, row, scrollable, space, text, text_input};
-use iced::{Element, Length};
+use iced::Element;
+use iced::widget::{
+    Column, button, center, column, container, row, scrollable, space, text, text_input,
+};
 use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
 use rwpm_core::profile::offline::OfflinePlan;
@@ -67,7 +69,7 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         Dialog::ConfirmDeleteBuild { key, bytes } => {
             confirm(t::confirm_delete_version(key, *bytes), t::YES_DELETE, true)
         }
-        Dialog::Help => help_dialog(),
+        Dialog::Help => help_dialog(help_list_height(600.0)),
     }
 }
 
@@ -75,9 +77,17 @@ fn heading(words: &str) -> iced::widget::Text<'_> {
     text(words).size(18).font(UI_BOLD)
 }
 
-/// The help sections scroll; the title and OK stay put, so OK is always on screen even
-/// in the smallest window (V33, T59 D36). The sections once filled 600 px on their own.
-fn help_dialog() -> Element<'static, Message> {
+/// Room the Help text list may take in a window `window_height` tall: what is left after
+/// the dialog's padding, its title and the OK row.
+fn help_list_height(window_height: f32) -> f32 {
+    const PADDING_AND_CHROME: f32 = 48.0 + 120.0;
+    (window_height - PADDING_AND_CHROME).max(120.0)
+}
+
+/// The Help sections scroll; the title and OK stay put, so OK is always on screen even in
+/// the smallest window (V33). The list takes only as much height as its text needs, up to
+/// what the window leaves. T59: the sections once filled 600 px on their own.
+fn help_dialog(list_height: f32) -> Element<'static, Message> {
     let mut sections = Column::new()
         .spacing(12)
         .padding(iced::Padding::ZERO.right(16));
@@ -88,7 +98,7 @@ fn help_dialog() -> Element<'static, Message> {
     let sections = sections.push(text(t::ICON_CREDIT).size(12).style(theme::muted));
     column![
         heading(t::HELP_TITLE),
-        scrollable(sections).height(Length::Fill),
+        container(scrollable(sections)).max_height(list_height),
         row![
             space::horizontal(),
             button(t::OK)
@@ -97,7 +107,18 @@ fn help_dialog() -> Element<'static, Message> {
         ]
     ]
     .spacing(12)
-    .height(Length::Fill)
+    .into()
+}
+
+/// The Help dialog on its backdrop, sized to the window it is shown in.
+pub fn help_layer(window_height: f32) -> Element<'static, Message> {
+    center(
+        container(help_dialog(help_list_height(window_height)))
+            .padding(24)
+            .max_width(560)
+            .style(theme::raised),
+    )
+    .style(theme::scrim)
     .into()
 }
 

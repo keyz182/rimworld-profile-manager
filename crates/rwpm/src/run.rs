@@ -274,6 +274,11 @@ fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
     Ok((store, settings))
 }
 
+/// What a start says when another start, or a capture or delete of a game version, holds
+/// the run lock. `docs/game-versions.md` quotes it (a test keeps the two the same).
+pub(crate) const LOCK_BUSY: &str =
+    "another profile is already being launched or played; close it first";
+
 /// V11: exclusive OS lock, released on drop or if rwpm dies.
 fn acquire_lock() -> Result<File, RunError> {
     let path =
@@ -291,9 +296,7 @@ fn acquire_lock() -> Result<File, RunError> {
         .map_err(failed)?;
     match file.try_lock() {
         Ok(()) => Ok(file),
-        Err(TryLockError::WouldBlock) => Err(RunError::Busy(
-            "another profile is already being launched or played; close it first".into(),
-        )),
+        Err(TryLockError::WouldBlock) => Err(RunError::Busy(LOCK_BUSY.into())),
         Err(TryLockError::Error(e)) => Err(failed(e)),
     }
 }
