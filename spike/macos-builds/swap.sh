@@ -10,13 +10,19 @@
 # then resolves CFBundleExecutable and execs the inner Mach-O (V41/V49, launch.rs).
 #
 # MATCH RULE (settled for T52; the Linux script has only rule 1's equivalent):
-#   rule 1  first token whose basename is RimWorldMac.app      -> <build>/RimWorldMac.app
-#   rule 2  else first token lying under the Steam install dir -> same path under <build>
+#   rule 1  first token whose basename is RimWorldMac.app      -> <build>'s own bundle
+#   rule 2  else first token lying under the Steam install dir -> <build>'s own bundle
 #   else    exit 2
-# Rule 2 exists because the spike may put Steam on a branch whose target is not a .app at
-# all: R37 shows RimWorld 1.7 is Waylith with a bare native exe. Without it the script
-# exits 2 and the V51 leg reads as a tooling bug rather than a rule gap. The rule that
-# fired is logged, so a rule-2 swap is never mistaken for a rule-1 one.
+#
+# Rule 2 exists because Steam may sit on a branch whose target is a DIFFERENT bundle:
+# macOS 1.7 ships `RimWorld.app` (Waylith), not `RimWorldMac.app`, so rule 1 cannot match
+# when the spike is mid-experiment with Steam on 1.7 and a stored 1.6 build.
+#
+# Both rules resolve to the build's OWN entry point rather than rewriting the path prefix.
+# A prefix rewrite (`<src>/X` -> `<build>/X`) looks right and is wrong across engines: it
+# would turn `<src>/RimWorld.app` into `<build>/RimWorld.app`, which does not exist in a
+# 1.6 build. The target swap has to resolve what the build actually contains. T55 needs
+# the same rule, not a prefix substitution.
 set -euo pipefail
 
 build=${RWPM_SPIKE_BUILD:?set RWPM_SPIKE_BUILD}
@@ -28,16 +34,26 @@ src=${RWPM_SPIKE_SRC:-$(sed -nE 's/^source_dir = "(.*)"$/\1/p' "$build/build.spi
 
 mkdir -p "$(dirname "$log")"
 
+# The build's own entry point, whatever it is called.
+target=""
+for cand in RimWorldMac.app RimWorld.app; do
+  [ -d "$build/$cand" ] && target="$build/$cand" && break
+done
+if [ -z "$target" ]; then
+  echo "swap.sh: no game bundle inside $build" >&2
+  exit 3
+fi
+
 args=()
 swapped=0
 rule=none
 for a in "$@"; do
   if [ "$swapped" = 0 ] && [ "$(basename -- "$a")" = RimWorldMac.app ]; then
-    args+=("$build/RimWorldMac.app")
+    args+=("$target")
     swapped=1
     rule=1
   elif [ "$swapped" = 0 ] && [ -n "$src" ] && [ "${a#"$src"/}" != "$a" ]; then
-    args+=("$build/${a#"$src"/}")
+    args+=("$target")
     swapped=1
     rule=2
   else

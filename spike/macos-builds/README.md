@@ -32,6 +32,9 @@ These are the things that do not carry across; each cost a real measurement.
 5. **No workshop log signal.** The Linux check asserts on workshop lines in `Player.log`. macOS
    logs none — not even for the Steam install launched by Steam with 524 workshop items present —
    so that check is informational here and the in-game mod list is the real evidence.
+7. **The target swap cannot be a path-prefix rewrite.** 1.7 ships `RimWorld.app` (Waylith) where
+   1.6 ships `RimWorldMac.app`, so rewriting `<install>/X` to `<build>/X` yields a path that does
+   not exist. `swap.sh` resolves the build's own bundle instead; a per-OS swap must do the same.
 6. **`steam_appid.txt` sits in three places** (install root, bundle root, `Contents/MacOS/`);
    all three are removed at capture so V52 is proved on the `SteamAppId` env var alone.
 
@@ -43,8 +46,8 @@ These are the things that do not carry across; each cost a real measurement.
 | Q2 signature | Copy keeps the ad-hoc signature exactly. `codesign -v` fails identically on source and copy — **Ludeon ships the bundle seal-invalid** (`Contents/PlugIns/` sealed vs `Contents/Plugins/` installed). The copy starts. Do **not** re-sign captured builds. |
 | Q3 Gatekeeper | Game code carries no quarantine; copying adds none. Quarantine under the install is only in `Mods/` and `bak/`. |
 | Q3b translocation | Quarantined build: `rwpm` direct exec runs in place. Via `open`, a translocated path was measured **and** macOS then refused the app outright ("RimWorldMac is damaged and can't be opened") — the broken seal turns R30's silent relocation into a hard refusal. Route-dependent either way; direct exec is unaffected. |
-| Q4 V50 | `Mono path[0]` and the live exe both point into the build. |
-| Q5/Q6 V51/V52 | Steam init from the copy: **OK** on `SteamAppId` alone. Overlay from a Steam-launched copy: **not yet run** — needs a launch-options change. Control measured: the Steam install loads `gameoverlayrenderer.dylib`. |
+| Q4 V50 | `Mono path[0]` and the live exe both point into the build, with a real version gap (build 1.6.4871 vs install 1.7.4976). |
+| Q5/Q6 V51/V52 | **Pass.** With Steam on 1.7 and a stored 1.6 build, Steam Play runs the stored build (`started_by = "steam"`), Steam init succeeds, and `gameoverlayrenderer.dylib` **is** loaded — macOS does not reproduce the Windows overlay loss. Shift-Tab draw still unconfirmed by eye. |
 | Q7 OFFLINE | Doorstop loads in the copy; mods and save dir redirect to the profile (V42). |
 
 Full detail, including the open decisions, is in the spike results write-up that accompanies this
