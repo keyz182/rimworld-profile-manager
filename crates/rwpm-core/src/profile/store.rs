@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use crate::builds::BuildKey;
 use crate::discovery::Engine;
 use crate::error::ProfileError;
 use crate::profile::file::{FILE_NAME, Mode, ProfileFile};
@@ -303,11 +304,15 @@ impl<T: Trash> ProfileStore<T> {
     }
 
     /// Pins the profile to a stored game build, or clears the pin with `None` (§I.file).
+    /// `key` must be a build key; anything else is refused before the file is touched.
     /// V54: Default cannot be pinned — it has no `profile.toml` to hold the key, and it
     /// shares the game's own save folder.
     pub fn set_pin(&self, id: &ProfileId, key: Option<&str>) -> Result<Profile, ProfileError> {
         if id.is_default() {
             return Err(ProfileError::DefaultImmutable("pinned to a game version"));
+        }
+        if let Some(key) = key {
+            BuildKey::parse(key)?;
         }
         let dir = self
             .get(id)?
@@ -789,6 +794,27 @@ mod tests {
         assert_eq!(listing.profiles.len(), 2, "Default + Good");
         assert_eq!(listing.unreadable.len(), 1);
         assert_eq!(listing.unreadable[0].0, bad.id);
+    }
+
+    /// §I.file: only a build key can be pinned; a refused pin leaves the file as it was.
+    #[test]
+    fn set_pin_refuses_a_value_that_is_not_a_build_key() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let trash = RecordingTrash::default();
+        let s = store(tmp.path(), &trash);
+        let p = s.create("Run").expect("create");
+        let path = s.root().join(p.id.as_str()).join(FILE_NAME);
+        let before = std::fs::read(&path).expect("read");
+        for bad in ["../x", "", "1.6 rev598", "UPPER"] {
+            assert!(s.set_pin(&p.id, Some(bad)).is_err(), "{bad:?} was pinned");
+        }
+        assert_eq!(std::fs::read(&path).expect("read"), before);
+
+        let pinned = s.set_pin(&p.id, Some("1.6.4871-rev598")).expect("pin");
+        assert_eq!(pinned.game_build.as_deref(), Some("1.6.4871-rev598"));
+        let unpinned = s.set_pin(&p.id, None).expect("unpin");
+        assert_eq!(unpinned.game_build, None);
+        assert_eq!(s.get(&p.id).expect("get").game_build, None);
     }
 
     #[test]

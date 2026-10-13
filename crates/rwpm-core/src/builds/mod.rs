@@ -16,6 +16,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::error::ProfileError;
+use crate::profile::file::FILE_NAME as PROFILE_FILE;
 use crate::profile::id::BUILDS_DIR;
 use crate::profile::lock::{take_run_lock, try_run_lock};
 use crate::profile::running::RunningProbe;
@@ -232,18 +233,35 @@ impl BuildStore {
     }
 }
 
-/// Display names of the profiles pinned to `key` (V54).
+/// Display names of the profiles pinned to `key` (V54). A `profile.toml` that fails to
+/// load (unknown field, newer schema, bad value) is still read as plain TOML: if its
+/// `game_build` names this build, it blocks too. A file that is not TOML at all cannot
+/// name a build and is passed over.
 fn pinned_by<T: Trash>(
     profiles: &ProfileStore<T>,
     key: &BuildKey,
 ) -> Result<Vec<String>, ProfileError> {
-    Ok(profiles
-        .list()?
+    let listing = profiles.list()?;
+    let mut names: Vec<String> = listing
         .profiles
         .into_iter()
         .filter(|p| p.game_build.as_deref() == Some(key.as_str()))
         .map(|p| p.name)
-        .collect())
+        .collect();
+    for (id, _) in &listing.unreadable {
+        let path = profiles.root().join(id.as_str()).join(PROFILE_FILE);
+        let Some(table) = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| text.parse::<toml::Table>().ok())
+        else {
+            continue;
+        };
+        if table.get("game_build").and_then(toml::Value::as_str) == Some(key.as_str()) {
+            let name = table.get("name").and_then(toml::Value::as_str);
+            names.push(name.unwrap_or(id.as_str()).to_owned());
+        }
+    }
+    Ok(names)
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::builds::BuildKey;
 use crate::error::ProfileError;
 
 /// Highest schema this build reads. Written only when `game_build` is set (§I.file);
@@ -81,9 +82,15 @@ impl ProfileFile {
             Some(Ok(_)) => {}
             _ => return Err(parse_err("missing or invalid `schema`".into())),
         }
-        table
+        let file: Self = table
             .try_into()
-            .map_err(|e: toml::de::Error| parse_err(e.to_string()))
+            .map_err(|e: toml::de::Error| parse_err(e.to_string()))?;
+        if let Some(key) = &file.game_build {
+            BuildKey::parse(key).map_err(|_| {
+                parse_err(format!("`game_build` {key:?} is not a game version key"))
+            })?;
+        }
+        Ok(file)
     }
 
     /// §I.file: schema 2 only while a game build is pinned. Recomputed on every write, so
@@ -189,6 +196,23 @@ mod tests {
         let read = ProfileFile::read(&path).expect("read");
         assert_eq!(read.game_build, None);
         assert_eq!(read.schema, 1);
+    }
+
+    /// §I.file: `game_build` names a stored build, so it must be a build key. A path
+    /// such as `../x` would otherwise point the game lookup outside the build store.
+    #[test]
+    fn rejects_a_game_build_that_is_not_a_build_key() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        for bad in ["../x", "", "1.6 rev598", "UPPER", "-1.6"] {
+            let text = format!("schema = 2\nname = \"x\"\nmode = \"live\"\ngame_build = {bad:?}\n");
+            std::fs::write(&path, text).expect("write");
+            let out = ProfileFile::read(&path);
+            assert!(
+                matches!(out, Err(ProfileError::Parse { .. })),
+                "{bad:?}: {out:?}"
+            );
+        }
     }
 
     #[test]
