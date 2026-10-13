@@ -140,3 +140,39 @@ fn unpinned_profile_ignores_a_legacy_profile_in_the_builds_folder() {
     let g = w.resolve(&p, Some(&w.games.live)).expect("resolve");
     assert_eq!(g.source(), &GameSource::Steam);
 }
+
+/// Review F2: the build was captured from another library than the one Steam uses now.
+/// The workshop follows the Steam install; the capture source is only the fallback.
+#[test]
+fn pinned_build_takes_the_steam_installs_workshop_over_its_capture_source() {
+    let w = World::new();
+    let p = w.pinned();
+    let toml = w.games.build_dir.join("build.toml");
+    let mut file = crate::builds::BuildFile::read(&toml).expect("read");
+    file.source_dir = w.path("old-lib/steamapps/common/RimWorld");
+    file.write_atomic(&toml).expect("write");
+    let workshop = |g: &EffectiveGame| g.steam.as_ref().map(|s| s.workshop_dir.clone());
+
+    let g = w.resolve(&p, Some(&w.games.live)).expect("resolve");
+    assert_eq!(g.steam, w.games.live.steam);
+    let g = w.resolve(&p, None).expect("resolve");
+    assert_eq!(
+        workshop(&g),
+        Some(w.path("old-lib/steamapps/workshop/content/294100"))
+    );
+}
+
+/// Review F4: a key that is not a build key (only reachable by building a `Profile`
+/// directly — `profile.toml` refuses it on read) is `BuildNotFound`, never the Steam install.
+#[test]
+fn invalid_build_key_is_build_not_found() {
+    let w = World::new();
+    let p = Profile {
+        game_build: Some("Not A Key!".into()),
+        ..w.store().create("Odd").expect("create")
+    };
+    assert!(matches!(
+        w.resolve(&p, Some(&w.games.live)),
+        Err(ProfileError::BuildNotFound(k)) if k == "Not A Key!"
+    ));
+}

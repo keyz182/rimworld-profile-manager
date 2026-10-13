@@ -284,6 +284,20 @@ impl App {
         self.ctx.effective_game(profile, self.game.as_ref().ok())
     }
 
+    /// The game whose log Open log / Copy log read (V55, V67). A pinned profile whose
+    /// build cannot be used refuses in plain words; an unpinned one with no game found
+    /// gets `None` (Unity's log path).
+    pub fn log_game(&self) -> Result<Option<EffectiveGame>, String> {
+        match self.effective_game() {
+            Ok(game) => Ok(Some(game)),
+            Err(e) => match self.current().and_then(|p| p.game_build.as_deref()) {
+                Some(key) => Err(text::build_missing(key)),
+                None if e == text::NO_GAME => Ok(None),
+                None => Err(e),
+            },
+        }
+    }
+
     pub fn current(&self) -> Option<&Profile> {
         self.profiles.iter().find(|p| p.id == self.selected)
     }

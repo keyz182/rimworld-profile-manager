@@ -1430,3 +1430,21 @@ fn empty_profile_gets_a_health_line_that_opens_copy_settings() {
     click(&mut app, text::COPY_SETTINGS_MENU);
     assert!(matches!(app.dialog, Some(Dialog::CopySettings(_))));
 }
+
+/// V55: Open log and Copy log refuse for a pinned profile whose build is gone, rather
+/// than fall back to another game's log.
+#[test]
+fn v55_logs_refuse_when_the_pinned_build_is_missing() {
+    let sb = Sandbox::new();
+    let store = sb.ctx().store().expect("store");
+    let p = store.create("Pinned").expect("create");
+    store.set_pin(&p.id, Some("1.5.4409-rev1118")).expect("pin");
+    let mut app = sb.app();
+    let _ = app.update(Message::Select(p.id.clone()));
+    let refused = |app: &App| matches!(&app.notice, Some(Notice::Error(e)) if *e == text::build_missing("1.5.4409-rev1118"));
+    let _ = app.update(Message::OpenLog);
+    assert!(refused(&app), "{:?}", app.notice);
+    app.notice = None;
+    let _ = app.update(Message::CopyLog);
+    assert!(refused(&app), "{:?}", app.notice);
+}

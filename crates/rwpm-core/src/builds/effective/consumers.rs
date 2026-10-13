@@ -200,3 +200,46 @@ fn v55_missing_build_is_the_one_health_problem() {
         [Problem::BuildMissing(w.games.build_key.to_string())]
     );
 }
+
+/// Review F1: a pinned build that is there but cannot be read, or a build store that
+/// cannot be opened, is also the build-missing problem — never silence.
+#[test]
+fn v55_unreadable_build_or_store_is_the_build_missing_problem() {
+    let w = World::new();
+    let p = w.profile(Mode::Offline, true);
+    let key = w.games.build_key.to_string();
+    let check = || {
+        health::check_profile(
+            &w.store(),
+            &p,
+            Some(&w.games.live),
+            &w.path("app"),
+            None,
+            Os::Linux,
+        )
+    };
+    std::fs::write(w.games.build_dir.join("build.toml"), "not toml [").expect("garble");
+    assert_eq!(check(), [Problem::BuildMissing(key.clone())]);
+    // A pre-v1.4 profile at `<root>/builds` makes the store refuse to open.
+    std::fs::write(w.path("profiles/builds/profile.toml"), "schema = 1").expect("legacy");
+    assert_eq!(check(), [Problem::BuildMissing(key)]);
+}
+
+/// Review F4: an invalid key resolves to `BuildNotFound`, so health reports it as missing.
+#[test]
+fn v55_invalid_build_key_is_the_build_missing_problem() {
+    let w = World::new();
+    let p = Profile {
+        game_build: Some("Not A Key!".into()),
+        ..w.profile(Mode::Offline, false)
+    };
+    let problems = health::check_profile(
+        &w.store(),
+        &p,
+        Some(&w.games.live),
+        &w.path("app"),
+        None,
+        Os::Linux,
+    );
+    assert_eq!(problems, [Problem::BuildMissing("Not A Key!".into())]);
+}

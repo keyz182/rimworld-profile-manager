@@ -633,7 +633,13 @@ impl App {
     }
 
     fn open_log(&mut self) {
-        let game = self.effective_game().ok();
+        let game = match self.log_game() {
+            Ok(g) => g,
+            Err(e) => {
+                let _ = self.fail(e);
+                return;
+            }
+        };
         let engine = super::support::engine(game.as_deref());
         let Some(log) = self.current().map(|p| p.log_path(engine)) else {
             return;
@@ -659,10 +665,13 @@ impl App {
     }
 
     fn copy_log(&mut self) -> Task<Message> {
+        let game = match self.log_game() {
+            Ok(g) => g,
+            Err(e) => return self.fail(e),
+        };
         let Some(profile) = self.current() else {
             return Task::none();
         };
-        let game = self.effective_game().ok();
         let report = super::support::support_text(profile, game.as_deref());
         self.notice = Some(Notice::Info(t::LOG_COPIED.into()));
         iced::clipboard::write(report)

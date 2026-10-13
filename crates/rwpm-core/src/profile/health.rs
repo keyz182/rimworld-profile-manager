@@ -26,8 +26,8 @@ pub enum Problem {
     LoaderForeign,
     /// RimSort's entry points at this profile's old folder (after a Move). Fix: add again.
     RimSortStale(String),
-    /// Pinned to a stored game version that is gone (V55). Every game action refuses
-    /// until the profile is pinned again. No fix here.
+    /// Pinned to a stored game version that is gone or cannot be read (V55). Every game
+    /// action refuses until the profile is pinned again. No fix here.
     BuildMissing(String),
 }
 
@@ -42,8 +42,9 @@ fn has_own_mods(profile: &Profile) -> bool {
         .is_ok_and(|ids| ids.iter().any(|id| !id.starts_with("ludeon.rimworld")))
 }
 
-/// Checks `profile` against its effective game (V55). A pinned build that is gone is the
-/// one problem reported; with no game at all there is nothing to check.
+/// Checks `profile` against its effective game (V55). A pinned build that cannot be used
+/// (gone, unreadable, store not readable) is the one problem reported; an unpinned profile
+/// with no game at all has nothing to check.
 pub fn check_profile<T: Trash>(
     store: &ProfileStore<T>,
     profile: &Profile,
@@ -54,8 +55,12 @@ pub fn check_profile<T: Trash>(
 ) -> Vec<Problem> {
     match effective_game(profile, live, store.root(), app_dir) {
         Ok(game) => check(store, profile, &game, app_dir, rimsort_settings, os),
-        Err(ProfileError::BuildNotFound(key)) => vec![Problem::BuildMissing(key)],
-        Err(_) => Vec::new(),
+        Err(ProfileError::NoGame) => Vec::new(),
+        Err(_) => profile
+            .game_build
+            .clone()
+            .map(|key| vec![Problem::BuildMissing(key)])
+            .unwrap_or_default(),
     }
 }
 
