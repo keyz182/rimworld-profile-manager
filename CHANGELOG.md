@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.4.1](https://github.com/keyz182/rimworld-profile-manager/compare/410ea72c74f11a18f790acd78ada5c10448d36d9..v1.4.1) - 2026-10-13
+#### Bug Fixes
+- (**core**) find RimWorld 1.7 on macOS, and reject the husk bundle (#12) - ([410ea72](https://github.com/keyz182/rimworld-profile-manager/commit/410ea72c74f11a18f790acd78ada5c10448d36d9)) - Kieran Evans
+
+- - -
+
 ## [v1.4.0](https://github.com/keyz182/rimworld-profile-manager/compare/c6b50badbee302737c00e7fede7e187cfd62659d..v1.4.0) - 2026-10-13
 #### Features
 - (**core**) T53 game build store — capture, update, delete (#10) - ([c6b50ba](https://github.com/keyz182/rimworld-profile-manager/commit/c6b50badbee302737c00e7fede7e187cfd62659d)) - Kieran Evans
