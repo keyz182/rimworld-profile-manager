@@ -113,7 +113,7 @@ fn guard_game(
     profiles_root: &Path,
     app_dir: &Path,
 ) -> Result<EffectiveGame, String> {
-    let live = find_game(command);
+    let live = live_game(profile, command);
     effective_game(profile, live.as_ref().ok(), profiles_root, app_dir).map_err(|e| {
         match (e, live) {
             (ProfileError::NoGame, Err(why)) => why,
@@ -122,8 +122,23 @@ fn guard_game(
     })
 }
 
+/// Steam's live install, as `effective_game` takes it. A pinned profile only needs its
+/// Steam library, for the workshop. App Play names the build itself, which sits outside
+/// every library, so when the command's game has none, Steam is asked instead. Without
+/// that, a library that moved since the capture would hide the workshop from the guard.
+pub(crate) fn live_game(profile: &Profile, command: &[OsString]) -> Result<GameInstall, String> {
+    let found = find_game(command);
+    if profile.game_build.is_some()
+        && found.as_ref().is_ok_and(|g| g.steam.is_none())
+        && let Ok(steam) = discovery::discover(None)
+    {
+        return Ok(steam);
+    }
+    found
+}
+
 /// The game folder holding the launched program, else the Steam install.
-pub(crate) fn find_game(command: &[OsString]) -> Result<GameInstall, String> {
+fn find_game(command: &[OsString]) -> Result<GameInstall, String> {
     let program = launch::game_program(command).map(Path::new);
     if let Some(dir) = program.and_then(Path::parent)
         && let Ok(game) = discovery::from_game_dir(dir)

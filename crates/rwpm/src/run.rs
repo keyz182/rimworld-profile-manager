@@ -117,8 +117,7 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
         Ok(target) => target,
         Err(e) => {
             record.write(e.outcome(), e.message(), None);
-            // Steam and RimSort show no console: say it where the player is looking.
-            if matches!(by, StartedBy::Steam | StartedBy::Rimsort) {
+            if refusal_needs_dialog(by) {
                 guard::show_error(e.message());
             }
             return Err(e);
@@ -140,6 +139,12 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
     }
 }
 
+/// Steam and RimSort show no console, so a pinned-launch refusal also gets a dialog
+/// where the player is looking (V72). The app shows it in its own Play row.
+fn refusal_needs_dialog(by: StartedBy) -> bool {
+    matches!(by, StartedBy::Steam | StartedBy::Rimsort)
+}
+
 /// T55 (V51, V57): a pinned profile's command with the stored build in place of Steam's
 /// game, before anything reads it. Unpinned: unchanged. A build that is gone or cannot be
 /// read, or a command with no single game entry, is refused: never Steam's game instead.
@@ -158,7 +163,7 @@ fn pinned_command(
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
     // Steam's install, for its workshop: the build sits outside `steamapps`.
-    let live = guard::find_game(command).ok();
+    let live = guard::live_game(profile, command).ok();
     let game = effective_game(profile, live.as_ref(), profiles_root, &app_dir)
         .map_err(|e| refuse(e.to_string(), text::build_missing(key)))?;
     launch::swap_target(command, &game)
@@ -347,5 +352,18 @@ mod tests {
         assert_eq!(game_dir(&wrapped), Some(Path::new("/builds/1.6")));
         let plain = cmd(&["/builds/1.6/RimWorldWin64.exe", "-x"]);
         assert_eq!(game_dir(&plain), Some(Path::new("/builds/1.6")));
+    }
+
+    /// V72: the refusal dialog is for launches without a console, not for the app's own.
+    #[test]
+    fn refusal_dialog_only_for_steam_and_rimsort() {
+        let shown = [
+            StartedBy::Steam,
+            StartedBy::Rimsort,
+            StartedBy::App,
+            StartedBy::Other,
+        ]
+        .map(refusal_needs_dialog);
+        assert_eq!(shown, [true, true, false, false]);
     }
 }
