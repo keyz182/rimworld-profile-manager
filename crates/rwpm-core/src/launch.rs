@@ -505,6 +505,7 @@ mod tests {
             id: ProfileId::parse("run").expect("id"),
             name: "Run".into(),
             mode,
+            game_build: None,
             location: Location::Stored {
                 dir: PathBuf::from("/profiles/run"),
             },
@@ -516,6 +517,7 @@ mod tests {
             id: ProfileId::default_id(),
             name: "Default".into(),
             mode: Mode::Live,
+            game_build: None,
             location: Location::Default {
                 save_dir: PathBuf::from("/home/u/.config/unity3d/x"),
             },

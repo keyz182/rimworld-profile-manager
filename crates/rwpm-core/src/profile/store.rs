@@ -49,6 +49,9 @@ pub struct Profile {
     pub id: ProfileId,
     pub name: String,
     pub mode: Mode,
+    /// Key of the stored game build this profile is pinned to; `None` = the Steam
+    /// install. Default is never pinned (V54).
+    pub game_build: Option<String>,
     pub location: Location,
 }
 
@@ -293,6 +296,25 @@ impl<T: Trash> ProfileStore<T> {
         Ok(Self::profile(id.clone(), dir, file))
     }
 
+    /// Pins the profile to a stored game build, or clears the pin with `None` (§I.file).
+    /// V54: Default cannot be pinned — it has no `profile.toml` to hold the key, and it
+    /// shares the game's own save folder.
+    pub fn set_pin(&self, id: &ProfileId, key: Option<&str>) -> Result<Profile, ProfileError> {
+        if id.is_default() {
+            return Err(ProfileError::DefaultImmutable("pinned to a game version"));
+        }
+        let dir = self
+            .get(id)?
+            .stored_dir()
+            .map(Path::to_path_buf)
+            .ok_or(ProfileError::DefaultImmutable("pinned to a game version"))?;
+        let path = dir.join(FILE_NAME);
+        let mut file = ProfileFile::read(&path)?;
+        file.game_build = key.map(ToOwned::to_owned);
+        file.write_atomic(&path)?;
+        Ok(Self::profile(id.clone(), dir, file))
+    }
+
     /// Moves the profile dir to the recycle bin. Refuses Default (V10) and running profiles (V27).
     pub fn delete(&self, id: &ProfileId, probe: &dyn RunningProbe) -> Result<(), ProfileError> {
         if id.is_default() {
@@ -323,7 +345,8 @@ impl<T: Trash> ProfileStore<T> {
     fn claim(&self, base: &str) -> Result<(ProfileId, PathBuf), ProfileError> {
         for n in 1..=MAX_SUFFIX {
             let id = ProfileId::candidate(base, n);
-            if id.is_default() {
+            // `default` is the built-in profile; `builds` is the game-build store (V56).
+            if id.is_default() || id.is_builds() {
                 continue;
             }
             let dir = self.root.join(id.as_str());
@@ -347,6 +370,7 @@ impl<T: Trash> ProfileStore<T> {
             id,
             name: file.name,
             mode: file.mode,
+            game_build: file.game_build,
             location: Location::Stored { dir },
         }
     }
@@ -356,6 +380,8 @@ impl<T: Trash> ProfileStore<T> {
             id: ProfileId::default_id(),
             name: DEFAULT_NAME.to_owned(),
             mode: Mode::Live,
+            // V54: Default shares the game's own save folder and cannot be pinned.
+            game_build: None,
             location: Location::Default {
                 save_dir: self.game_save_dir.clone(),
             },
@@ -424,6 +450,17 @@ mod tests {
         file.frozen_mods = vec![frozen("2009463077")];
         file.write_atomic(&dir.join(FILE_NAME)).expect("write");
         p
+    }
+
+    /// §I.cmd: `builds` is reserved for the game-build store, so no new profile takes it.
+    #[test]
+    fn a_profile_named_builds_gets_the_next_free_id() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let trash = RecordingTrash::default();
+        let s = store(tmp.path(), &trash);
+        let p = s.create("Builds").expect("create");
+        assert_eq!(p.id.as_str(), "builds-2");
+        assert!(!s.root().join("builds").exists());
     }
 
     #[test]
@@ -758,12 +795,14 @@ mod tests {
             id: ProfileId::parse("p").expect("id"),
             name: "P".into(),
             mode: Mode::Live,
+            game_build: None,
             location: Location::Stored { dir: dir.clone() },
         };
         let default = Profile {
             id: ProfileId::default_id(),
             name: "Default".into(),
             mode: Mode::Live,
+            game_build: None,
             location: Location::Default {
                 save_dir: save.clone(),
             },

@@ -86,6 +86,16 @@ impl GameInstall {
         }
     }
 
+    /// `Version.txt` for this install. Linux/Windows: the install root. macOS: INSIDE the
+    /// bundle (`<bundle>/Version.txt`) — there is none at the root, live-confirmed T52.
+    pub fn version_file(&self) -> PathBuf {
+        if self.is_macos_bundle() {
+            self.exe.join(VERSION_FILE)
+        } else {
+            self.game_dir.join(VERSION_FILE)
+        }
+    }
+
     /// RimSort's `game_folder` field (T45). Linux/Windows: `game_dir`, the flat install
     /// root. macOS: the `.app` bundle itself — confirmed live against this machine's real
     /// `~/Library/Application Support/RimSort/settings.json`, which names the bundle
@@ -203,16 +213,18 @@ fn read_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
             exe,
         });
     }
-    let version = std::fs::read_to_string(dir.join(VERSION_FILE))
+    let mut install = GameInstall {
+        game_dir: dir.to_path_buf(),
+        exe,
+        version: None,
+        steam: None,
+    };
+    // `Version.txt` is CRLF-terminated on every platform; `trim` handles that.
+    install.version = std::fs::read_to_string(install.version_file())
         .ok()
         .map(|v| v.trim().to_owned())
         .filter(|v| !v.is_empty());
-    Ok(GameInstall {
-        game_dir: dir.to_path_buf(),
-        exe,
-        version,
-        steam: None,
-    })
+    Ok(install)
 }
 
 /// `<library>/steamapps/common/<game>` → `<library>`.
@@ -338,7 +350,14 @@ mod tests {
             let game = lib.join("steamapps/common").join(INSTALL_DIR);
             std::fs::create_dir_all(&game).expect("game dir");
             write_game_exe(&game);
-            std::fs::write(game.join(VERSION_FILE), "1.6.4871 rev598\r\n").expect("version");
+            // T52: on macOS `Version.txt` lives INSIDE the bundle; there is none at the
+            // install root. CRLF on every platform.
+            let version_dir = if cfg!(target_os = "macos") {
+                game.join(GAME_EXE)
+            } else {
+                game.clone()
+            };
+            std::fs::write(version_dir.join(VERSION_FILE), "1.6.4871 rev598\r\n").expect("version");
         }
         (steam, libs)
     }
@@ -375,6 +394,29 @@ mod tests {
             discover(Some(&steam)),
             Err(DiscoveryError::GameNotInstalled)
         ));
+    }
+
+    /// R29 + T52: the bundle holds `Version.txt`; a flat install holds it at the root.
+    #[test]
+    fn version_file_sits_inside_a_macos_bundle() {
+        let flat = GameInstall {
+            game_dir: PathBuf::from("/games/RimWorld"),
+            exe: PathBuf::from("/games/RimWorld/RimWorldLinux"),
+            version: None,
+            steam: None,
+        };
+        assert_eq!(
+            flat.version_file(),
+            PathBuf::from("/games/RimWorld/Version.txt")
+        );
+        let bundle = GameInstall {
+            exe: PathBuf::from("/games/RimWorld/RimWorldMac.app"),
+            ..flat
+        };
+        assert_eq!(
+            bundle.version_file(),
+            PathBuf::from("/games/RimWorld/RimWorldMac.app/Version.txt")
+        );
     }
 
     #[test]

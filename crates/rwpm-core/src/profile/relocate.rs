@@ -2,15 +2,15 @@
 //! copy byte for byte, switch `settings.toml`, then send the old folders to the recycle
 //! bin. Nothing old is removed before the copy is verified.
 
-use std::fs::{File, TryLockError};
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
-use crate::fs_copy::copy_tree;
-use crate::profile::id::ProfileId;
+use crate::fs_copy::{copy_tree, same_tree};
+use crate::profile::file::FILE_NAME;
+use crate::profile::id::{BUILDS_DIR, ProfileId};
+use crate::profile::lock::take_run_lock;
 use crate::profile::running::RunningProbe;
 use crate::profile::store::{ProfileStore, Trash};
 use crate::settings::AppSettings;
@@ -18,7 +18,6 @@ use crate::space;
 
 /// Left in the target while a move runs, so an interrupted move can be retried (DA1).
 const MARKER: &str = ".rwpm-move";
-const RUN_LOCK: &str = "run.lock";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovePlan {
@@ -27,8 +26,22 @@ pub struct MovePlan {
     pub profiles: Vec<ProfileId>,
     pub bytes: u64,
     pub free_bytes: Option<u64>,
+    /// V56: the game-build store moves with the profiles. Carried by name, never by
+    /// `ProfileId`, because `builds` is not a profile.
+    pub builds: bool,
     /// Profile copies from an interrupted earlier move to the same target.
     leftovers: Vec<PathBuf>,
+}
+
+impl MovePlan {
+    /// Every folder this move copies: the profiles, then the build store (V56).
+    fn moved_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.profiles.iter().map(ToString::to_string).collect();
+        if self.builds {
+            names.push(BUILDS_DIR.to_owned());
+        }
+        names
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +56,9 @@ pub struct MoveReport {
 struct Marker {
     old_root: PathBuf,
     profiles: Vec<String>,
+    /// Absent in markers written before v1.4, which never carried a build store.
+    #[serde(default)]
+    builds: bool,
 }
 
 /// Checks `new_root` and measures the move. Reads only.
@@ -72,15 +88,22 @@ pub fn plan_move<T: Trash>(
     }
     let leftovers = leftovers(new_root).ok_or_else(|| bad("the new folder is not empty"))?;
     let profiles = profile_ids(&old_root)?;
+    let builds = old_root.join(BUILDS_DIR).is_dir() && !is_legacy_profile(&old_root);
     Ok(MovePlan {
         bytes: profiles
             .iter()
             .map(|id| space::dir_size(&old_root.join(id.as_str())))
-            .sum(),
+            .sum::<u64>()
+            + if builds {
+                space::dir_size(&old_root.join(BUILDS_DIR))
+            } else {
+                0
+            },
         free_bytes: space::free_space(new_root),
         old_root,
         new_root: new_root.to_path_buf(),
         profiles,
+        builds,
         leftovers,
     })
 }
@@ -117,9 +140,9 @@ fn apply_with_hook<T: Trash>(
     write_marker(plan)?;
     let copied = copy_all(plan, progress).and_then(|()| {
         after_copy(new);
-        plan.profiles
+        plan.moved_names()
             .iter()
-            .try_for_each(|id| same_tree(&plan.old_root.join(id.as_str()), &new.join(id.as_str())))
+            .try_for_each(|n| same_tree(&plan.old_root.join(n), &new.join(n), &|_| false))
     });
     if let Err(e) = copied {
         undo_copies(plan);
@@ -135,9 +158,9 @@ fn apply_with_hook<T: Trash>(
     let marker = new.join(MARKER);
     std::fs::remove_file(&marker).map_err(ProfileError::io("remove", &marker))?;
     let left_behind = plan
-        .profiles
+        .moved_names()
         .iter()
-        .map(|id| plan.old_root.join(id.as_str()))
+        .map(|n| plan.old_root.join(n))
         .filter(|dir| store.trash_path(dir).is_err())
         .collect();
     // Only an empty old folder goes; anything else in it stays where it was.
@@ -177,23 +200,14 @@ pub fn stale_rimsort(settings: &Path, old_root: &Path, profiles: &[ProfileId]) -
         .collect()
 }
 
-fn take_run_lock(app_dir: &Path) -> Result<File, ProfileError> {
-    let path = app_dir.join(RUN_LOCK);
-    std::fs::create_dir_all(app_dir).map_err(ProfileError::io("create", app_dir))?;
-    let file = File::options()
-        .create(true)
-        .write(true)
-        .truncate(false)
-        .open(&path)
-        .map_err(ProfileError::io("open", &path))?;
-    match file.try_lock() {
-        Ok(()) => Ok(file),
-        Err(TryLockError::WouldBlock) => Err(ProfileError::GameRunning),
-        Err(TryLockError::Error(e)) => Err(ProfileError::io("lock", &path)(e)),
-    }
+/// `<root>/builds` holding a `profile.toml` is a profile made before v1.4, not the build
+/// store. It keeps moving as a profile; the store is carried separately.
+fn is_legacy_profile(root: &Path) -> bool {
+    root.join(BUILDS_DIR).join(FILE_NAME).is_file()
 }
 
-/// Every profile-id folder under the old root, with or without `profile.toml`.
+/// Every profile-id folder under the old root, with or without `profile.toml`. The build
+/// store is left out on purpose (V56): it is carried by name, not as a `ProfileId`.
 fn profile_ids(root: &Path) -> Result<Vec<ProfileId>, ProfileError> {
     let entries = match std::fs::read_dir(root) {
         Ok(e) => e,
@@ -208,6 +222,7 @@ fn profile_ids(root: &Path) -> Result<Vec<ProfileId>, ProfileError> {
                 .to_str()
                 .and_then(|n| ProfileId::parse(n).ok())
         })
+        .filter(|id| !id.is_builds() || is_legacy_profile(root))
         .collect();
     ids.sort();
     Ok(ids)
@@ -231,7 +246,8 @@ fn leftovers(target: &Path) -> Option<Vec<PathBuf>> {
     let dirs = names.iter().filter(|n| *n != MARKER);
     let mut out = Vec::new();
     for name in dirs {
-        if !marker.profiles.contains(name) || !target.join(name).is_dir() {
+        let known = marker.profiles.contains(name) || (marker.builds && name == BUILDS_DIR);
+        if !known || !target.join(name).is_dir() {
             return None;
         }
         out.push(target.join(name));
@@ -243,6 +259,7 @@ fn write_marker(plan: &MovePlan) -> Result<(), ProfileError> {
     let marker = Marker {
         old_root: plan.old_root.clone(),
         profiles: plan.profiles.iter().map(ToString::to_string).collect(),
+        builds: plan.builds,
     };
     let path = plan.new_root.join(MARKER);
     let text = toml::to_string(&marker).map_err(|e| ProfileError::Parse {
@@ -254,11 +271,8 @@ fn write_marker(plan: &MovePlan) -> Result<(), ProfileError> {
 
 fn copy_all(plan: &MovePlan, progress: &mut dyn FnMut(u64)) -> Result<(), ProfileError> {
     let mut done = 0;
-    for id in &plan.profiles {
-        let (from, to) = (
-            plan.old_root.join(id.as_str()),
-            plan.new_root.join(id.as_str()),
-        );
+    for name in plan.moved_names() {
+        let (from, to) = (plan.old_root.join(&name), plan.new_root.join(&name));
         let base = done;
         copy_tree(&from, &to, &|_| false, &mut |n| {
             done = base + n;
@@ -271,71 +285,11 @@ fn copy_all(plan: &MovePlan, progress: &mut dyn FnMut(u64)) -> Result<(), Profil
 
 /// Removes only what this move created; the old profiles are untouched.
 fn undo_copies(plan: &MovePlan) {
-    for id in &plan.profiles {
-        let _ = std::fs::remove_dir_all(plan.new_root.join(id.as_str()));
+    for name in plan.moved_names() {
+        let _ = std::fs::remove_dir_all(plan.new_root.join(name));
     }
     let _ = std::fs::remove_file(plan.new_root.join(MARKER));
     let _ = std::fs::remove_dir(&plan.new_root);
-}
-
-/// V14: same entries, kinds, link targets and bytes.
-fn same_tree(a: &Path, b: &Path) -> Result<(), ProfileError> {
-    let differs = || ProfileError::VerifyFailed(b.to_path_buf());
-    let list = |dir: &Path| -> Result<Vec<std::fs::DirEntry>, ProfileError> {
-        let mut v: Vec<_> = std::fs::read_dir(dir)
-            .map_err(ProfileError::io("list", dir))?
-            .collect::<Result<_, _>>()
-            .map_err(ProfileError::io("list", dir))?;
-        v.sort_by_key(std::fs::DirEntry::file_name);
-        Ok(v)
-    };
-    let (la, lb) = (list(a)?, list(b)?);
-    if la.len() != lb.len() {
-        return Err(differs());
-    }
-    for (ea, eb) in la.iter().zip(&lb) {
-        if ea.file_name() != eb.file_name() {
-            return Err(differs());
-        }
-        let (ta, tb) = (ea.file_type(), eb.file_type());
-        let (ta, tb) = (
-            ta.map_err(ProfileError::io("read", ea.path()))?,
-            tb.map_err(ProfileError::io("read", eb.path()))?,
-        );
-        if ta.is_symlink() || tb.is_symlink() {
-            if std::fs::read_link(ea.path()).ok() != std::fs::read_link(eb.path()).ok() {
-                return Err(ProfileError::VerifyFailed(eb.path()));
-            }
-        } else if ta.is_dir() && tb.is_dir() {
-            same_tree(&ea.path(), &eb.path())?;
-        } else if !(ta.is_file() && tb.is_file() && same_file(&ea.path(), &eb.path())?) {
-            return Err(ProfileError::VerifyFailed(eb.path()));
-        }
-    }
-    Ok(())
-}
-
-fn same_file(a: &Path, b: &Path) -> Result<bool, ProfileError> {
-    let open = |p: &Path| File::open(p).map_err(ProfileError::io("read", p));
-    let (mut fa, mut fb) = (open(a)?, open(b)?);
-    let (ma, mb) = (fa.metadata(), fb.metadata());
-    if ma.map(|m| m.len()).ok() != mb.map(|m| m.len()).ok() {
-        return Ok(false);
-    }
-    let (mut ba, mut bb) = (vec![0u8; 1 << 16], vec![0u8; 1 << 16]);
-    loop {
-        let na = fa.read(&mut ba).map_err(ProfileError::io("read", a))?;
-        let nb = fb
-            .read_exact(&mut bb[..na])
-            .map(|()| na)
-            .map_err(ProfileError::io("read", b))?;
-        if ba[..na] != bb[..nb] {
-            return Ok(false);
-        }
-        if na == 0 {
-            return Ok(true);
-        }
-    }
 }
 
 /// Canonical form of `p`, or of its nearest existing parent joined with the rest.
