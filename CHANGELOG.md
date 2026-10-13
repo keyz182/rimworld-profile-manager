@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.7.0](https://github.com/keyz182/rimworld-profile-manager/compare/99aa87e83c179840fd06a52ec7ef1131b40c3c84..v1.7.0) - 2026-10-13
+#### Features
+- (**gui**) pin under the run lock, play a pinned build without Steam (#18) - ([99aa87e](https://github.com/keyz182/rimworld-profile-manager/commit/99aa87e83c179840fd06a52ec7ef1131b40c3c84)) - Kieran Evans
+
+- - -
+
 ## [v1.6.0](https://github.com/keyz182/rimworld-profile-manager/compare/4cfb33c73cfbb690b6e575faa8afd160f9ddd1ad..v1.6.0) - 2026-10-13
 #### Features
 - (**run**) T55 launch the pinned game build (#17) - ([4cfb33c](https://github.com/keyz182/rimworld-profile-manager/commit/4cfb33c73cfbb690b6e575faa8afd160f9ddd1ad)) - Kieran Evans
