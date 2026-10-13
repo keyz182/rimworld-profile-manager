@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use super::capture::{CaptureKind, UpdateReason, apply_for_test, plan_capture};
 use super::*;
 use crate::discovery::{GAME_EXE, GameInstall, RIMWORLD_APP_ID, discover};
+use crate::profile::file::FILE_NAME;
 use crate::profile::lock::RUN_LOCK;
 use crate::profile::{ProfileFile, ProfileId, RunningProbe};
 
@@ -307,6 +308,43 @@ fn delete_refused_while_a_profile_pins_the_build() {
             .delete(&f.profiles(), &key("9.9"), &FakeProbe(false))
             .is_err()
     );
+}
+
+/// V54: a pin in a `profile.toml` that no longer parses still blocks Delete. A profile
+/// whose own `game_build` is not a build key cannot name this build, so it does not.
+#[test]
+fn delete_refused_while_an_unreadable_profile_pins_the_build() {
+    let f = Fixture::new("19234567", "4", &["Core"]);
+    f.capture().expect("capture");
+    let pins = f.profiles().create("Newer Run").expect("create");
+    let bad_key = f.profiles().create("Bad Key").expect("create");
+    let file_of = |id: &ProfileId| f.profiles_root().join(id.as_str()).join(FILE_NAME);
+    std::fs::write(
+        file_of(&pins.id),
+        format!("schema = 2\nname = \"Newer Run\"\nmode = \"live\"\ngame_build = \"{KEY}\"\nfuture = 1\n"),
+    )
+    .expect("write");
+    std::fs::write(
+        file_of(&bad_key.id),
+        "schema = 2\nname = \"Bad Key\"\nmode = \"live\"\ngame_build = \"../builds/x\"\n",
+    )
+    .expect("write");
+    assert_eq!(f.profiles().list().expect("list").unreadable.len(), 2);
+
+    let out = f
+        .builds()
+        .delete(&f.profiles(), &key(KEY), &FakeProbe(false));
+    let Err(ProfileError::BuildInUse { profiles, .. }) = out else {
+        panic!("delete was allowed: {out:?}");
+    };
+    assert_eq!(profiles, ["Newer Run"]);
+    assert!(f.builds().dir_of(&key(KEY)).exists());
+
+    std::fs::remove_file(file_of(&pins.id)).expect("remove");
+    f.builds()
+        .delete(&f.profiles(), &key(KEY), &FakeProbe(false))
+        .expect("the bad-key profile does not pin this build");
+    assert!(!f.builds().dir_of(&key(KEY)).exists());
 }
 
 #[test]
