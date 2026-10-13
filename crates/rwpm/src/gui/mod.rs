@@ -12,7 +12,7 @@ mod message;
 mod mods;
 mod setup;
 mod support;
-mod text;
+pub(crate) mod text;
 mod theme;
 mod update;
 mod view;

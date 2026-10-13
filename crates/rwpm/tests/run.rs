@@ -151,6 +151,11 @@ fn run_cli_contract_serial() {
     records_who_started_each_run();
     records_a_failed_start();
     run_uses_moved_root();
+    pinned_launch_runs_the_build();
+    pinned_wrapped_offline_runs_the_build_inside_the_wrapper();
+    pinned_guard_sees_the_live_workshop();
+    pinned_guard_from_app_play_sees_the_live_workshop();
+    pinned_guard_uses_the_steam_chosen_in_settings();
 }
 
 fn records_who_started_each_run() {
@@ -786,5 +791,358 @@ fn run_uses_moved_root() {
             moved.join(&id).join("SaveData").display()
         )),
         "{seen}"
+    );
+}
+
+const BUILD_KEY: &str = "1.5.4409-rev1118";
+
+impl Sandbox {
+    fn profiles_root(&self) -> PathBuf {
+        self.app_dir().join("profiles")
+    }
+
+    /// A profile pinned to `BUILD_KEY`, in `mode`, with `active` turned on.
+    fn pinned_profile(&self, mode: Mode, active: &[&str]) -> (String, PathBuf) {
+        let store =
+            ProfileStore::open(self.profiles_root(), self.path().join("game-save"), NoTrash)
+                .expect("store");
+        let id = store.create("Pinned").expect("create").id;
+        store.set_pin(&id, Some(BUILD_KEY)).expect("pin");
+        let profile = self.profiles_root().join(id.as_str());
+        let toml = profile.join("profile.toml");
+        let mut file = ProfileFile::read(&toml).expect("toml");
+        file.mode = mode;
+        file.write_atomic(&toml).expect("toml");
+        let config = profile.join("SaveData/Config/ModsConfig.xml");
+        std::fs::create_dir_all(config.parent().expect("parent")).expect("config dir");
+        let items: String = active.iter().map(|a| format!("<li>{a}</li>")).collect();
+        std::fs::write(
+            &config,
+            format!("<ModsConfigData><activeMods>{items}</activeMods></ModsConfigData>"),
+        )
+        .expect("config");
+        (id.to_string(), profile)
+    }
+
+    /// A Linux 1.6 game folder whose `RimWorldLinux` appends `<tag> <args…> cwd=<pwd>` to
+    /// `seen.txt`; with `start_RimWorld.sh` too (which must never run itself).
+    fn fake_install(&self, dir: &Path, tag: &str) {
+        about(&dir.join("Data/Core"), "ludeon.rimworld");
+        std::fs::write(dir.join("start_RimWorld.sh"), "#!/bin/sh\nexit 99\n").expect("script");
+        let elf = dir.join("RimWorldLinux");
+        std::fs::write(
+            &elf,
+            format!(
+                "#!/bin/sh\necho \"{tag} $* cwd=$(pwd) exe=${{RWPM_GAME_EXE-}}\" >> '{}'\n",
+                self.path().join("seen.txt").display()
+            ),
+        )
+        .expect("elf");
+        std::fs::set_permissions(&elf, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+
+    /// Steam's install at `lib/steamapps/common/RimWorld` and the stored build `BUILD_KEY`
+    /// captured from it. → (Steam's game dir, the build dir).
+    fn steam_and_build(&self) -> (PathBuf, PathBuf) {
+        let steam = self.path().join("lib/steamapps/common/RimWorld");
+        self.fake_install(&steam, "steam");
+        let build = self.profiles_root().join("builds").join(BUILD_KEY);
+        self.fake_install(&build, "build");
+        std::fs::write(
+            build.join("build.toml"),
+            format!(
+                "schema = 1\nversion = \"1.5.4409 rev1118\"\nbuildid = \"1\"\nbeta = \"\"\n\
+                 dlc = [\"Core\"]\ncaptured_at = 2026-10-13T00:00:00Z\nsource_dir = '{}'\nsize = 0\n",
+                steam.display()
+            ),
+        )
+        .expect("build.toml");
+        (steam, build)
+    }
+
+    fn seen(&self) -> String {
+        std::fs::read_to_string(self.path().join("seen.txt")).unwrap_or_default()
+    }
+
+    fn rwpm_log(&self, profile: &Path) -> String {
+        std::fs::read_to_string(profile.join("rwpm.log")).unwrap_or_default()
+    }
+}
+
+/// V50/V51 (T55): Steam names its own install; a pinned profile starts the build.
+fn pinned_launch_runs_the_build() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let (id, _) = sb.pinned_profile(Mode::Live, &["ludeon.rimworld"]);
+    let status = sb
+        .rwpm()
+        .args(["run", &id, "--"])
+        .arg(steam.join("RimWorldLinux"))
+        .arg("-popupwindow")
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0));
+    let seen = sb.seen();
+    assert!(seen.starts_with("build -popupwindow"), "{seen}");
+    assert!(!seen.contains("steam"), "Steam's game ran: {seen}");
+    assert_eq!(sb.last_run(&id).outcome, RunOutcome::Ok);
+    assert!(build.join("RimWorldLinux").is_file());
+}
+
+/// V29 + V57 (T55): behind Steam's wrappers, rwpm goes between for the BUILD's script, and
+/// an in-game Restart (`RWPM_GAME_EXE`) would re-run the build.
+fn pinned_wrapped_offline_runs_the_build_inside_the_wrapper() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let (id, profile) = sb.pinned_profile(Mode::Offline, &["ludeon.rimworld"]);
+    let wrapper = sb.script(
+        "entry-point",
+        &format!(
+            "echo \"wrapper exe=$RWPM_GAME_EXE $*\" >> '{}'\n[ \"$1\" = -- ] && shift\nexec \"$@\"",
+            sb.path().join("seen.txt").display()
+        ),
+    );
+    let rwpm = staged_rwpm(&sb);
+    let status = Command::new(&rwpm)
+        .env("XDG_DATA_HOME", sb.path().join("data"))
+        .env("XDG_CONFIG_HOME", sb.path().join("config"))
+        .env("HOME", sb.path())
+        .env("RWPM_GUARD_CHOICE", "cancel")
+        .env_remove("LD_PRELOAD")
+        .args(["run", &id, "--"])
+        .arg(&wrapper)
+        .arg("--")
+        .arg(steam.join("start_RimWorld.sh"))
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0), "{}", sb.rwpm_log(&profile));
+    let seen = sb.seen();
+    let lines: Vec<&str> = seen.lines().collect();
+    assert_eq!(lines.len(), 2, "{seen}");
+    assert!(
+        lines[0].starts_with(&format!(
+            "wrapper exe={} -- {} --rwpm-inner",
+            build.join("start_RimWorld.sh").display(),
+            rwpm.display()
+        )),
+        "{seen}"
+    );
+    // The inner rwpm runs the build's script as its ELF, and names that ELF for Restart.
+    let elf = build.join("RimWorldLinux");
+    assert!(
+        lines[1].starts_with("build ")
+            && lines[1].ends_with(&format!("cwd={} exe={}", build.display(), elf.display())),
+        "{seen}"
+    );
+}
+
+/// T55: a pinned build that is gone → refused in plain words, Steam's game never runs,
+/// recorded and logged (V32). Started by Steam, which would show a dialog: the guard
+/// override keeps the test headless.
+#[test]
+fn pinned_missing_build_is_refused() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    std::fs::remove_dir_all(&build).expect("lose build");
+    let (id, profile) = sb.pinned_profile(Mode::Live, &["ludeon.rimworld"]);
+    let out = sb
+        .rwpm()
+        .env("SteamGameId", "294100")
+        .env("RWPM_GUARD_CHOICE", "launch")
+        .args(["run", &id, "--"])
+        .arg(steam.join("RimWorldLinux"))
+        .output()
+        .expect("rwpm");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("\nrwpm run: This profile uses the stored game version"),
+        "{stderr}"
+    );
+    let run = sb.last_run(&id);
+    assert_eq!(
+        (run.started_by, run.outcome, run.exit),
+        (StartedBy::Steam, RunOutcome::Refused, None)
+    );
+    assert!(
+        run.reason
+            .contains(&format!("“{BUILD_KEY}”, which is gone or cannot be read")),
+        "{}",
+        run.reason
+    );
+    assert!(
+        sb.rwpm_log(&profile).contains("launch refused:"),
+        "{}",
+        sb.rwpm_log(&profile)
+    );
+}
+
+/// T55 decision 2: no part of the command is the game → refused, never guessed.
+#[test]
+fn pinned_command_without_a_game_is_refused() {
+    let sb = Sandbox::new();
+    sb.steam_and_build();
+    let (id, _) = sb.pinned_profile(Mode::Live, &["ludeon.rimworld"]);
+    let launcher = sb.script("my-launcher.sh", "echo ran >> \"$0.ran\"");
+    let out = sb
+        .rwpm()
+        .args(["run", &id, "--"])
+        .arg(&launcher)
+        .output()
+        .expect("rwpm");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        !sb.path().join("my-launcher.sh.ran").exists(),
+        "the launcher ran"
+    );
+    let run = sb.last_run(&id);
+    assert_eq!(run.outcome, RunOutcome::Refused);
+    assert!(
+        run.reason
+            .contains("cannot tell which part of the launch command"),
+        "{}",
+        run.reason
+    );
+}
+
+/// T55 M3: the guard takes Steam's live install from the command AS GIVEN, so a pinned
+/// profile still sees the workshop when the build was captured from a library that has
+/// since moved. A swapped command would hide it: Harmony would read as "not installed"
+/// and the game would start without asking.
+fn pinned_guard_sees_the_live_workshop() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let moved = sb.path().join("old-library/RimWorld");
+    let toml = std::fs::read_to_string(build.join("build.toml")).expect("build.toml");
+    let toml = toml.replace(&steam.display().to_string(), &moved.display().to_string());
+    std::fs::write(build.join("build.toml"), toml).expect("build.toml");
+    about(
+        &sb.path()
+            .join("lib/steamapps/workshop/content/294100/2009463077"),
+        "brrainz.harmony",
+    );
+    let (id, profile) = sb.pinned_profile(Mode::Offline, &UNFROZEN);
+    let status = Command::new(staged_rwpm(&sb))
+        .env("XDG_DATA_HOME", sb.path().join("data"))
+        .env("XDG_CONFIG_HOME", sb.path().join("config"))
+        .env("HOME", sb.path())
+        .env("RWPM_GUARD_CHOICE", "cancel")
+        .args(["run", &id, "--"])
+        .arg(steam.join("RimWorldLinux"))
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0));
+    assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
+    let log = sb.rwpm_log(&profile);
+    assert!(
+        log.contains("brrainz.harmony; player chose Cancel"),
+        "{log}"
+    );
+}
+
+/// T55 F1: the same, shaped as app Play, which names the BUILD's exe (decision 1). That
+/// folder sits in no Steam library, so the guard must ask Steam where its library is.
+fn pinned_guard_from_app_play_sees_the_live_workshop() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let moved = sb.path().join("old-library/RimWorld");
+    let toml = std::fs::read_to_string(build.join("build.toml")).expect("build.toml");
+    let toml = toml.replace(&steam.display().to_string(), &moved.display().to_string());
+    std::fs::write(build.join("build.toml"), toml).expect("build.toml");
+    about(
+        &sb.path()
+            .join("lib/steamapps/workshop/content/294100/2009463077"),
+        "brrainz.harmony",
+    );
+    // A Steam install where discovery looks (`$XDG_DATA_HOME/Steam`), listing `lib`.
+    sb.steam_root(&sb.path().join("data/Steam"), &sb.path().join("lib"));
+    let (id, profile) = sb.pinned_profile(Mode::Offline, &UNFROZEN);
+    let status = Command::new(staged_rwpm(&sb))
+        .env("XDG_DATA_HOME", sb.path().join("data"))
+        .env("XDG_CONFIG_HOME", sb.path().join("config"))
+        .env("HOME", sb.path())
+        .env("RWPM_GUARD_CHOICE", "cancel")
+        .args(["run", &id, "--"])
+        .arg(build.join("RimWorldLinux"))
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0));
+    assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
+    let log = sb.rwpm_log(&profile);
+    assert!(
+        log.contains("brrainz.harmony; player chose Cancel"),
+        "{log}"
+    );
+}
+
+impl Sandbox {
+    /// A Steam install at `root` whose only library is `library`, holding RimWorld.
+    fn steam_root(&self, root: &Path, library: &Path) {
+        let steamapps = root.join("steamapps");
+        std::fs::create_dir_all(&steamapps).expect("steamapps");
+        std::fs::create_dir_all(library.join("steamapps")).expect("library");
+        std::fs::write(
+            steamapps.join("libraryfolders.vdf"),
+            format!(
+                "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t\t\"apps\"\n\t\t{{\n\t\t}}\n\t}}\n}}\n",
+                library.display()
+            ),
+        )
+        .expect("vdf");
+        std::fs::write(
+            library.join("steamapps/appmanifest_294100.acf"),
+            "\"AppState\"\n{\n\t\"appid\"\t\t\"294100\"\n\t\"name\"\t\t\"RimWorld\"\n\t\"installdir\"\t\t\"RimWorld\"\n}\n",
+        )
+        .expect("manifest");
+    }
+}
+
+/// T55 N1: with two Steams holding RimWorld (Flatpak, found first, and native), the
+/// guard reads the workshop of the one chosen in Settings, not the first one found.
+fn pinned_guard_uses_the_steam_chosen_in_settings() {
+    let sb = Sandbox::new();
+    let (steam, build) = sb.steam_and_build();
+    let moved = sb.path().join("old-library/RimWorld");
+    let toml = std::fs::read_to_string(build.join("build.toml")).expect("build.toml");
+    let toml = toml.replace(&steam.display().to_string(), &moved.display().to_string());
+    std::fs::write(build.join("build.toml"), toml).expect("build.toml");
+    // First Steam (Flatpak path, searched first): RimWorld, no workshop items.
+    let flatpak_lib = sb.path().join("flatpak-lib");
+    sb.fake_install(&flatpak_lib.join("steamapps/common/RimWorld"), "flatpak");
+    sb.steam_root(
+        &sb.path()
+            .join(".var/app/com.valvesoftware.Steam/.local/share/Steam"),
+        &flatpak_lib,
+    );
+    // Second Steam (native), chosen in Settings: its library holds Harmony.
+    let native = sb.path().join("data/Steam");
+    sb.steam_root(&native, &sb.path().join("lib"));
+    about(
+        &sb.path()
+            .join("lib/steamapps/workshop/content/294100/2009463077"),
+        "brrainz.harmony",
+    );
+    let (id, profile) = sb.pinned_profile(Mode::Offline, &UNFROZEN);
+    std::fs::write(
+        sb.app_dir().join("settings.toml"),
+        format!("schema = 1\nsteam_dir = '{}'\n", native.display()),
+    )
+    .expect("settings");
+    let status = Command::new(staged_rwpm(&sb))
+        .env("XDG_DATA_HOME", sb.path().join("data"))
+        .env("XDG_CONFIG_HOME", sb.path().join("config"))
+        .env("HOME", sb.path())
+        .env("RWPM_GUARD_CHOICE", "cancel")
+        .args(["run", &id, "--"])
+        .arg(build.join("RimWorldLinux"))
+        .status()
+        .expect("rwpm");
+    assert_eq!(status.code(), Some(0));
+    assert!(sb.seen().is_empty(), "a game ran: {}", sb.seen());
+    let log = sb.rwpm_log(&profile);
+    assert!(
+        log.contains("brrainz.harmony; player chose Cancel"),
+        "{log}"
     );
 }

@@ -13,7 +13,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use rwpm_core::ProfileError;
-use rwpm_core::discovery::{Engine, engine_of};
+use rwpm_core::builds::effective_game;
+use rwpm_core::discovery::{Engine, engine_of_exe};
 use rwpm_core::launch::{self, LaunchPlan, Os, PayloadFiles};
 use rwpm_core::paths;
 use rwpm_core::profile::last_run::{self, LastRun, RunOutcome, StartedBy};
@@ -22,6 +23,7 @@ use rwpm_core::settings::AppSettings;
 use rwpm_core::winhttp;
 
 use crate::guard;
+use crate::gui::text;
 
 const EX_USAGE: i32 = 64;
 const EX_TEMPFAIL: i32 = 75;
@@ -43,6 +45,13 @@ impl RunError {
             Self::Usage(_) => EX_USAGE,
             Self::Busy(_) => EX_TEMPFAIL,
             Self::Refused(_) | Self::Failed(_) => EX_FAILED,
+        }
+    }
+
+    fn outcome(&self) -> RunOutcome {
+        match self {
+            Self::Busy(_) | Self::Refused(_) => RunOutcome::Refused,
+            Self::Usage(_) | Self::Failed(_) => RunOutcome::Failed,
         }
     }
 
@@ -94,7 +103,7 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
     let (from, id, command) = parse(args)?;
     // Before this process changes its environment (`SteamAppId` for the game).
     let by = last_run::started_by(&|k| std::env::var_os(k), from.as_deref());
-    let store = open_store()?;
+    let (store, settings) = open()?;
     let profile = store.get(&id).map_err(|e| match e {
         ProfileError::NotFound(_) => RunError::Usage(e.to_string()),
         other => RunError::Failed(other.to_string()),
@@ -104,7 +113,17 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
         path: LastRun::path(store.root(), &profile),
         by,
     };
-    match launch(&store, &profile, &command, &record) {
+    let target = match pinned_command(store.root(), &profile, &command, &settings) {
+        Ok(target) => target,
+        Err(e) => {
+            record.write(e.outcome(), e.message(), None);
+            if refusal_needs_dialog(by) {
+                guard::show_error(e.message());
+            }
+            return Err(e);
+        }
+    };
+    match launch(&store, &settings, &command, &target, &record) {
         Ok(Ended::Played(code)) => {
             record.write(RunOutcome::Ok, "", Some(code));
             Ok(code)
@@ -114,39 +133,71 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
             Ok(0)
         }
         Err(e) => {
-            let outcome = match e {
-                RunError::Busy(_) | RunError::Refused(_) => RunOutcome::Refused,
-                RunError::Usage(_) | RunError::Failed(_) => RunOutcome::Failed,
-            };
-            record.write(outcome, e.message(), None);
+            record.write(e.outcome(), e.message(), None);
             Err(e)
         }
     }
 }
 
+/// Steam and RimSort show no console, so a pinned-launch refusal also gets a dialog
+/// where the player is looking (V72). The app shows it in its own Play row.
+fn refusal_needs_dialog(by: StartedBy) -> bool {
+    matches!(by, StartedBy::Steam | StartedBy::Rimsort)
+}
+
+/// T55 (V51, V57): a pinned profile's command with the stored build in place of Steam's
+/// game, before anything reads it. Unpinned: unchanged. A build that is gone or cannot be
+/// read, or a command with no single game entry, is refused: never Steam's game instead.
+fn pinned_command(
+    profiles_root: &Path,
+    profile: &Profile,
+    command: &[OsString],
+    settings: &AppSettings,
+) -> Result<Vec<OsString>, RunError> {
+    let Some(key) = profile.game_build.as_deref() else {
+        return Ok(command.to_vec());
+    };
+    let refuse = |detail: String, text: String| {
+        guard::append_log(profile, &format!("launch refused: {detail}"));
+        RunError::Refused(text)
+    };
+    let app_dir =
+        paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
+    // Steam's install, for its workshop: the build sits outside `steamapps`.
+    let live = guard::live_game(profile, command, settings).ok();
+    let game = effective_game(profile, live.as_ref(), profiles_root, &app_dir)
+        .map_err(|e| refuse(e.to_string(), text::build_missing(key)))?;
+    launch::swap_target(command, &game)
+        .map_err(|e| refuse(e.to_string(), text::build_target_unknown(key)))
+}
+
 const GUARD_CANCELLED: &str = "the player chose Cancel when asked about mods that are not frozen";
 
+/// `incoming` is the command as given; `command` is the one to launch (`pinned_command`).
 fn launch(
     store: &ProfileStore<OsTrash>,
-    profile: &Profile,
+    settings: &AppSettings,
+    incoming: &[OsString],
     command: &[OsString],
     record: &Record<'_>,
 ) -> Result<Ended, RunError> {
+    let profile = record.profile;
     let _lock = acquire_lock()?;
     if any_game_running() {
         return Err(RunError::Busy(
             "RimWorld is already running; close it first".into(),
         ));
     }
+    // The guard resolves the effective game itself; the command as given keeps Steam's
+    // live install, and with it the workshop, in view for a pinned profile.
     if profile.mode == Mode::Offline
-        && guard::run(store, profile, command) == guard::Outcome::Cancel
+        && guard::run(store, profile, incoming, settings) == guard::Outcome::Cancel
     {
         return Ok(Ended::Cancelled);
     }
     let mut payload = payload_files().map_err(RunError::Failed)?;
-    let engine = launch::game_program(command)
-        .and_then(|p| Path::new(p).parent())
-        .map_or(Engine::Unity, engine_of);
+    let engine =
+        launch::game_program(command).map_or(Engine::Unity, |p| engine_of_exe(Path::new(p)));
     if launch::needs_game_folder_loader(profile.mode, Os::current(), engine) {
         payload.chain_target = windows_loader(profile, command)?;
     }
@@ -207,14 +258,20 @@ fn parse(args: &[OsString]) -> Result<(Option<String>, ProfileId, Vec<OsString>)
 }
 
 pub(crate) fn open_store() -> Result<ProfileStore<OsTrash>, RunError> {
+    open().map(|(store, _)| store)
+}
+
+/// The profile store and the settings it was found through.
+fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
-    let root = AppSettings::load(&app_dir)
-        .map_err(|e| RunError::Failed(e.to_string()))?
-        .profiles_root(&app_dir);
+    let settings = AppSettings::load(&app_dir).map_err(|e| RunError::Failed(e.to_string()))?;
+    let root = settings.profiles_root(&app_dir);
     let save = paths::default_game_save_dir()
         .ok_or_else(|| RunError::Failed("no game save folder".into()))?;
-    ProfileStore::open(root, save, OsTrash).map_err(|e| RunError::Failed(e.to_string()))
+    let store =
+        ProfileStore::open(root, save, OsTrash).map_err(|e| RunError::Failed(e.to_string()))?;
+    Ok((store, settings))
 }
 
 /// V11: exclusive OS lock, released on drop or if rwpm dies.
@@ -244,16 +301,19 @@ fn acquire_lock() -> Result<File, RunError> {
 /// Windows OFFLINE needs `winhttp.dll` beside the game: ours, or a compatible foreign
 /// Doorstop whose own target the payload then chain-loads (T12, V8).
 fn windows_loader(profile: &Profile, command: &[OsString]) -> Result<Option<PathBuf>, RunError> {
-    let game_dir = command
-        .first()
-        .and_then(|p| Path::new(p).parent())
-        .ok_or_else(|| RunError::Failed("cannot find the game folder".into()))?;
+    let game_dir =
+        game_dir(command).ok_or_else(|| RunError::Failed("cannot find the game folder".into()))?;
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
     winhttp::launch_check(game_dir, &app_dir).map_err(|e| {
         guard::append_log(profile, &format!("launch refused: {e}"));
         RunError::Refused(e.to_string())
     })
+}
+
+/// The folder of the game's own program, behind any wrappers.
+fn game_dir(command: &[OsString]) -> Option<&Path> {
+    launch::game_program(command).and_then(|p| Path::new(p).parent())
 }
 
 /// Payload + Doorstop beside this binary; this binary is the restart trampoline (V28).
@@ -285,4 +345,33 @@ pub(crate) fn command_for(plan: &LaunchPlan) -> Command {
         cmd.current_dir(dir);
     }
     cmd
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// T55: the Windows loader looks beside the game's own program, behind any wrappers,
+    /// so a swapped command checks the build's folder.
+    #[test]
+    fn game_dir_is_the_game_programs_folder() {
+        let cmd = |parts: &[&str]| parts.iter().map(OsString::from).collect::<Vec<_>>();
+        let wrapped = cmd(&["/wrap/entry", "--", "/builds/1.6/start_RimWorld.sh", "-x"]);
+        assert_eq!(game_dir(&wrapped), Some(Path::new("/builds/1.6")));
+        let plain = cmd(&["/builds/1.6/RimWorldWin64.exe", "-x"]);
+        assert_eq!(game_dir(&plain), Some(Path::new("/builds/1.6")));
+    }
+
+    /// V72: the refusal dialog is for launches without a console, not for the app's own.
+    #[test]
+    fn refusal_dialog_only_for_steam_and_rimsort() {
+        let shown = [
+            StartedBy::Steam,
+            StartedBy::Rimsort,
+            StartedBy::App,
+            StartedBy::Other,
+        ]
+        .map(refusal_needs_dialog);
+        assert_eq!(shown, [true, true, false, false]);
+    }
 }

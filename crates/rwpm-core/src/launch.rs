@@ -7,6 +7,10 @@ use std::path::{Path, PathBuf};
 use crate::discovery::{Engine, engine_of, is_bundle_path};
 use crate::profile::{Mode, Profile};
 
+mod target;
+
+pub use target::{game_target, swap_target};
+
 pub const STEAM_APP_ID: &str = "294100";
 pub const ENV_MODS_DIR: &str = "RWPM_MODS_DIR";
 pub const ENV_PAYLOAD_LOG: &str = "RWPM_PAYLOAD_LOG";
@@ -110,6 +114,12 @@ pub enum LaunchError {
     BadBundle(PathBuf),
     #[error("RimWorld 1.7 on macOS is not supported yet; use a 1.6 game version for now")]
     MacOsWaylithUnsupported,
+    #[error("no part of the launch command is RimWorld, so rwpm cannot swap in the stored game")]
+    NoGameInCommand,
+    #[error(
+        "more than one part of the launch command looks like RimWorld, so rwpm cannot tell which to swap"
+    )]
+    AmbiguousGameInCommand,
 }
 
 /// Builds the launch for `profile`. `env` reads the inherited environment (for V18 prepends).
