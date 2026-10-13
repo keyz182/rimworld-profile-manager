@@ -108,6 +108,7 @@ pub fn matches(row: &ModRow, needle: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::discovery::Engine;
     use crate::discovery::SteamInfo;
     use crate::profile::{Location, ProfileId};
 
@@ -143,6 +144,7 @@ mod tests {
                 game_dir: self.path("game"),
                 exe: self.path("game/RimWorldLinux"),
                 version: None,
+                engine: Engine::Unity,
                 steam: Some(SteamInfo {
                     library_dir: self.path("library"),
                     workshop_dir: self.path("workshop"),

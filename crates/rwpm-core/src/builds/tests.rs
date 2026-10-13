@@ -55,9 +55,17 @@ impl Fixture {
         f.write_manifest(buildid, state, "");
         let game = f.game_dir();
         std::fs::create_dir_all(&game).expect("game");
-        // macOS: GAME_EXE is the bundle DIRECTORY (R29).
+        // macOS: GAME_EXE is the bundle DIRECTORY (R29), and it only counts as the game
+        // when it holds its executable — a bare dir is the husk Steam leaves behind.
         if cfg!(target_os = "macos") {
-            std::fs::create_dir_all(game.join(GAME_EXE)).expect("bundle");
+            let bundle = game.join(GAME_EXE);
+            std::fs::create_dir_all(bundle.join("Contents/MacOS")).expect("bundle");
+            std::fs::write(
+                bundle.join("Contents/Info.plist"),
+                "<plist><dict><key>CFBundleExecutable</key><string>RimWorld</string></dict></plist>",
+            )
+            .expect("plist");
+            std::fs::write(bundle.join("Contents/MacOS/RimWorld"), b"game").expect("binary");
         } else {
             std::fs::write(game.join(GAME_EXE), b"game").expect("exe");
         }

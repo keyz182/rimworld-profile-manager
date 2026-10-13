@@ -4,7 +4,7 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use crate::discovery::{Engine, engine_of};
+use crate::discovery::{Engine, engine_of, is_bundle_path};
 use crate::profile::{Mode, Profile};
 
 pub const STEAM_APP_ID: &str = "294100";
@@ -108,6 +108,8 @@ pub enum LaunchError {
     WrappedWithoutRwpm,
     #[error("`{}` is a macOS app bundle rwpm could not read (missing or malformed Info.plist)", .0.display())]
     BadBundle(PathBuf),
+    #[error("RimWorld 1.7 on macOS is not supported yet; use a 1.6 game version for now")]
+    MacOsWaylithUnsupported,
 }
 
 /// Builds the launch for `profile`. `env` reads the inherited environment (for V18 prepends).
@@ -120,7 +122,15 @@ pub fn build(
 ) -> Result<LaunchPlan, LaunchError> {
     let (program, rest) = command.split_first().ok_or(LaunchError::NoCommand)?;
     // V62: the engine decides the launch shape; Waylith never gets Doorstop.
-    if waylith_program(command).is_some() {
+    if let Some(target) = waylith_program(command) {
+        // The macOS 1.7 depot is Waylith too, but its launch has never been proven: no
+        // spike has run the startup hook against it, and `build_waylith` was written and
+        // tested for Linux and Windows. Refuse in plain words rather than fall through to
+        // the Unity builder, which would put Doorstop `DYLD_INSERT_LIBRARIES` on a CoreCLR
+        // process and leave an OFFLINE profile launching against the live mod set.
+        if is_bundle_path(Path::new(target)) {
+            return Err(LaunchError::MacOsWaylithUnsupported);
+        }
         return build_waylith(profile, command, payload, os, env);
     }
     if os == Os::Linux
@@ -177,10 +187,14 @@ pub fn game_program(command: &[OsString]) -> Option<&OsString> {
         .or_else(|| command.first())
 }
 
-/// V69: the entry of `%command%` that is a file beside `Waylith.dll` (RimWorld 1.7+).
+/// V69: the entry of `%command%` that is the game's Waylith exe (RimWorld 1.7+) — a file
+/// beside `Waylith.dll`, or a macOS `.app` bundle carrying the engine assemblies inside it.
 fn waylith_program(command: &[OsString]) -> Option<&OsString> {
     command.iter().find(|a| {
         let path = Path::new(a);
+        if is_bundle_path(path) {
+            return path.is_dir() && engine_of(path) == Engine::Waylith;
+        }
         path.is_file()
             && path
                 .parent()
@@ -1325,6 +1339,66 @@ mod tests {
         ];
         parts.extend(extra.iter().map(|s| (*s).to_owned()));
         (exe, parts.iter().map(OsString::from).collect())
+    }
+
+    /// A 1.7 macOS install: `RimWorld.app` with the engine assemblies in
+    /// `Contents/MacOS/`, and Steam's macOS `%command%`, which names the bundle (R33).
+    fn macos_waylith_command(tmp: &Path) -> Vec<OsString> {
+        let bundle = tmp.join("game/RimWorld.app");
+        let bin = bundle.join("Contents/MacOS");
+        std::fs::create_dir_all(&bin).expect("bundle");
+        std::fs::write(
+            bundle.join("Contents/Info.plist"),
+            "<plist><dict><key>CFBundleExecutable</key><string>RimWorld</string></dict></plist>",
+        )
+        .expect("plist");
+        std::fs::write(bin.join("RimWorld"), b"").expect("binary");
+        std::fs::write(bin.join("Waylith.dll"), b"").expect("marker");
+        vec![OsString::from(bundle)]
+    }
+
+    /// A macOS 1.7 launch is refused in plain words, not built as a Unity launch. The
+    /// Unity builder would put Doorstop `DYLD_INSERT_LIBRARIES` on a CoreCLR process and
+    /// leave an OFFLINE profile running against the live mod set.
+    #[test]
+    fn macos_waylith_launch_is_refused_not_built_as_unity() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let command = macos_waylith_command(tmp.path());
+        for mode in [Mode::Live, Mode::Offline] {
+            let err = build(
+                &stored(mode),
+                &command,
+                &payload(tmp.path()),
+                Os::MacOs,
+                &|_| None,
+            )
+            .expect_err("macOS 1.7 was launched anyway");
+            assert!(
+                matches!(err, LaunchError::MacOsWaylithUnsupported),
+                "{mode:?}: {err:?}"
+            );
+            let text = err.to_string();
+            assert!(text.contains("1.7") && text.contains("macOS"), "{text}");
+        }
+    }
+
+    /// The macOS 1.6 bundle still launches: the refusal is keyed on the engine, not on
+    /// the bundle shape.
+    #[test]
+    fn macos_unity_bundle_still_launches() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let command = macos_waylith_command(tmp.path());
+        let bundle = Path::new(&command[0]);
+        std::fs::remove_file(bundle.join("Contents/MacOS/Waylith.dll")).expect("drop marker");
+        let plan = build(
+            &stored(Mode::Live),
+            &command,
+            &payload(tmp.path()),
+            Os::MacOs,
+            &|_| None,
+        )
+        .expect("1.6 macOS launch");
+        assert_eq!(plan.program, bundle.join("Contents/MacOS/RimWorld"));
     }
 
     fn env_keys(plan: &LaunchPlan) -> Vec<String> {

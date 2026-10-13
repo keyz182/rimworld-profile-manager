@@ -1,3 +1,4 @@
+use crate::discovery::Engine;
 use std::cell::RefCell;
 
 use super::*;
@@ -58,6 +59,7 @@ impl Fixture {
             game_dir: self.path("install"),
             exe: self.path("install/RimWorldLinux"),
             version: None,
+            engine: Engine::Unity,
             steam: Some(SteamInfo {
                 library_dir: self.path("lib"),
                 workshop_dir: self.path("ws"),
