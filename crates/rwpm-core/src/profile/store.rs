@@ -323,7 +323,8 @@ impl<T: Trash> ProfileStore<T> {
     fn claim(&self, base: &str) -> Result<(ProfileId, PathBuf), ProfileError> {
         for n in 1..=MAX_SUFFIX {
             let id = ProfileId::candidate(base, n);
-            if id.is_default() {
+            // `default` is the built-in profile; `builds` is the game-build store (V56).
+            if id.is_default() || id.is_builds() {
                 continue;
             }
             let dir = self.root.join(id.as_str());
@@ -424,6 +425,17 @@ mod tests {
         file.frozen_mods = vec![frozen("2009463077")];
         file.write_atomic(&dir.join(FILE_NAME)).expect("write");
         p
+    }
+
+    /// §I.cmd: `builds` is reserved for the game-build store, so no new profile takes it.
+    #[test]
+    fn a_profile_named_builds_gets_the_next_free_id() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let trash = RecordingTrash::default();
+        let s = store(tmp.path(), &trash);
+        let p = s.create("Builds").expect("create");
+        assert_eq!(p.id.as_str(), "builds-2");
+        assert!(!s.root().join("builds").exists());
     }
 
     #[test]

@@ -260,3 +260,52 @@ fn stale_rimsort_instances_flagged() {
     );
     assert_eq!(std::fs::read(&settings).expect("r"), before, "read only");
 }
+
+/// V56: the build store moves with the profiles, is verified like them, and is not
+/// carried as a `ProfileId`.
+#[test]
+fn move_carries_and_verifies_the_build_store() {
+    let f = Fixture::new();
+    let old = f.store().root().to_path_buf();
+    let build = old.join("builds/1.6.4871-rev598");
+    std::fs::create_dir_all(build.join("Data/Core")).expect("build");
+    std::fs::write(build.join("build.toml"), "schema = 1\n").expect("toml");
+    std::fs::write(build.join("Data/Core/About.xml"), vec![3u8; 50_000]).expect("data");
+
+    let plan = plan_move(&f.store(), &f.target()).expect("plan");
+    assert!(plan.builds, "build store not planned");
+    assert_eq!(plan.profiles.len(), 2, "builds counted as a profile");
+    assert!(plan.bytes >= 250_000, "size estimate skipped builds: {}", plan.bytes);
+
+    f.apply(&plan).expect("move");
+    let moved = f.target().join("builds/1.6.4871-rev598");
+    assert_eq!(std::fs::read(moved.join("Data/Core/About.xml")).expect("r").len(), 50_000);
+    assert!(!old.join("builds").exists(), "old build store left behind");
+    // A pin names a key, not a path, so pinned profiles still resolve after the Move.
+    assert!(moved.join("build.toml").is_file());
+}
+
+#[test]
+fn move_without_a_build_store_plans_none() {
+    let f = Fixture::new();
+    assert!(!plan_move(&f.store(), &f.target()).expect("plan").builds);
+}
+
+/// A profile folder called `builds` predates the build store; it keeps moving as a profile.
+#[test]
+fn move_treats_a_legacy_builds_profile_as_a_profile() {
+    let f = Fixture::new();
+    let old = f.store().root().to_path_buf();
+    let legacy = old.join("builds");
+    std::fs::create_dir_all(legacy.join("SaveData")).expect("dir");
+    ProfileFile::new("Builds")
+        .write_atomic(&legacy.join("profile.toml"))
+        .expect("toml");
+
+    let plan = plan_move(&f.store(), &f.target()).expect("plan");
+    assert!(!plan.builds, "a legacy profile was taken for the build store");
+    assert_eq!(plan.profiles.len(), 3);
+    f.apply(&plan).expect("move");
+    assert!(f.target().join("builds/profile.toml").is_file());
+    assert!(names(&f.store()).contains(&"Builds".to_owned()));
+}
