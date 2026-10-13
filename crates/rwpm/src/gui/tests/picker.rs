@@ -187,3 +187,27 @@ fn change_waits_while_a_game_runs_and_a_removed_build_is_refused() {
     );
     assert_eq!(profile_toml(&sb, &id), before);
 }
+
+/// N3: an unreadable version still gets a question, with words that name no version
+/// instead of a blank ("Saves made in  may not open in …").
+#[test]
+fn v61_question_without_a_readable_version_names_none() {
+    assert_eq!(
+        text::confirm_downgrade("", "1.5.4409 rev1118"),
+        text::CONFIRM_DOWNGRADE_UNKNOWN
+    );
+    assert_eq!(
+        text::confirm_downgrade("1.6.4871 rev598", "  "),
+        text::CONFIRM_DOWNGRADE_UNKNOWN
+    );
+    assert!(!text::CONFIRM_DOWNGRADE_UNKNOWN.contains("  "));
+
+    // Through the dialog: the current game cannot be read (no Steam, unpinned profile).
+    let (sb, id, key) = world(OLD);
+    saves(&sb, &id);
+    let mut app = open_picker(&sb, &id);
+    app.game = Err("gone".to_owned());
+    let _ = pick(&mut app, Some(&key));
+    assert!(matches!(app.dialog, Some(Dialog::ConfirmDowngrade { .. })));
+    assert!(found(&app, text::CONFIRM_DOWNGRADE_UNKNOWN));
+}

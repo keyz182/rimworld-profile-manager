@@ -746,7 +746,14 @@ pub fn short_version(version: &str) -> String {
     }
 }
 
+pub const CONFIRM_DOWNGRADE_UNKNOWN: &str = "Saves made in the game version this profile plays now may not open in the one you chose. Change anyway?";
+
+/// V61/§C: names both versions; when either cannot be read (the question is asked for an
+/// unreadable version too) the words do not name one, rather than showing a blank.
 pub fn confirm_downgrade(from: &str, into: &str) -> String {
+    if from.trim().is_empty() || into.trim().is_empty() {
+        return CONFIRM_DOWNGRADE_UNKNOWN.to_owned();
+    }
     format!(
         "Saves made in {} may not open in {}. Change anyway?",
         short_version(from),
