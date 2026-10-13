@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.6.0](https://github.com/keyz182/rimworld-profile-manager/compare/4cfb33c73cfbb690b6e575faa8afd160f9ddd1ad..v1.6.0) - 2026-10-13
+#### Features
+- (**run**) T55 launch the pinned game build (#17) - ([4cfb33c](https://github.com/keyz182/rimworld-profile-manager/commit/4cfb33c73cfbb690b6e575faa8afd160f9ddd1ad)) - Kieran Evans
+
+- - -
+
 ## [v1.5.1](https://github.com/keyz182/rimworld-profile-manager/compare/20f0fcded4b1dcfc362270a99d7eb80b28834430..v1.5.1) - 2026-10-13
 #### Bug Fixes
 - (**gui**) T57 pinned RimSort export close-out, same missing-build text (#16) - ([20f0fcd](https://github.com/keyz182/rimworld-profile-manager/commit/20f0fcded4b1dcfc362270a99d7eb80b28834430)) - Kieran Evans
