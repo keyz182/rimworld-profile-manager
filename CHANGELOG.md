@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.10.0](https://github.com/keyz182/rimworld-profile-manager/compare/fa8718db64598ca7ead202c93e61842b88d1e624..v1.10.0) - 2026-10-13
+#### Features
+- (**gui**) explain game versions in the docs and Help, and scroll the Help sections (#21) - ([fa8718d](https://github.com/keyz182/rimworld-profile-manager/commit/fa8718db64598ca7ead202c93e61842b88d1e624)) - Kieran Evans
+
+- - -
+
 ## [v1.9.0](https://github.com/keyz182/rimworld-profile-manager/compare/16b29c5c0eb250a0ecab323712090b2ba49f4a97..v1.9.0) - 2026-10-13
 #### Features
 - (**gui**) game version row and picker on the profile (#20) - ([16b29c5](https://github.com/keyz182/rimworld-profile-manager/commit/16b29c5c0eb250a0ecab323712090b2ba49f4a97)) - Kieran Evans
