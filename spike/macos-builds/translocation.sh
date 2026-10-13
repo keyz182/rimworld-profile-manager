@@ -2,6 +2,10 @@
 # T52 spike (R30 / V46): does a quarantined stored build get app-translocated?
 # Usage: translocation.sh <build dir> <profile id>
 #
+# WARNING, read before re-running: route b puts a Gatekeeper dialog in the user's face
+# ("RimWorldMac is damaged and can't be opened"). It was run once, on 2026-10-13, and that
+# is enough. Do not repeat it casually. Route a is safe to re-run.
+#
 # Translocation is a LaunchServices behaviour, not an execve one, so testing only the
 # route rwpm actually uses would produce a non-finding that reads as a finding. Both
 # routes are run against the SAME quarantined bundle and the running process path is

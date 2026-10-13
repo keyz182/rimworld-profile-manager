@@ -13,7 +13,7 @@ buildid 23969874, public branch. Only 1.6 runs on macOS; 1.7 (Waylith, R37) is o
 | `capture.sh <install> <builds> [--pristine] [--ditto]` | Copies the install as a stored build. APFS clone by default (`cp -cR`), `ditto` with `--ditto`. Refuses unless `StateFlags == 4` (V58). Keys the already-captured test on **buildid**, not the version string (V63). Asserts the copy's `CFBundleExecutable` resolves. |
 | `check.sh <profile> <build>` | V50/V52/R30 evidence from the logs and the live process. |
 | `swap.sh` | Steam launch-options stand-in: rewrites the `%command%` target to the build, then `rwpm run`. |
-| `translocation.sh <build> <profile>` | R30: launches a quarantined build by **both** routes and records the process path for each. |
+| `translocation.sh <build> <profile>` | R30: launches a quarantined build by **both** routes and records the process path for each. **Route (b) raises a Gatekeeper dialog on the user's screen — run once, deliberately.** |
 | `watch-acf.sh <acf> <log>` | Logs appmanifest state while Steam switches branch (V58). |
 
 ## Platform differences from the Linux spike
@@ -42,7 +42,7 @@ These are the things that do not carry across; each cost a real measurement.
 | Q1 capture | APFS clone: 15 s, ~11 MiB real for a 948 MiB build. `ditto`: 42 s, 993 MiB. Clone wins; `reflink_or_copy` is right on macOS too. |
 | Q2 signature | Copy keeps the ad-hoc signature exactly. `codesign -v` fails identically on source and copy — **Ludeon ships the bundle seal-invalid** (`Contents/PlugIns/` sealed vs `Contents/Plugins/` installed). The copy starts. Do **not** re-sign captured builds. |
 | Q3 Gatekeeper | Game code carries no quarantine; copying adds none. Quarantine under the install is only in `Mods/` and `bak/`. |
-| Q3b translocation | Quarantined build: `rwpm` direct exec runs in place; `open` **translocates**. R30 is real but route-dependent. |
+| Q3b translocation | Quarantined build: `rwpm` direct exec runs in place. Via `open`, a translocated path was measured **and** macOS then refused the app outright ("RimWorldMac is damaged and can't be opened") — the broken seal turns R30's silent relocation into a hard refusal. Route-dependent either way; direct exec is unaffected. |
 | Q4 V50 | `Mono path[0]` and the live exe both point into the build. |
 | Q5/Q6 V51/V52 | Steam init from the copy: **OK** on `SteamAppId` alone. Overlay from a Steam-launched copy: **not yet run** — needs a launch-options change. Control measured: the Steam install loads `gameoverlayrenderer.dylib`. |
 | Q7 OFFLINE | Doorstop loads in the copy; mods and save dir redirect to the profile (V42). |
