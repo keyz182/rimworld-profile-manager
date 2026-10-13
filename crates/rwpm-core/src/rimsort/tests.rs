@@ -1,5 +1,6 @@
 use super::*;
 use crate::consent::ConsentStore;
+use crate::discovery::Engine;
 use crate::discovery::SteamInfo;
 use crate::profile::{Location, ProfileId};
 
@@ -74,6 +75,7 @@ impl Fixture {
             game_dir: PathBuf::from("/games/RimWorld"),
             exe: PathBuf::from("/games/RimWorld/RimWorldLinux"),
             version: None,
+            engine: Engine::Unity,
             steam: steam.then(|| SteamInfo {
                 library_dir: PathBuf::from("/steam"),
                 workshop_dir: PathBuf::from("/steam/steamapps/workshop/content/294100"),

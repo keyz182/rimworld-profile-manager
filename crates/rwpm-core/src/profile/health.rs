@@ -86,6 +86,7 @@ pub fn check<T: Trash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::discovery::Engine;
     use crate::profile::{ProfileFile, ProfileStore};
 
     struct NoTrash;
@@ -131,6 +132,7 @@ mod tests {
                 game_dir: self.path("game"),
                 exe: self.path("game/RimWorldWin64.exe"),
                 version: None,
+                engine: Engine::Unity,
                 steam: Some(crate::discovery::SteamInfo {
                     library_dir: self.path("lib"),
                     workshop_dir: self.path("workshop"),
@@ -252,9 +254,13 @@ mod tests {
     fn v70_waylith_offline_windows_no_loader_problem() {
         let w = World::new();
         let p = w.offline(&[]);
-        std::fs::create_dir_all(w.path("game")).expect("game");
-        std::fs::write(w.path("game/Waylith.dll"), "").expect("marker");
-        let problems = check(&w.store(), &p, &w.game(), &w.path("app"), None, Os::Windows);
+        // The engine is resolved when the install is read, so a 1.7 install is a
+        // `GameInstall` that says Waylith, not a marker file found later.
+        let game = GameInstall {
+            engine: Engine::Waylith,
+            ..w.game()
+        };
+        let problems = check(&w.store(), &p, &game, &w.path("app"), None, Os::Windows);
         assert!(problems.is_empty(), "{problems:?}");
     }
 }
