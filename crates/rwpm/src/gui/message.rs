@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use rwpm_core::builds::capture::CapturePlan;
 use rwpm_core::profile::ProfileId;
 use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
@@ -74,6 +75,12 @@ pub enum Message {
     Done(Result<Outcome, String>),
     /// The OS light/dark setting, at start and when it changes.
     Theme(iced::theme::Mode),
+    /// The stored game versions, read off the window's thread (T56).
+    BuildsRead(Result<super::builds::BuildsView, String>),
+    /// Game versions: measure the Steam install, then ask before storing a copy.
+    CaptureBuild,
+    /// Game versions: ask before moving this stored version to the recycle bin.
+    DeleteBuild(String),
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -81,6 +88,7 @@ pub enum Message {
 pub enum Drill {
     SteamGuide,
     Mods,
+    GameVersions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +115,10 @@ pub enum Outcome {
     MovePlanned(MovePlan),
     /// Fixes are done (guard or loader); continue starting the game.
     ReadyToPlay(ProfileId),
+    /// A capture was measured: ask before copying (T56).
+    CapturePlanned(Box<CapturePlan>),
+    /// A game version was stored, updated or deleted: reload and show this line.
+    BuildsChanged(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,5 +162,11 @@ pub enum Dialog {
         move_to: String,
     },
     ConfirmMove(MovePlan),
+    /// Store (or update) a copy of the Steam install, after showing size and free space.
+    ConfirmCapture(Box<CapturePlan>),
+    ConfirmDeleteBuild {
+        key: String,
+        bytes: u64,
+    },
     Help,
 }

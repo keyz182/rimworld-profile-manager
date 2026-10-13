@@ -85,6 +85,8 @@ impl App {
                     | M::Guard(_)
                     | M::FreezeUnfrozen
                     | M::InstallLoader
+                    | M::CaptureBuild
+                    | M::DeleteBuild(_)
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -100,6 +102,8 @@ impl App {
                     | M::Guard(_)
                     | M::FreezeUnfrozen
                     | M::InstallLoader
+                    | M::CaptureBuild
+                    | M::DeleteBuild(_)
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -108,6 +112,8 @@ impl App {
                         | Dialog::Offline { .. }
                         | Dialog::Settings { .. }
                         | Dialog::ConfirmMove(_)
+                        | Dialog::ConfirmCapture(_)
+                        | Dialog::ConfirmDeleteBuild { .. }
                 )
             }))
     }
@@ -182,10 +188,18 @@ impl App {
             }
             Message::Drill(drill) => {
                 self.drill = drill;
-                if drill == Some(super::message::Drill::Mods) {
-                    return self.read_mods();
+                match drill {
+                    Some(super::message::Drill::Mods) => return self.read_mods(),
+                    Some(super::message::Drill::GameVersions) => {
+                        return self.read_builds_task();
+                    }
+                    _ => {}
                 }
             }
+            Message::BuildsRead(Ok(view)) => self.builds = Some(view),
+            Message::BuildsRead(Err(e)) => return self.fail(e),
+            Message::CaptureBuild => return self.capture_build(),
+            Message::DeleteBuild(key) => self.ask_delete_build(&key),
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -282,6 +296,12 @@ impl App {
                 });
             }
             Ok(Outcome::MovePlanned(plan)) => self.dialog = Some(Dialog::ConfirmMove(plan)),
+            Ok(Outcome::CapturePlanned(plan)) => self.capture_planned(plan),
+            Ok(Outcome::BuildsChanged(line)) => {
+                self.reload();
+                self.notice = Some(Notice::Info(line));
+                return self.read_builds_task();
+            }
             Ok(Outcome::ReadyToPlay(id)) => {
                 self.reload();
                 self.selected = id;
@@ -316,6 +336,8 @@ impl App {
                 ..
             }) => return self.save_settings(game, steam, move_to),
             Some(Dialog::ConfirmMove(plan)) => return self.apply_move(plan),
+            Some(Dialog::ConfirmCapture(plan)) => return self.apply_capture(plan),
+            Some(Dialog::ConfirmDeleteBuild { key, .. }) => return self.delete_build(key),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}

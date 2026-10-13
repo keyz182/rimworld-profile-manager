@@ -1,6 +1,7 @@
 //! The desktop app (I.gui): profile list, actions, progress. iced, Elm-style: all state
 //! changes go through `update`, so they are tested without a window.
 
+mod builds;
 mod copy;
 mod dialogs;
 mod guide;
@@ -188,6 +189,8 @@ pub struct App {
     pub health: HashMap<ProfileId, Vec<rwpm_core::profile::health::Problem>>,
     /// The other layout's profiles folder, when it has profiles this app ignores (V31).
     pub other_profiles: Option<PathBuf>,
+    /// The stored game versions, once read (T56).
+    pub builds: Option<builds::BuildsView>,
 }
 
 impl App {
@@ -213,6 +216,7 @@ impl App {
             mod_search: String::new(),
             health: HashMap::new(),
             other_profiles: None,
+            builds: None,
         };
         app.reload();
         app.decide_setup();

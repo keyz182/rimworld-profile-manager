@@ -60,6 +60,15 @@ impl App {
         row![
             text(t::TITLE).size(20).font(UI_BOLD),
             space::horizontal(),
+            tip(
+                action(
+                    Icon::Folder,
+                    t::GAME_VERSIONS,
+                    Some(Message::Drill(Some(Drill::GameVersions))),
+                    theme::ghost
+                ),
+                t::TIP_GAME_VERSIONS
+            ),
             action(Icon::Help, t::HELP, Some(Message::Help), theme::ghost),
             action(
                 Icon::Settings,
@@ -204,6 +213,7 @@ impl App {
         let drill = match self.drill {
             Some(Drill::SteamGuide) => Some(self.steam_guide(p)),
             Some(Drill::Mods) => Some(self.mod_list_view(p)),
+            Some(Drill::GameVersions) => Some(self.game_versions_view()),
             None => None,
         };
         if let Some(drill) = drill {
@@ -489,7 +499,7 @@ fn problem<'a>(line: String) -> Element<'a, Message> {
 type Style = fn(&iced::Theme, button::Status) -> button::Style;
 
 /// A button with an icon and a label; disabled when `msg` is `None`.
-fn action<'a>(
+pub(super) fn action<'a>(
     glyph: Icon,
     label: &'a str,
     msg: Option<Message>,

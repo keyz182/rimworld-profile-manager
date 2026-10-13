@@ -13,6 +13,8 @@ use rwpm_core::profile::{Mode, ProfileFile};
 use super::message::{Field, GuardChoice, Message, NameFor, Outcome};
 use super::*;
 
+mod builds;
+
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings
 /// pointing at it, and a fake `rwpm` that records how it was started.
 struct Sandbox {
