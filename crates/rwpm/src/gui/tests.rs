@@ -13,6 +13,9 @@ use rwpm_core::profile::{Mode, ProfileFile};
 use super::message::{Field, GuardChoice, Message, NameFor, Outcome};
 use super::*;
 
+mod builds;
+mod gating;
+
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings
 /// pointing at it, and a fake `rwpm` that records how it was started.
 struct Sandbox {
@@ -1506,8 +1509,8 @@ fn play_on_a_pinned_profile_passes_the_builds_exe() {
     assert_eq!(args[..4], ["run", p.id.as_str(), "--", exe.as_str()]);
 }
 
-/// T56 (deferred from T55/T60): a pinned profile with a good build plays without a Steam
-/// install; an unpinned one still needs it; a pinned one with a missing build says why.
+/// T56: what `game_problem` says per profile, from the health the app has read. (Pressing
+/// the buttons with no Steam install is in `tests/gating.rs`.)
 #[test]
 fn play_gating_follows_the_effective_game() {
     use rwpm_core::profile::health::Problem;

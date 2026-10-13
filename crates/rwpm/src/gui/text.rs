@@ -601,6 +601,105 @@ pub fn other_profiles(other: &Path, used: &Path) -> String {
     )
 }
 
+// Game versions (T56): stored copies of the game, kept so a profile can stay on one.
+pub const GAME_VERSIONS: &str = "Game versions";
+pub const TIP_GAME_VERSIONS: &str = "Store copies of RimWorld, so a profile can keep playing one version while Steam moves to another.";
+pub const GV_ABOUT: &str = "A stored game version is a full copy of RimWorld that a profile can play. To store one: switch Steam to that version, wait until it finishes updating, then choose Capture.";
+pub const CAPTURE: &str = "Capture current game";
+pub const GV_EMPTY: &str = "No game versions are stored yet.";
+pub const GV_READING: &str = "Reading the stored game versions…";
+pub const GV_NO_GAME: &str = "RimWorld was not found. Choose its folder in Settings first.";
+pub const DELETE_VERSION: &str = "Delete";
+pub const STORE_IT: &str = "Store it";
+pub const UPDATE_IT: &str = "Update it";
+pub const NOT_ENOUGH_ROOM: &str = "There is not enough free space for this copy.";
+pub const JOB_MEASURING_GAME: &str = "Measuring the game";
+pub const JOB_STORING: &str = "Storing the game version";
+pub const JOB_DELETING_VERSION: &str = "Deleting the game version";
+
+pub fn gv_title(count: usize) -> String {
+    format!("Game versions ({count} stored)")
+}
+
+pub fn steam_now(version: &str) -> String {
+    format!("Steam install: {version}")
+}
+
+pub fn engine_label(waylith: bool) -> &'static str {
+    if waylith { "1.7" } else { "1.6 or older" }
+}
+
+pub fn gv_facts(waylith: bool, bytes: u64, stored: Option<&str>) -> String {
+    let base = format!("RimWorld {} · {}", engine_label(waylith), size(bytes));
+    match stored {
+        Some(date) => format!("{base} · stored {date}"),
+        None => base,
+    }
+}
+
+pub fn used_by(profiles: &[String]) -> String {
+    format!(
+        "Used by: {}. Change their game version first.",
+        profiles.join(", ")
+    )
+}
+
+pub fn cannot_check(ids: &[String]) -> String {
+    format!(
+        "Cannot tell whether these profiles use it, because their files cannot be read: {}.",
+        ids.join(", ")
+    )
+}
+
+pub fn version_unreadable(key: &str, reason: &str) -> String {
+    format!("“{key}” cannot be read ({reason}). You can still delete it.")
+}
+
+pub fn confirm_delete_version(key: &str, bytes: u64) -> String {
+    format!(
+        "Move the stored game version “{key}” ({}) to the recycle bin? No profile uses it.",
+        size(bytes)
+    )
+}
+
+pub fn confirm_capture(version: &str, bytes: u64, free_bytes: Option<u64>) -> String {
+    format!(
+        "Store a copy of RimWorld {version}? It needs up to {}. Free space: {}.",
+        size(bytes),
+        free(free_bytes)
+    )
+}
+
+pub fn confirm_update(key: &str, why: &str, bytes: u64, free_bytes: Option<u64>) -> String {
+    format!(
+        "Update the stored game version “{key}”, because {why}? Profiles that use it get the new \
+         files. Its Mods folder is kept. It needs up to {}. Free space: {}.",
+        size(bytes),
+        free(free_bytes)
+    )
+}
+
+pub fn update_reason(reason: rwpm_core::builds::capture::UpdateReason) -> &'static str {
+    use rwpm_core::builds::capture::UpdateReason::{BetaChanged, DlcChanged, NewBuildId};
+    match reason {
+        NewBuildId => "Steam updated this version",
+        DlcChanged => "its expansions changed",
+        BetaChanged => "it now comes from a different Steam branch",
+    }
+}
+
+pub fn already_stored(key: &str) -> String {
+    format!("This game version is already stored as “{key}”.")
+}
+
+pub fn version_stored(key: &str) -> String {
+    format!("Stored game version “{key}”.")
+}
+
+pub fn version_deleted(key: &str) -> String {
+    format!("Moved game version “{key}” to the recycle bin.")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

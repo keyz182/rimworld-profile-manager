@@ -2,6 +2,7 @@
 
 use iced::Element;
 use iced::widget::{button, column, row, space, text, text_input};
+use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
@@ -54,6 +55,10 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
             settings_dialog(game, game_check, steam, move_to, root.unwrap_or_default())
         }
         Dialog::ConfirmMove(plan) => move_dialog(plan),
+        Dialog::ConfirmCapture(plan) => capture_dialog(plan),
+        Dialog::ConfirmDeleteBuild { key, bytes } => {
+            confirm(t::confirm_delete_version(key, *bytes), t::YES_DELETE, true)
+        }
         Dialog::Help => help_dialog(),
     }
 }
@@ -267,4 +272,31 @@ fn move_dialog(plan: &MovePlan) -> Element<'_, Message> {
         t::MOVE,
         false,
     )
+}
+
+/// V58/§C: size and free space before a copy starts; Store is off when it cannot fit.
+fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
+    let (words, label) = match &plan.kind {
+        CaptureKind::Update { reason, .. } => (
+            t::confirm_update(
+                plan.key.as_str(),
+                t::update_reason(*reason),
+                plan.bytes,
+                plan.free_bytes,
+            ),
+            t::UPDATE_IT,
+        ),
+        _ => (
+            t::confirm_capture(&plan.version, plan.bytes, plan.free_bytes),
+            t::STORE_IT,
+        ),
+    };
+    let fits = plan.free_bytes.is_none_or(|free| free >= plan.bytes);
+    let mut body = column![text(words)].spacing(12);
+    if !fits {
+        body = body.push(text(t::NOT_ENOUGH_ROOM).style(theme::error));
+    }
+    body.push(buttons(label, fits.then_some(Message::Confirm), false))
+        .spacing(16)
+        .into()
 }
