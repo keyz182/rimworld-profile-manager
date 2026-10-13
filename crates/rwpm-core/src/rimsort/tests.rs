@@ -477,6 +477,43 @@ fn real_settings_copy_export() {
     std::mem::forget(tmp); // keep the copy for the Python type check
 }
 
+/// Manual setup for the T57 e2e (docs/QA/T57-rimsort-pinned-export.md): stores a build
+/// of this machine's Steam RimWorld with the real capture code, then makes a profile
+/// "T57 Pinned" pinned to it. Writes to the REAL app data: the build is a full copy of
+/// the game. Runs only with `RWPM_T57_E2E=1`, so a plain `--ignored` run cannot fill the
+/// disk.
+#[test]
+#[ignore = "copies the real game into the real profiles folder"]
+fn t57_e2e_capture_and_pin() {
+    use crate::builds::BuildStore;
+    use crate::builds::capture::{apply_capture, plan_capture};
+    use crate::profile::{OsTrash, ProcessProbe, ProfileStore};
+    if std::env::var("RWPM_T57_E2E").as_deref() != Ok("1") {
+        println!("set RWPM_T57_E2E=1 to run");
+        return;
+    }
+    let app_dir = crate::paths::app_data_dir().expect("app data dir");
+    let root = crate::settings::AppSettings::load(&app_dir)
+        .expect("settings")
+        .profiles_root(&app_dir);
+    let builds = BuildStore::open(&root, &app_dir).expect("build store");
+    let live = crate::discovery::discover(None).expect("Steam RimWorld");
+    let plan = plan_capture(&builds, &live).expect("plan capture");
+    println!(
+        "KEY={} BYTES={} FREE={:?}",
+        plan.key, plan.bytes, plan.free_bytes
+    );
+    apply_capture(&builds, &plan, &ProcessProbe, &mut |_| {}).expect("capture");
+    println!("BUILD_DIR={}", builds.dir_of(&plan.key).display());
+    let save = crate::paths::default_game_save_dir().expect("save dir");
+    let store = ProfileStore::open(root, save, OsTrash).expect("profile store");
+    let profile = store.create("T57 Pinned").expect("create T57 Pinned");
+    let profile = store
+        .set_pin(&profile.id, Some(plan.key.as_str()))
+        .expect("pin");
+    println!("PROFILE={} PINNED={:?}", profile.id, profile.game_build);
+}
+
 #[test]
 fn runs_profile_knows_every_form_this_tool_wrote() {
     assert!(runs_profile("'/r/rwpm' run beta -- %command%", "beta"));
@@ -513,8 +550,12 @@ fn v55_pinned_export_points_at_the_build() {
         game_build: Some(games.build_key.to_string()),
         ..profile("Pinned Run", Mode::Live)
     };
+    let pinned_offline = Profile {
+        game_build: Some(games.build_key.to_string()),
+        ..profile("Pinned Off", Mode::Offline)
+    };
     let plain = profile("Plain Run", Mode::Live);
-    for p in [&pinned, &plain] {
+    for p in [&pinned, &pinned_offline, &plain] {
         let plan =
             plan_export(p, &resolve(p), Path::new("/opt/rwpm/rwpm"), &f.settings()).expect("plan");
         f.apply(&plan).expect("apply");
@@ -535,4 +576,14 @@ fn v55_pinned_export_points_at_the_build() {
     assert_eq!(field("Plain Run", "local_folder"), games.live.mods_dir());
     let workshop = &games.live.steam.as_ref().expect("steam").workshop_dir;
     assert_eq!(&field("Pinned Run", "workshop_folder"), workshop);
+    // OFFLINE: the build's game, the profile's own Mods.
+    assert_eq!(
+        field("Pinned Off", "game_folder"),
+        build.rimsort_game_folder()
+    );
+    assert_eq!(
+        Some(field("Pinned Off", "local_folder")),
+        pinned_offline.mods_dir()
+    );
+    assert_eq!(&field("Pinned Off", "workshop_folder"), workshop);
 }
