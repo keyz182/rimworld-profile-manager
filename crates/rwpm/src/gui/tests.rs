@@ -484,6 +484,20 @@ fn render_screens_manual() {
     shot(&app, "23-copy-settings");
     let _ = app.update(Message::Cancel);
 
+    // T74: the Backup dialog with the game files ticked (both notices show), and the
+    // Restore question on a computer that lacks the profile's game version.
+    let packed = Sandbox::new();
+    let pinned = backups::offline_pinned(&packed);
+    let mut app = backups::selected(&packed, &pinned);
+    let _ = app.update(Message::Backup);
+    let _ = app.update(Message::BackupTick(super::backup::Tick::Build, true));
+    shot(&app, "24-backup-dialog");
+    let file = backups::make_backup(&packed, &pinned, backups::inc(true, false, false));
+    let elsewhere = Sandbox::new();
+    let mut app = elsewhere.app();
+    let _ = app.update(Message::RestorePicked(Some(file)));
+    shot(&app, "25-restore-dialog");
+
     let many = Sandbox::new();
     let store = many.ctx().store().expect("store");
     store

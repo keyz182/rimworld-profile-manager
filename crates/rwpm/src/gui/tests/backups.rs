@@ -22,12 +22,12 @@ impl rwpm_core::profile::RunningProbe for Idle {
     }
 }
 
-fn inc(saves: bool, logs: bool, build: bool) -> Includes {
+pub(super) fn inc(saves: bool, logs: bool, build: bool) -> Includes {
     Includes { saves, logs, build }
 }
 
 /// A profile pinned to the stored build and made OFFLINE.
-fn offline_pinned(sb: &Sandbox) -> ProfileId {
+pub(super) fn offline_pinned(sb: &Sandbox) -> ProfileId {
     sb.steam_install("1111");
     sb.stored_build();
     let id = sb.pin("Pinned Run");
@@ -38,14 +38,14 @@ fn offline_pinned(sb: &Sandbox) -> ProfileId {
     id
 }
 
-fn selected(sb: &Sandbox, id: &ProfileId) -> App {
+pub(super) fn selected(sb: &Sandbox, id: &ProfileId) -> App {
     let mut app = sb.app();
     let _ = app.update(Message::Select(id.clone()));
     app
 }
 
 /// A backup made through core, as the job thread would.
-fn make_backup(sb: &Sandbox, id: &ProfileId, includes: Includes) -> PathBuf {
+pub(super) fn make_backup(sb: &Sandbox, id: &ProfileId, includes: Includes) -> PathBuf {
     let (store, builds) = (sb.ctx().store().expect("store"), sb.builds());
     let plan = backup::plan_backup(&store, &builds, id, includes).expect("plan");
     let dest = sb.path("made.rimrim");
