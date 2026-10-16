@@ -7,21 +7,21 @@ use rwpm_core::builds::BuildKey;
 use super::builds::{VERSION, clicked, found};
 use super::*;
 
-const OLD: &str = "1.5.4409 rev1118";
+pub(super) const OLD: &str = "1.5.4409 rev1118";
 const NEW: &str = "1.7.4976 rev1043";
 
 fn profile_toml(sb: &Sandbox, id: &ProfileId) -> Vec<u8> {
     std::fs::read(sb.path(&format!("app/profiles/{}/profile.toml", id.as_str()))).expect("read")
 }
 
-fn saves(sb: &Sandbox, id: &ProfileId) {
+pub(super) fn saves(sb: &Sandbox, id: &ProfileId) {
     let dir = sb.path(&format!("app/profiles/{}/SaveData/Saves", id.as_str()));
     std::fs::create_dir_all(&dir).expect("saves");
     std::fs::write(dir.join("Colony.rws"), "x").expect("save");
 }
 
 /// A profile, the Steam install on `VERSION`, and a stored build of `stored`.
-fn world(stored: &str) -> (Sandbox, ProfileId, String) {
+pub(super) fn world(stored: &str) -> (Sandbox, ProfileId, String) {
     let sb = Sandbox::new();
     sb.steam_install_as("1111", stored);
     sb.stored_build();
@@ -38,14 +38,14 @@ fn world(stored: &str) -> (Sandbox, ProfileId, String) {
 }
 
 /// Opens the picker the way the Change… button does, feeding the read by hand.
-fn open_picker(sb: &Sandbox, id: &ProfileId) -> App {
+pub(super) fn open_picker(sb: &Sandbox, id: &ProfileId) -> App {
     let mut app = sb.app();
     let _ = app.update(Message::Select(id.clone()));
     let _ = app.update(Message::PickerRead(sb.ctx().read_builds()));
     app
 }
 
-fn pick(app: &mut App, key: Option<&str>) -> Task<Message> {
+pub(super) fn pick(app: &mut App, key: Option<&str>) -> Task<Message> {
     let _ = app.update(Message::PickBuild(key.map(ToOwned::to_owned)));
     app.update(Message::Confirm)
 }
