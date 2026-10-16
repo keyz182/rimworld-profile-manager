@@ -353,7 +353,8 @@ impl<T: Trash> ProfileStore<T> {
             .map_err(ProfileError::io("move to recycle bin", path))
     }
 
-    fn claim(&self, base: &str) -> Result<(ProfileId, PathBuf), ProfileError> {
+    /// Makes the new profile's dir and returns it; also how a restored backup gets its id.
+    pub(crate) fn claim(&self, base: &str) -> Result<(ProfileId, PathBuf), ProfileError> {
         for n in 1..=MAX_SUFFIX {
             let id = ProfileId::candidate(base, n);
             // `default` is the built-in profile; `builds` is the game-build store (V56).

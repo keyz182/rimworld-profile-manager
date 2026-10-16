@@ -63,6 +63,16 @@ pub enum ProfileError {
     NotSteamInstall(PathBuf),
     #[error("not enough room in `{}`: the copy needs {need} bytes and {free} are free", .path.display())]
     NotEnoughSpace { path: PathBuf, need: u64, free: u64 },
+    #[error("`{}` is not a backup this version can use: {reason}", .path.display())]
+    BadBackup { path: PathBuf, reason: String },
+    #[error("`{0}` is not an offline profile; only offline profiles can be backed up")]
+    NotOffline(String),
+    #[error(
+        "`{0}` uses the Steam install, so there is no stored game version to put in the backup"
+    )]
+    NoBuildToBackUp(String),
+    #[error("a backup cannot hold links or special files, but the profile has: {}", .0.join(", "))]
+    NotBackupable(Vec<String>),
     #[error("cannot {op} `{path}`: {source}")]
     Io {
         op: &'static str,
