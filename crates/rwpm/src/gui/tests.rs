@@ -406,6 +406,8 @@ fn render_screens_manual() {
         }
     };
     let sb = Sandbox::new();
+    // A readable `Version.txt`, so a profile's "Plays:" row names the game, not "(not found)".
+    sb.steam_install("1111");
     played_default(&sb);
     let id = sb.offline_profile("Frozen Colony", &["ludeon.rimworld", "brrainz.harmony"]);
     let mut app = sb.app();
@@ -497,6 +499,33 @@ fn render_screens_manual() {
     let mut app = elsewhere.app();
     let _ = app.update(Message::RestorePicked(Some(file)));
     shot(&app, "25-restore-dialog");
+
+    // Game versions (docs/game-versions.md and the wiki page): the screen, the question
+    // before a copy, the profile's row, the picker, the row once pinned, the question
+    // before an older version, and Default.
+    let (gv, run, key) = picker::world(picker::OLD);
+    let app = builds::open_versions(&gv);
+    shot(&app, "26-game-versions");
+    let mut app = gv.app();
+    let game = app.game.as_ref().expect("game").clone();
+    let plan = rwpm_core::builds::capture::plan_capture(&gv.builds(), &game).expect("plan");
+    let _ = app.update(Message::Done(Ok(Outcome::CapturePlanned(Box::new(plan)))));
+    shot(&app, "27-capture-dialog");
+    let _ = app.update(Message::Cancel);
+    let _ = app.update(Message::Select(run.clone()));
+    shot(&app, "28-game-version-row");
+    let app = picker::open_picker(&gv, &run);
+    shot(&app, "29-pick-version");
+    let mut app = picker::open_picker(&gv, &run);
+    let _ = picker::pick(&mut app, Some(&key));
+    shot(&app, "30-pinned-row");
+    let (risky, run2, key2) = picker::world(picker::OLD);
+    picker::saves(&risky, &run2);
+    let mut app = picker::open_picker(&risky, &run2);
+    let _ = picker::pick(&mut app, Some(&key2));
+    shot(&app, "31-downgrade-question");
+    let app = gv.app();
+    shot(&app, "32-default-steam-only");
 
     let many = Sandbox::new();
     let store = many.ctx().store().expect("store");
