@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.11.0](https://github.com/keyz182/rimworld-profile-manager/compare/5c07f9fbb58bc8cdfd095b11133671fbd157879c..v1.11.0) - 2026-10-16
+#### Features
+- back up and restore OFFLINE profiles as .rimrim files (#24) - ([5c07f9f](https://github.com/keyz182/rimworld-profile-manager/commit/5c07f9fbb58bc8cdfd095b11133671fbd157879c)) - Kieran Evans
+
+- - -
+
 ## [v1.10.0](https://github.com/keyz182/rimworld-profile-manager/compare/fa8718db64598ca7ead202c93e61842b88d1e624..v1.10.0) - 2026-10-13
 #### Features
 - (**gui**) explain game versions in the docs and Help, and scroll the Help sections (#21) - ([fa8718d](https://github.com/keyz182/rimworld-profile-manager/commit/fa8718db64598ca7ead202c93e61842b88d1e624)) - Kieran Evans
