@@ -37,8 +37,11 @@ appdir="$ROOT/target/appimage/$name.AppDir"
 [[ ! -e "$appdir" ]] || trash "$appdir"
 mkdir -p "$(dirname "$appdir")"
 cp -a "$src" "$appdir"
-# The AppImage is its own menu entry (via the player's AppImage integration tool).
-rm -f "$appdir/install-desktop-entry.sh"
+# The AppImage is its own menu entry (via the player's AppImage integration tool). That
+# tool reads `MimeType` below and the type definition in usr/share/mime/packages (V83).
+rm -f "$appdir/install-desktop-entry.sh" "$appdir/rwpm-mime.xml"
+mkdir -p "$appdir/usr/share/mime/packages"
+cp "$ROOT/packaging/linux/rwpm-mime.xml" "$appdir/usr/share/mime/packages/rwpm.xml"
 ln -s rwpm "$appdir/AppRun"
 cp "$appdir/icons/rwpm-256.png" "$appdir/rwpm.png"
 ln -s rwpm.png "$appdir/.DirIcon"
@@ -47,10 +50,11 @@ cat >"$appdir/rwpm.desktop" <<DESKTOP
 Type=Application
 Name=RimWorld Profile Manager
 Comment=Separate RimWorld profiles with their own saves, settings and mods
-Exec=rwpm
+Exec=rwpm %f
 Icon=rwpm
 Terminal=false
 Categories=Game;Utility;
+MimeType=application/x-rimrim;
 StartupWMClass=rwpm
 X-AppImage-Version=$version
 DESKTOP

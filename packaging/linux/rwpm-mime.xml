@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The .rimrim backup type (V83). Installed beside the desktop entry; matched by name only,
+     since the zstd bytes inside look like any other zstd file. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-rimrim">
+    <comment>RimWorld Profile Manager backup</comment>
+    <sub-class-of type="application/zstd"/>
+    <glob pattern="*.rimrim"/>
+    <icon name="rwpm"/>
+  </mime-type>
+</mime-info>

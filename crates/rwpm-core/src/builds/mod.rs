@@ -29,7 +29,7 @@ pub use effective::{EffectiveGame, GameSource, effective_game};
 pub use file::{BuildFile, dlc_folders};
 
 /// A capture in flight. Never a build: it is swapped into place under its real key.
-const STAGING_PREFIX: &str = ".staging-";
+pub(crate) const STAGING_PREFIX: &str = ".staging-";
 /// The build a finished update has replaced, kept until the swap is complete.
 const REPLACED_PREFIX: &str = ".replaced-";
 
@@ -221,7 +221,7 @@ impl BuildStore {
     }
 
     /// Caller holds `run.lock`.
-    fn recover_locked(&self) -> Result<(), ProfileError> {
+    pub(crate) fn recover_locked(&self) -> Result<(), ProfileError> {
         let Ok(entries) = std::fs::read_dir(&self.root) else {
             return Ok(());
         };

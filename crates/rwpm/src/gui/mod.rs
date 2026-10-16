@@ -1,6 +1,7 @@
 //! The desktop app (I.gui): profile list, actions, progress. iced, Elm-style: all state
 //! changes go through `update`, so they are tested without a window.
 
+mod backup;
 mod builds;
 mod copy;
 mod dialogs;
@@ -376,8 +377,10 @@ impl App {
     }
 }
 
-/// Opens the window; returns when it closes.
-pub fn run() -> iced::Result {
+/// Opens the window; returns when it closes. `backup` is a `.rimrim` file the OS opened:
+/// the Restore dialog starts on it (T74). First-run setup comes first and takes it over,
+/// so the player restores from "Restore backup…" once setup is done.
+pub fn run_with(backup: Option<PathBuf>) -> iced::Result {
     let (ctx, note) = match Ctx::detect() {
         Ok(found) => found,
         Err(e) => {
@@ -391,6 +394,11 @@ pub fn run() -> iced::Result {
             app.notice = Some(Notice::Info(note.clone()));
         }
         app.other_profiles = paths::ignored_profiles();
+        if let Some(path) = &backup
+            && app.setup.is_none()
+        {
+            app.open_backup(path);
+        }
         let health = app.check_health();
         (
             app,

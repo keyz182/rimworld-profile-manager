@@ -37,11 +37,16 @@ impl BuildFile {
     /// Reads and validates; a newer schema is refused before field checks run.
     pub fn read(path: &Path) -> Result<Self, ProfileError> {
         let text = std::fs::read_to_string(path).map_err(ProfileError::io("read", path))?;
+        Self::parse(&text, path)
+    }
+
+    /// The checks of [`Self::read`] on text already in hand; `path` names it in errors.
+    pub fn parse(text: &str, path: &Path) -> Result<Self, ProfileError> {
         let parse_err = |message: String| ProfileError::Parse {
             path: path.to_path_buf(),
             message,
         };
-        let table: toml::Table = toml::from_str(&text).map_err(|e| parse_err(e.to_string()))?;
+        let table: toml::Table = toml::from_str(text).map_err(|e| parse_err(e.to_string()))?;
         let found = table.get("schema").and_then(toml::Value::as_integer);
         match found.map(u32::try_from) {
             Some(Ok(found)) if found > SCHEMA => {

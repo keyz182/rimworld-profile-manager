@@ -2,13 +2,15 @@
 
 use iced::Element;
 use iced::widget::{
-    Column, button, center, column, container, row, scrollable, space, text, text_input,
+    Column, button, center, checkbox, column, container, row, scrollable, space, text, text_input,
 };
+use rwpm_core::backup::RestorePlan;
 use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
+use super::backup::{Draft, GameFiles, Tick};
 use super::icon::UI_BOLD;
 use super::message::{Ask, Dialog, Field, GuardChoice, Message, NameFor};
 use super::{App, text as t, theme};
@@ -69,6 +71,8 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         Dialog::ConfirmDeleteBuild { key, bytes } => {
             confirm(t::confirm_delete_version(key, *bytes), t::YES_DELETE, true)
         }
+        Dialog::Backup(draft) => backup_dialog(draft),
+        Dialog::Restore(plan) => restore_dialog(plan),
         Dialog::Help => help_dialog(help_list_height(600.0)),
     }
 }
@@ -339,4 +343,78 @@ fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
     body.push(buttons(label, fits.then_some(Message::Confirm), false))
         .spacing(16)
         .into()
+}
+
+/// V80: the mods notice always; the game notice when the game files are ticked.
+fn backup_dialog(draft: &Draft) -> Element<'_, Message> {
+    let tick = |label: String, on: bool, which: Tick| {
+        checkbox(on)
+            .label(label)
+            .on_toggle(move |v| Message::BackupTick(which, v))
+    };
+    let game: Element<'_, Message> = match &draft.game {
+        GameFiles::Stored { key, bytes } => tick(
+            t::backup_build(key, *bytes),
+            draft.includes.build,
+            Tick::Build,
+        )
+        .into(),
+        GameFiles::NotPinned => text(t::BACKUP_BUILD_NONE)
+            .size(13)
+            .style(theme::muted)
+            .into(),
+        GameFiles::Missing(key) => text(t::backup_build_missing(key))
+            .size(13)
+            .style(theme::muted)
+            .into(),
+    };
+    let mut body = column![
+        heading(t::BACKUP_TITLE),
+        text(t::backup_about(&draft.name)),
+        tick(
+            t::backup_saves(draft.saves_bytes),
+            draft.includes.saves,
+            Tick::Saves
+        ),
+        tick(t::BACKUP_LOGS.to_owned(), draft.includes.logs, Tick::Logs),
+        game,
+        text(t::NOTICE_MODS).size(13),
+    ]
+    .spacing(10);
+    if draft.includes.build {
+        body = body.push(text(t::NOTICE_GAME).size(13).style(theme::warning));
+    }
+    body.push(buttons(t::BACKUP_IT, Some(Message::Confirm), false))
+        .into()
+}
+
+/// V80: both notices that apply, and the plain-words notes (missing game version and so on)
+/// before the player agrees.
+fn restore_dialog(plan: &RestorePlan) -> Element<'_, Message> {
+    let m = &plan.manifest;
+    let mut body = column![
+        heading(t::RESTORE_TITLE),
+        text(t::restore_summary(
+            &m.name,
+            &m.rwpm_version,
+            m.game_version.as_deref(),
+            plan.bytes_needed,
+            plan.free_bytes
+        )),
+        text(t::RESTORE_NAME),
+        text_input(t::NAME_HINT, &plan.name)
+            .padding(8)
+            .on_input(|v| Message::Input(Field::Name, v))
+            .on_submit(Message::Confirm),
+    ]
+    .spacing(10);
+    for note in &plan.notes {
+        body = body.push(text(note.to_string()).size(13).style(theme::warning));
+    }
+    body = body.push(text(t::NOTICE_MODS).size(13));
+    if m.includes.build {
+        body = body.push(text(t::NOTICE_GAME).size(13).style(theme::warning));
+    }
+    let ok = super::backup::restore_ok(plan).then_some(Message::Confirm);
+    body.push(buttons(t::RESTORE_IT, ok, false)).into()
 }

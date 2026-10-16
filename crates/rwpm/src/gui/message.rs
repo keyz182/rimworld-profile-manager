@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use rwpm_core::backup::{Includes, RestorePlan};
 use rwpm_core::builds::capture::CapturePlan;
 use rwpm_core::profile::ProfileId;
 use rwpm_core::profile::guard::GuardReport;
@@ -87,6 +88,16 @@ pub enum Message {
     PickerRead(Result<super::builds::BuildsView, String>),
     /// Picker: choose a stored version (`Some(key)`) or the Steam install (`None`).
     PickBuild(Option<String>),
+    /// More → "Back up…" (T74).
+    Backup,
+    /// Backup dialog: a box ticked or unticked.
+    BackupTick(super::backup::Tick, bool),
+    /// The file chosen to save the backup in; `None` when the dialog was closed.
+    BackupPicked(ProfileId, Includes, Option<PathBuf>),
+    /// "Restore backup…": open the file dialog.
+    RestoreBackup,
+    /// The backup file chosen to restore; `None` when the dialog was closed.
+    RestorePicked(Option<PathBuf>),
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -125,6 +136,11 @@ pub enum Outcome {
     CapturePlanned(Box<CapturePlan>),
     /// A game version was stored, updated or deleted: reload and show this line.
     BuildsChanged(String),
+    /// A backup became this new profile: reload, select it and show this line.
+    Restored {
+        id: ProfileId,
+        line: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,5 +202,9 @@ pub enum Dialog {
         from: String,
         into: String,
     },
+    /// What goes in a backup (T74).
+    Backup(Box<super::backup::Draft>),
+    /// A backup file's contents and the name of the profile it will become.
+    Restore(Box<RestorePlan>),
     Help,
 }
