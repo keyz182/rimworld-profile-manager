@@ -143,7 +143,7 @@ cp "$ROOT"/licenses/*.txt "$license_dir/"
 if [[ "$os" == linux ]]; then
   mkdir -p "$out/icons"
   cp "$ROOT"/crates/rwpm/assets/icon/rwpm-*.png "$ROOT/crates/rwpm/assets/icon/rwpm.svg" "$out/icons/"
-  cp "$ROOT/packaging/linux/install-desktop-entry.sh" "$out/"
+  cp "$ROOT/packaging/linux/install-desktop-entry.sh" "$ROOT/packaging/linux/rwpm-mime.xml" "$out/"
 fi
 cargo metadata --format-version 1 --filter-platform "$target" --manifest-path "$ROOT/Cargo.toml" |
   python3 -I "$ROOT/scripts/third_party.py" "$license_dir" "$ROOT/vendor/licenses"

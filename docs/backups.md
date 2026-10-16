@@ -55,13 +55,23 @@ A backup can hold the game version that the profile plays. Restore treats it lik
 
 The file holds the mods and the settings, and the boxes that you tick. The app compresses the data. Mods and game files often compress little, so plan for the size of the profile, plus the game if you tick "Game files". The app checks the free space and tells you if there is not enough.
 
+## Open a backup from your file manager
+
+Double-click a `.rimrim` file. The app opens with the question from "Restore backup…" already on the screen.
+
+- **Windows.** The installer ties `.rimrim` files to this app. The zip download does not. With the zip, use "Restore backup…".
+- **Linux, tar.gz.** Run `install-desktop-entry.sh` from the folder. It adds the app to your menu and ties `.rimrim` files to it. Run `install-desktop-entry.sh --remove` to undo both.
+- **Linux, AppImage.** Your AppImage tool (for example AppImageLauncher) sets this up when it adds the app to your menu. Without such a tool, use "Restore backup…".
+- **macOS.** Not supported yet. Use "Restore backup…".
+
+If the app is already open, the file opens in a second window. Close the first window if you want only one. The two windows never restore at the same time.
+
 ## Limits
 
 - Backup and restore wait while RimWorld runs, and while another long job runs.
 - A mods folder or a save folder that holds a link, or a file whose name has `\` or `:`, cannot be backed up. The app names the files.
 - In the game files, a link that points outside the game folder is left out. Steam makes some on Linux. The app names them after the backup.
 - A backup cannot be larger than 128 GB.
-- On macOS, choose "Restore backup…" to open a file. Opening a `.rimrim` file from Finder is not supported yet.
 - The first-run setup comes first. When you start the app for the first time, finish the setup, then choose "Restore backup…".
 
 ## The file

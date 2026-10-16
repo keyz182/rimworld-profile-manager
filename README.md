@@ -50,7 +50,7 @@ An OFFLINE profile can go into one backup file. The file name ends in `.rimrim`.
 2. Tick what goes in: saves, log files and game files. The mods and settings are always in.
 3. Choose "Back up", then choose where to save the file.
 
-To use a backup, choose "Restore backup…" under the profile list and pick the `.rimrim` file. A restore always makes a new profile. It never changes a profile that you already have.
+To use a backup, choose "Restore backup…" under the profile list and pick the `.rimrim` file. A restore always makes a new profile. It never changes a profile that you already have. On Windows (installer) and Linux you can also double-click a `.rimrim` file; see [Backups](docs/backups.md) for how to set it up.
 
 A backup holds other people's mods. Check each mod's licence or ask its author before you share a backup. A backup with game files holds RimWorld's own files: do not share it. See [Backups](docs/backups.md) for the steps and the limits.
 
