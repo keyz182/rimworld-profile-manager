@@ -88,6 +88,10 @@ impl App {
                     | M::CaptureBuild
                     | M::DeleteBuild(_)
                     | M::ChangeGameVersion
+                    | M::Backup
+                    | M::RestoreBackup
+                    | M::BackupPicked(..)
+                    | M::RestorePicked(_)
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -106,6 +110,10 @@ impl App {
                     | M::CaptureBuild
                     | M::DeleteBuild(_)
                     | M::ChangeGameVersion
+                    | M::Backup
+                    | M::RestoreBackup
+                    | M::BackupPicked(..)
+                    | M::RestorePicked(_)
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -118,6 +126,8 @@ impl App {
                         | Dialog::ConfirmDeleteBuild { .. }
                         | Dialog::PickVersion { .. }
                         | Dialog::ConfirmDowngrade { .. }
+                        | Dialog::Backup(_)
+                        | Dialog::Restore(_)
                 )
             }))
     }
@@ -214,6 +224,11 @@ impl App {
             Message::PickerRead(Ok(view)) => self.picker_read(view),
             Message::PickerRead(Err(e)) => return self.fail(e),
             Message::PickBuild(key) => self.pick_build(key),
+            Message::Backup
+            | Message::BackupTick(..)
+            | Message::BackupPicked(..)
+            | Message::RestoreBackup
+            | Message::RestorePicked(_) => return self.backup_update(message),
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -257,6 +272,7 @@ impl App {
     fn input(&mut self, field: Field, value: String) {
         match (&mut self.dialog, field) {
             (Some(Dialog::Name { value: v, .. }), Field::Name) => *v = value,
+            (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
             (
                 Some(Dialog::Settings {
                     game, game_check, ..
@@ -316,6 +332,7 @@ impl App {
                 self.notice = Some(Notice::Info(line));
                 return self.read_builds_task();
             }
+            Ok(Outcome::Restored { id, line }) => self.changed(Some(id), line),
             Ok(Outcome::ReadyToPlay(id)) => {
                 self.reload();
                 self.selected = id;
@@ -370,6 +387,12 @@ impl App {
                 return self.apply_pin(&p, to);
             }
             Some(Dialog::ConfirmDeleteBuild { key, .. }) => return self.delete_build(key),
+            Some(Dialog::Backup(draft)) => return self.pick_backup_save(*draft),
+            Some(Dialog::Restore(plan)) if !super::backup::restore_ok(&plan) => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::Restore(plan));
+            }
+            Some(Dialog::Restore(plan)) => return self.restore_job(*plan),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}

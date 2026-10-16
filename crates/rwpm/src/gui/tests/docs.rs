@@ -5,6 +5,7 @@ use super::*;
 
 const GUIDE: &str = include_str!("../../../../../docs/game-versions.md");
 const README: &str = include_str!("../../../../../README.md");
+const BACKUPS: &str = include_str!("../../../../../docs/backups.md");
 
 /// A label as the guide writes it: in straight double quotes, so the check does not pass on
 /// the same word used in other prose.
@@ -95,4 +96,50 @@ fn help_explains_game_versions() {
     let mut ui = iced_test::simulator(app.view());
     ui.find(text::HELP_SECTIONS[0].1)
         .expect("the dialog shows its sections");
+}
+
+/// T74: the backup guide and the README quote the labels the app shows, and the guide
+/// quotes the two sharing notes word for word (V80).
+#[test]
+fn the_backup_docs_quote_the_shipped_labels_and_notices() {
+    for label in [
+        text::BACKUP_MENU,
+        text::RESTORE_MENU,
+        text::BACKUP_IT,
+        text::RESTORE_IT,
+        text::BACKUP_LOGS,
+    ] {
+        assert!(
+            BACKUPS.contains(&quoted(label)),
+            "docs/backups.md does not quote {label:?}"
+        );
+    }
+    for notice in [text::NOTICE_MODS, text::NOTICE_GAME] {
+        assert!(
+            BACKUPS.contains(&format!("> {notice}")),
+            "docs/backups.md does not quote {notice:?}"
+        );
+    }
+    for label in [text::BACKUP_MENU, text::RESTORE_MENU, text::BACKUP_IT] {
+        assert!(
+            README.contains(&quoted(label)),
+            "README.md does not quote {label:?}"
+        );
+    }
+    assert!(README.contains("docs/backups.md"));
+}
+
+#[test]
+fn help_explains_backups_and_the_sharing_limit() {
+    let (title, words) = text::HELP_SECTIONS[7];
+    assert_eq!(title, "Backups");
+    for part in [
+        text::BACKUP_MENU,
+        text::RESTORE_MENU,
+        ".rimrim",
+        "licence",
+        "do not share",
+    ] {
+        assert!(words.contains(part), "{part:?} missing from {words}");
+    }
 }

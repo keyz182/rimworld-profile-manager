@@ -42,6 +42,18 @@ A game version is a full copy of RimWorld that the app keeps. A profile can play
 
 Each game version takes about as much disk space as the game. A file system with copy-on-write, such as btrfs or APFS, shares the data until Steam changes the original. Windows game versions of 1.6 have no Steam overlay ([issue 5](https://github.com/keyz182/rimworld-profile-manager/issues/5)). See [Game versions](docs/game-versions.md) for the full steps, the disk numbers and the limits.
 
+## Backups
+
+An OFFLINE profile can go into one backup file. The file name ends in `.rimrim`. Use it to keep a safe copy, or to move a profile to another computer.
+
+1. Select an OFFLINE profile. Choose "⋯", then "Back up…".
+2. Tick what goes in: saves, log files and game files. The mods and settings are always in.
+3. Choose "Back up", then choose where to save the file.
+
+To use a backup, choose "Restore backup…" under the profile list and pick the `.rimrim` file. A restore always makes a new profile. It never changes a profile that you already have.
+
+A backup holds other people's mods. Check each mod's licence or ask its author before you share a backup. A backup with game files holds RimWorld's own files: do not share it. See [Backups](docs/backups.md) for the steps and the limits.
+
 ## How it works
 
 - Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.

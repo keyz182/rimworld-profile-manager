@@ -51,8 +51,9 @@ impl ProfileId {
         &self.0
     }
 
-    /// Slug base for a new profile name. May equal `default`; the store skips that.
-    pub(crate) fn slug_base(name: &str) -> String {
+    /// Slug base for a new profile name. May equal `default`; the store skips that. Also the
+    /// suggested file name of a backup.
+    pub fn slug_base(name: &str) -> String {
         let mut slug = String::with_capacity(name.len());
         for c in name.chars() {
             if c.is_ascii_alphanumeric() {

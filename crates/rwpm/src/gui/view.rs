@@ -146,7 +146,13 @@ impl App {
                 .on_submit(Message::SearchSubmit)
                 .padding(8),
             container(body).height(Length::Fill),
-            action(Icon::Add, t::NEW, Some(Message::New), theme::secondary)
+            action(Icon::Add, t::NEW, Some(Message::New), theme::secondary),
+            action(
+                Icon::Folder,
+                t::RESTORE_MENU,
+                self.blocked().is_none().then_some(Message::RestoreBackup),
+                theme::ghost
+            )
         ]
         .spacing(GAP)
         .width(280)
@@ -421,6 +427,9 @@ impl App {
         ];
         if !p.is_default() {
             items.insert(1, item(Icon::Rename, t::RENAME, Message::Rename, !wait));
+        }
+        if !p.is_default() && p.mode == Mode::Offline {
+            items.push(item(Icon::Copy, t::BACKUP_MENU, Message::Backup, !wait));
         }
         if Os::current() == Os::Windows {
             items.push(item(

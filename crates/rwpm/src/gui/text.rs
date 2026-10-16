@@ -109,7 +109,7 @@ pub const TIP_GO_LIVE: &str =
 
 // Help.
 pub const HELP_TITLE: &str = "How profiles work";
-pub const HELP_SECTIONS: [(&str, &str); 7] = [
+pub const HELP_SECTIONS: [(&str, &str); 8] = [
     (
         "Profiles",
         "Each profile has its own saves, settings and mod list. Playing one never touches another.",
@@ -137,6 +137,10 @@ pub const HELP_SECTIONS: [(&str, &str); 7] = [
     (
         "Game versions",
         "A game version is a full copy of RimWorld. A profile can play one, so it stays on 1.6 while Steam runs 1.7. Use \"Game versions\" at the top to store or delete game versions. Each game version takes about as much disk space as the game, unless your file system shares data. Steam's own Play button, without this tool's launch options, starts the Steam version. Windows game versions of 1.6 have no Steam overlay.",
+    ),
+    (
+        "Backups",
+        "\"Back up…\" in the More menu saves an OFFLINE profile as one .rimrim file: its mods and settings, and, if you choose, its saves, log files and game files. \"Restore backup…\" makes a new profile from a .rimrim file and never changes a profile you already have. A backup holds other people's mods. Check each mod's licence or ask its author before you share it. Game files are RimWorld's own: do not share them.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";
@@ -773,6 +777,88 @@ pub fn gv_unreadable(reason: &str) -> String {
     format!("The stored game versions cannot be read: {reason}")
 }
 
+// Backups (T74, V80). The two notices live in rwpm-core, which also writes them into the file.
+pub const BACKUP_MENU: &str = "Back up…";
+pub const RESTORE_MENU: &str = "Restore backup…";
+pub const BACKUP_TITLE: &str = "Back up this profile";
+pub const BACKUP_IT: &str = "Back up";
+pub const RESTORE_TITLE: &str = "Restore a backup";
+pub const RESTORE_IT: &str = "Restore";
+pub const RESTORE_NAME: &str = "Name of the new profile";
+pub const BACKUP_LOGS: &str = "Log files";
+pub const BACKUP_BUILD_NONE: &str =
+    "Game files: this profile plays the Steam install, so there are none to include.";
+pub const NOTICE_MODS: &str = rwpm_core::backup::NOTICE_MODS;
+pub const NOTICE_GAME: &str = rwpm_core::backup::NOTICE_GAME;
+pub const PICK_BACKUP_SAVE_TITLE: &str = "Save the backup";
+pub const PICK_BACKUP_OPEN_TITLE: &str = "Choose a backup to restore";
+pub const BACKUP_FILTER: &str = "RimWorld Profile Manager backup";
+pub const BACKUP_EXTENSION: &str = "rimrim";
+
+pub fn backup_about(name: &str) -> String {
+    format!(
+        "“{name}” goes into one .rimrim file, with its mods and settings. Choose what else to include."
+    )
+}
+
+pub fn backup_saves(bytes: u64) -> String {
+    format!("Saves ({})", size(bytes))
+}
+
+pub fn backup_build(key: &str, bytes: u64) -> String {
+    format!("Game files, version {key} ({})", size(bytes))
+}
+
+pub fn backup_build_missing(key: &str) -> String {
+    format!(
+        "Game files: version {key} is not stored on this computer, so it cannot go in the backup."
+    )
+}
+
+pub fn backing_up(name: &str) -> String {
+    format!("Backing up “{name}”")
+}
+
+pub fn backed_up(name: &str, path: &str, bytes: u64, left_out: usize) -> String {
+    let mut line = format!("Backed up “{name}” to {path} ({}).", size(bytes));
+    if left_out > 0 {
+        let links = count(left_out, "link", "links");
+        line.push_str(&format!(
+            " {links} in the game files could not go in the backup."
+        ));
+    }
+    line
+}
+
+pub fn restoring(name: &str) -> String {
+    format!("Restoring “{name}”")
+}
+
+/// The notes are rwpm-core's own plain words; they follow the line as they are.
+pub fn restored(name: &str, notes: &[rwpm_core::backup::RestoreNote]) -> String {
+    let mut line = format!("Restored “{name}”.");
+    for note in notes {
+        line.push(' ');
+        line.push_str(&note.to_string());
+    }
+    line
+}
+
+pub fn restore_summary(
+    name: &str,
+    version: &str,
+    game: Option<&str>,
+    need: u64,
+    free_bytes: Option<u64>,
+) -> String {
+    let game = game.map_or_else(String::new, |v| format!(" The profile plays RimWorld {v}."));
+    format!(
+        "“{name}” was backed up with RimWorld Profile Manager {version}.{game} Restoring needs {} of disk space; {} is free.",
+        size(need),
+        free(free_bytes)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -892,6 +978,7 @@ mod tests {
             ("mods.rs", include_str!("mods.rs")),
             ("health.rs", include_str!("health.rs")),
             ("copy.rs", include_str!("copy.rs")),
+            ("backup.rs", include_str!("backup.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

@@ -13,6 +13,7 @@ use rwpm_core::profile::{Mode, ProfileFile};
 use super::message::{Field, GuardChoice, Message, NameFor, Outcome};
 use super::*;
 
+mod backups;
 mod builds;
 mod docs;
 mod gating;
