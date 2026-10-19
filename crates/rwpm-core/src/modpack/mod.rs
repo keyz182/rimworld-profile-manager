@@ -7,6 +7,7 @@
 
 pub mod entry;
 pub mod file;
+pub mod gather;
 pub mod pack;
 pub mod unpack;
 
@@ -15,6 +16,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 
 pub use file::{Includes, Manifest, ModEntry};
+pub use gather::{Gathered, gather_mods};
 pub use pack::{PackPlan, PackReport, PackSpec, apply_pack, plan_pack};
 pub use unpack::{UnpackPlan, UnpackReport, apply_unpack, plan_unpack};
 
@@ -79,5 +81,7 @@ pub fn read_manifest(path: &Path) -> Result<Manifest, ProfileError> {
     Manifest::parse(&text, path)
 }
 
+#[cfg(test)]
+mod gather_tests;
 #[cfg(test)]
 mod tests;

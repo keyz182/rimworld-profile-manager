@@ -237,6 +237,33 @@ fn read_about(mod_dir: &Path) -> Result<(String, Option<String>), String> {
     Ok((id, field("name")))
 }
 
+/// A root-level text field of `About/About.xml` (for example `url`), trimmed; `None` when the
+/// file or the field is missing.
+pub(crate) fn about_field(mod_dir: &Path, tag: &str) -> Option<String> {
+    let about =
+        child_ignore_case(mod_dir, "About").and_then(|d| child_ignore_case(&d, "About.xml"))?;
+    root_field(&about, tag)
+}
+
+/// `<version>` of `About/Manifest.xml`, for the mods that ship one.
+pub(crate) fn manifest_version(mod_dir: &Path) -> Option<String> {
+    let manifest =
+        child_ignore_case(mod_dir, "About").and_then(|d| child_ignore_case(&d, "Manifest.xml"))?;
+    root_field(&manifest, "version")
+}
+
+fn root_field(xml: &Path, tag: &str) -> Option<String> {
+    let text = read_xml_text(xml).ok()?;
+    let doc = roxmltree::Document::parse(&text).ok()?;
+    doc.root_element()
+        .children()
+        .find(|n| n.has_tag_name(tag))
+        .and_then(|n| n.text())
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_owned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

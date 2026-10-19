@@ -12,6 +12,7 @@
 //! installed bits, so `MountedConfig` wins; `UserConfig` is the fallback. Those two differ
 //! between a branch switch and the download that follows it.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::error::ProfileError;
@@ -103,6 +104,46 @@ fn parse(text: &str) -> Option<AppManifest> {
     })
 }
 
+/// `timeupdated` (unix seconds) of every installed Workshop item, by item id, from
+/// `<library>/steamapps/workshop/appworkshop_294100.acf` (block `WorkshopItemsInstalled`).
+/// A missing or unreadable file reads as empty: the time is only a hint for a modpack.
+pub fn read_workshop_times(path: &Path) -> BTreeMap<u64, u64> {
+    std::fs::read_to_string(path)
+        .map(|text| parse_workshop_times(&text))
+        .unwrap_or_default()
+}
+
+fn parse_workshop_times(text: &str) -> BTreeMap<u64, u64> {
+    let mut times = BTreeMap::new();
+    let mut block: Vec<String> = Vec::new();
+    let mut pending: Option<String> = None;
+    for line in text.lines() {
+        match line.trim() {
+            "{" => block.push(pending.take().unwrap_or_default()),
+            "}" => {
+                block.pop();
+            }
+            line => {
+                let mut tokens = quoted(line);
+                let Some(key) = tokens.next() else { continue };
+                match (tokens.next(), block.as_slice()) {
+                    (None, _) => pending = Some(key.to_ascii_lowercase()),
+                    (Some(value), [_, installed, item])
+                        if installed == "workshopitemsinstalled"
+                            && key.eq_ignore_ascii_case("timeupdated") =>
+                    {
+                        if let (Ok(item), Ok(value)) = (item.parse(), value.parse()) {
+                            times.insert(item, value);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    times
+}
+
 /// The double-quoted tokens of one line, unescaped only for `\"` and `\\`.
 fn quoted(line: &str) -> impl Iterator<Item = String> + '_ {
     let mut chars = line.chars().peekable();
@@ -130,6 +171,32 @@ mod tests {
              \t\t\"language\"\t\t\"english\"\n\t}}\n\t\"MountedConfig\"\n\t{{\n\
              \t\t\"BetaKey\"\t\t\"{mounted}\"\n\t}}\n}}\n"
         )
+    }
+
+    const WORKSHOP: &str = "\"AppWorkshop\"\n{\n\t\"appid\"\t\t\"294100\"\n\
+        \t\"TimeLastUpdated\"\t\t\"1792413618\"\n\t\"WorkshopItemsInstalled\"\n\t{\n\
+        \t\t\"717575199\"\n\t\t{\n\t\t\t\"size\"\t\t\"1459202\"\n\
+        \t\t\t\"timeupdated\"\t\t\"1785962405\"\n\t\t\t\"manifest\"\t\t\"5231497147622646016\"\n\t\t}\n\
+        \t\t\"730936602\"\n\t\t{\n\t\t\t\"timeupdated\"\t\t\"1786739756\"\n\t\t}\n\t}\n\
+        \t\"WorkshopItemDetails\"\n\t{\n\t\t\"717575199\"\n\t\t{\n\
+        \t\t\t\"timeupdated\"\t\t\"1\"\n\t\t}\n\t\t\"999\"\n\t\t{\n\
+        \t\t\t\"timeupdated\"\t\t\"2\"\n\t\t}\n\t}\n}\n";
+
+    #[test]
+    fn reads_workshop_times_of_installed_items_only() {
+        let times = parse_workshop_times(WORKSHOP);
+        assert_eq!(times.len(), 2);
+        assert_eq!(times[&717_575_199], 1_785_962_405);
+        assert_eq!(times[&730_936_602], 1_786_739_756);
+        assert!(!times.contains_key(&999), "details block is not installed");
+    }
+
+    #[test]
+    fn workshop_times_survive_junk_and_a_missing_file() {
+        let junk = WORKSHOP.replace("\"1785962405\"", "\"soon\"");
+        assert_eq!(parse_workshop_times(&junk).len(), 1);
+        assert!(parse_workshop_times("not a manifest").is_empty());
+        assert!(read_workshop_times(Path::new("/nonexistent/appworkshop.acf")).is_empty());
     }
 
     #[test]
