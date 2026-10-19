@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 
 use crate::mods::about_field;
 
+pub mod record;
+
 /// The helper's file name. It sits beside `rwpm`.
 pub const HELPER: &str = if cfg!(windows) {
     "rwpm-steam.exe"

@@ -946,6 +946,84 @@ pub fn open_page_failed(reason: &str) -> String {
     format!("Could not open the page: {reason}")
 }
 
+// Getting the missing mods through Steam (T83c).
+pub const SUBSCRIBE_MENU: &str = "Restore and subscribe…";
+pub const SUBSCRIBE_TITLE: &str = "Subscribe in Steam";
+pub const SUBSCRIBE_IT: &str = "Subscribe";
+pub const SUBSCRIBE_TRUST: &str = "These names come from the pack. Steam may show something else. Mods run code on your computer: only get mods from a pack you trust.";
+pub const SUBSCRIBE_KEEPS: &str =
+    "Steam keeps these subscriptions and updates the mods until you remove them.";
+pub const REMOVE_PACK_SUBS: &str = "Remove subscriptions from the pack";
+pub const UNSUBSCRIBE_TITLE: &str = "Remove subscriptions";
+pub const UNSUBSCRIBE_IT: &str = "Unsubscribe";
+pub const UNSUBSCRIBING: &str = "Removing subscriptions";
+pub const NO_PACK_SUBS: &str = "This profile has no subscriptions from a pack to remove.";
+pub const STEAM_HELPER_MISSING: &str = "The Steam helper is missing, so this cannot be done.";
+pub const STEAM_NO_LIBRARY: &str =
+    "Steam's Workshop folder was not found, so mods cannot be fetched from Steam.";
+
+pub fn steam_unreachable(why: &str) -> String {
+    format!("Steam cannot be used now: {why}")
+}
+
+pub fn subscribe_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("This makes a new profile and subscribes you to {mods} in Steam:")
+}
+
+pub fn unsubscribe_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!(
+        "This unsubscribes you from {mods} that a modpack subscribed you to. Mods you chose yourself are not touched."
+    )
+}
+
+pub fn pack_subscribed(
+    name: &str,
+    subscribed: usize,
+    already: usize,
+    failed: &[(String, String)],
+    mismatched: &[String],
+    still_to_find: usize,
+) -> String {
+    let mut line = format!(
+        "Restored “{name}”. Subscribed to {}.",
+        count(subscribed, "mod", "mods")
+    );
+    if already > 0 {
+        line.push_str(&format!(" {} already had.", count(already, "mod", "mods")));
+    }
+    if !failed.is_empty() {
+        let list: Vec<String> = failed
+            .iter()
+            .map(|(n, why)| format!("{n} ({why})"))
+            .collect();
+        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+    }
+    if !mismatched.is_empty() {
+        line.push_str(&format!(
+            " Not the mod the pack named, so not kept: {}.",
+            mismatched.join(", ")
+        ));
+    }
+    if still_to_find > 0 {
+        let mods = count(still_to_find, "mod", "mods");
+        line.push_str(&format!(" {mods} to find yourself."));
+    }
+    line
+}
+
+pub fn pack_unsubscribed(done: usize, failed: usize) -> String {
+    let mut line = format!("Unsubscribed from {}.", count(done, "mod", "mods"));
+    if failed > 0 {
+        line.push_str(&format!(
+            " {} could not be removed.",
+            count(failed, "mod", "mods")
+        ));
+    }
+    line
+}
+
 pub fn sharing(name: &str) -> String {
     format!("Sharing “{name}”")
 }
@@ -1118,6 +1196,7 @@ mod tests {
             ("backup.rs", include_str!("backup.rs")),
             ("modpack.rs", include_str!("modpack.rs")),
             ("modpack_open.rs", include_str!("modpack_open.rs")),
+            ("pack_fetch.rs", include_str!("pack_fetch.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

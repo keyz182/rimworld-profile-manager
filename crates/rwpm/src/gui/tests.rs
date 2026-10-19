@@ -18,6 +18,7 @@ mod builds;
 mod docs;
 mod gating;
 mod modpacks;
+mod pack_fetch;
 mod pack_open;
 mod picker;
 

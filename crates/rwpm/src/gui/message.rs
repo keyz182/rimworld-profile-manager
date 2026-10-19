@@ -119,6 +119,12 @@ pub enum Message {
     PackOpened(Box<PackPreview>),
     /// A Steam page link in the Open dialog (Steam pages only).
     OpenUrl(String),
+    /// Open dialog: "Restore and subscribe…" (T83c).
+    PackSubscribe,
+    /// The Cancel button on the progress bar of a job that can be stopped.
+    CancelJob,
+    /// More → "Remove subscriptions from the pack".
+    RemovePackSubs,
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -235,5 +241,12 @@ pub enum Dialog {
     Share(Box<ShareDraft>),
     /// A modpack's contents and the name of the profile it will become (T81b).
     OpenPack(Box<PackPreview>),
+    /// What opening the pack would subscribe the player to (T83c).
+    ConfirmSubscribe(Box<PackPreview>),
+    /// Unsubscribe from the mods that a pack subscribed this profile's player to.
+    ConfirmUnsubscribe {
+        id: ProfileId,
+        count: usize,
+    },
     Help,
 }

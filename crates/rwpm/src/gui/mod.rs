@@ -14,6 +14,7 @@ mod message;
 mod modpack;
 mod modpack_open;
 mod mods;
+mod pack_fetch;
 mod picker;
 mod setup;
 mod support;
@@ -174,6 +175,10 @@ pub struct App {
     pub selected: ProfileId,
     pub dialog: Option<Dialog>,
     pub job: Option<Job>,
+    /// Set by the Cancel button of a job that can be stopped (T83c). Cleared when it ends.
+    pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// How the Steam helper is run; tests replace it so none of them starts a process.
+    pub fetcher: pack_fetch::Fetcher,
     pub notice: Option<Notice>,
     /// The OS asks for dark colours.
     pub dark: bool,
@@ -213,6 +218,8 @@ impl App {
             selected: ProfileId::default_id(),
             dialog: None,
             job: None,
+            cancel: None,
+            fetcher: pack_fetch::Fetcher::real(),
             notice: None,
             dark: false,
             search: String::new(),

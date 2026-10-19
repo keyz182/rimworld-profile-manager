@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use iced::widget::{Column, button, column, container, row, scrollable, text, text_input};
+use iced::widget::{Column, button, column, container, row, scrollable, space, text, text_input};
 use iced::{Alignment, Element, Length, Task};
 use rwpm_core::ProfileError;
 use rwpm_core::builds::acf;
@@ -16,6 +16,7 @@ use rwpm_core::mods::ModIndex;
 use super::dialogs::{buttons, heading};
 use super::icon::UI_BOLD;
 use super::message::{Dialog, Field, Message, Outcome};
+use super::pack_fetch::{SteamRoute, steam_route};
 use super::{App, Notice, support, text as t, theme};
 
 /// Rows drawn per list; the rest is "and N more", so a huge pack cannot slow the window.
@@ -62,6 +63,10 @@ pub struct PackPreview {
     pub game_note: Option<String>,
     /// False when no game was found: nothing could be checked.
     pub checked: bool,
+    /// Set when the Steam helper is there and Steam can be reached (T83c).
+    pub steam: Option<SteamRoute>,
+    /// Why Steam cannot be used, when a helper is there but Steam is not reachable.
+    pub steam_note: Option<String>,
 }
 
 impl PackPreview {
@@ -122,6 +127,8 @@ pub fn build_preview(plan: UnpackPlan, game: Option<&GameInstall>) -> PackPrevie
         missing_dlc,
         newer,
         game_note,
+        steam: None,
+        steam_note: None,
     }
 }
 
@@ -168,8 +175,14 @@ impl App {
         match opened {
             Ok(plan) => {
                 let game = self.game.as_ref().ok().cloned();
+                let exe = self.ctx.exe.clone();
                 Task::perform(
-                    async move { Box::new(build_preview(plan, game.as_ref())) },
+                    async move {
+                        let mut preview = build_preview(plan, game.as_ref());
+                        // Asking the helper starts a process, so it is done here, off the UI.
+                        (preview.steam, preview.steam_note) = steam_route(&exe, game.as_ref());
+                        Box::new(preview)
+                    },
                     Message::PackOpened,
                 )
             }
@@ -216,6 +229,7 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
         notes.push(t::PACK_NO_GAME.to_owned());
     }
     notes.extend(preview.game_note.clone());
+    notes.extend(preview.steam_note.clone());
     if !preview.missing_dlc.is_empty() {
         notes.push(t::pack_dlc_missing(&preview.missing_dlc));
     }
@@ -241,7 +255,30 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
             .on_submit(Message::Confirm),
         container(scrollable(details)).max_height(DETAILS_HEIGHT),
         text(t::SHARE_NOTICE).size(13),
-        buttons(t::OPEN_PACK_IT, ok, false),
+        pack_buttons(preview, ok),
+    ]
+    .spacing(10)
+    .into()
+}
+
+/// Cancel and Restore. With a Steam route and mods to get, also "Restore and subscribe…",
+/// the main button: restoring alone leaves the mods to the player.
+fn pack_buttons(preview: &PackPreview, ok: Option<Message>) -> Element<'_, Message> {
+    if preview.steam.is_none() || preview.missing.is_empty() {
+        return buttons(t::OPEN_PACK_IT, ok, false);
+    }
+    let subscribe = ok.as_ref().map(|_| Message::PackSubscribe);
+    row![
+        space::horizontal(),
+        button(t::CANCEL)
+            .on_press(Message::Cancel)
+            .style(theme::secondary),
+        button(t::OPEN_PACK_IT)
+            .on_press_maybe(ok)
+            .style(theme::secondary),
+        button(t::SUBSCRIBE_MENU)
+            .on_press_maybe(subscribe)
+            .style(theme::primary),
     ]
     .spacing(10)
     .into()

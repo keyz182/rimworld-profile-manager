@@ -96,6 +96,7 @@ impl App {
                     | M::SharePicked(..)
                     | M::OpenPack
                     | M::OpenPackPicked(_)
+                    | M::RemovePackSubs
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -122,6 +123,7 @@ impl App {
                     | M::SharePicked(..)
                     | M::OpenPack
                     | M::OpenPackPicked(_)
+                    | M::RemovePackSubs
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -138,6 +140,8 @@ impl App {
                         | Dialog::Restore(_)
                         | Dialog::Share(_)
                         | Dialog::OpenPack(_)
+                        | Dialog::ConfirmSubscribe(_)
+                        | Dialog::ConfirmUnsubscribe { .. }
                 )
             }))
     }
@@ -248,6 +252,9 @@ impl App {
             | Message::OpenPackPicked(_)
             | Message::PackOpened(_)
             | Message::OpenUrl(_) => return self.pack_update(message),
+            Message::PackSubscribe | Message::CancelJob | Message::RemovePackSubs => {
+                return self.pack_fetch_update(message);
+            }
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -325,8 +332,30 @@ impl App {
         jobs::spawn(work)
     }
 
+    /// A job that has a Cancel button: `work` gets a flag that turns true when it is pressed.
+    pub(super) fn start_cancellable<F>(
+        &mut self,
+        label: String,
+        total: u64,
+        work: F,
+    ) -> Task<Message>
+    where
+        F: FnOnce(&mut dyn FnMut(u64), &std::sync::atomic::AtomicBool) -> Result<Outcome, String>
+            + Send
+            + 'static,
+    {
+        let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let task = self.start(label, total, {
+            let flag = std::sync::Arc::clone(&flag);
+            move |progress| work(progress, &flag)
+        });
+        self.cancel = Some(flag);
+        task
+    }
+
     fn finished(&mut self, result: Result<Outcome, String>) -> Task<Message> {
         self.job = None;
+        self.cancel = None;
         match result {
             Ok(Outcome::Changed(line)) => {
                 self.reload();
@@ -425,6 +454,8 @@ impl App {
                 self.dialog = Some(Dialog::OpenPack(preview));
             }
             Some(Dialog::OpenPack(preview)) => return self.pack_restore_job(*preview),
+            Some(Dialog::ConfirmSubscribe(preview)) => return self.subscribe_job(*preview),
+            Some(Dialog::ConfirmUnsubscribe { id, .. }) => return self.unsubscribe_job(id),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}
