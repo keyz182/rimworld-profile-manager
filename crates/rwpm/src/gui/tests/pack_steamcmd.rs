@@ -357,3 +357,15 @@ fn a_job_counted_in_steps_shows_a_percentage_not_sizes() {
     assert_eq!(text::progress_percent("X", 5, 0), "X…");
     assert_eq!(text::progress_percent("X", 2000, 1000), "X… 100%");
 }
+
+#[test]
+fn only_a_mac_is_told_it_needs_rosetta() {
+    let note = text::cmd_platform_note(true).expect("a Mac is told");
+    assert!(note.contains("Rosetta 2"), "{note}");
+    assert!(note.contains("softwareupdate --install-rosetta"), "{note}");
+    assert_eq!(
+        text::cmd_platform_note(false),
+        None,
+        "other systems are not"
+    );
+}

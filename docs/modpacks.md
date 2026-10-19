@@ -89,7 +89,8 @@ What happens:
 - The app downloads in batches. A pack can have any number of mods.
 - If one mod fails, the profile stays LIVE and the app lists what failed.
 - The app deletes steamcmd's copies of the mods after the profile has its own.
-- On Linux, steamcmd needs the 32-bit system libraries. On a Mac, it needs Rosetta 2. The app says so when it cannot start.
+- On a Mac, steamcmd needs Rosetta 2. It is an Intel program. The app says so before it downloads anything. To install Rosetta, run `softwareupdate --install-rosetta` in Terminal.
+- On Linux, steamcmd needs the 32-bit system libraries. The app says so when steamcmd cannot start.
 
 In both routes, a mod must name the package id that the pack promised. If it does not, the app does not keep it.
 

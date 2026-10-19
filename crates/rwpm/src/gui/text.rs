@@ -995,6 +995,13 @@ pub const CMD_CONSENT_POINTS: [&str; 4] = [
     "Run steamcmd, signed in anonymously. steamcmd then updates itself from Valve.",
     "Download the mods from the Steam Workshop. Their authors wrote them; this app does not check them.",
 ];
+/// What this system must have for steamcmd to start, told before anything is downloaded.
+/// steamcmd is an Intel program, so a Mac needs Rosetta 2 to run it.
+pub fn cmd_platform_note(macos: bool) -> Option<&'static str> {
+    macos.then_some(
+        "On a Mac, steamcmd needs Rosetta 2, Apple's way of running Intel programs. If it is not installed, run \"softwareupdate --install-rosetta\" in Terminal first.",
+    )
+}
 pub const CMD_CONSENT_GO: &str = "Download steamcmd and continue";
 pub const CMD_NO_CONSENT: &str = "steamcmd is not downloaded until you agree to it.";
 pub const CMD_CHANGED_TITLE: &str = "steamcmd file changed";

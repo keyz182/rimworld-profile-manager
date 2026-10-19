@@ -62,7 +62,7 @@ A modpack is a small file that names the mods of a profile, in load order. The f
 2. Tick what goes in: mod settings, your own scenarios and similar, game settings and saves. The mod list is always in.
 3. Choose "Share", then choose where to save the file.
 
-To use a modpack, choose "Open modpack…" under the profile list and pick the `.rimpack` file. The app makes a new profile and shows which mods you have, which to get from Steam and which to find yourself. The app can subscribe to the missing mods in Steam, or download them into an OFFLINE profile with Valve's steamcmd when Steam cannot be reached. On Windows (installer) and Linux you can also double-click a `.rimpack` file.
+To use a modpack, choose "Open modpack…" under the profile list and pick the `.rimpack` file. The app makes a new profile and shows which mods you have, which to get from Steam and which to find yourself. The app can subscribe to the missing mods in Steam, or download them into an OFFLINE profile with Valve's steamcmd when Steam cannot be reached (on a Mac, steamcmd needs Rosetta 2). On Windows (installer) and Linux you can also double-click a `.rimpack` file.
 
 Mod settings can hold private details, such as account logins. Only share settings you have checked. See [Modpacks](docs/modpacks.md) for the steps and the limits.
 

@@ -28,4 +28,4 @@ Delete `<app data>/steamcmd/`, remove the `steamcmd` entry from `consent.toml`, 
 
 ## Not yet run
 
-Windows and macOS (T82d). Linux without the 32-bit libraries, and a Mac without Rosetta, to see the plain-words messages.
+Windows and macOS (T82d). Linux without the 32-bit libraries, to see the plain-words message. A Mac without Rosetta is parked: the consent dialog says Rosetta 2 is needed, and the failure message is covered by a test.

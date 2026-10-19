@@ -562,6 +562,9 @@ pub fn consent_steamcmd_dialog() -> Element<'static, Message> {
     for point in t::CMD_CONSENT_POINTS {
         points = points.push(text(point).size(14));
     }
+    if let Some(note) = t::cmd_platform_note(cfg!(target_os = "macos")) {
+        points = points.push(text(note).size(14).font(UI_BOLD).style(theme::warning));
+    }
     column![
         heading(t::CMD_CONSENT_TITLE),
         text(t::CMD_CONSENT_ABOUT),
