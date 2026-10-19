@@ -71,6 +71,10 @@ pub struct PackPreview {
     pub steam_note: Option<String>,
     /// The player ticked "Make it an OFFLINE profile": download copies, never subscribe (T83d).
     pub offline: bool,
+    /// Steam cannot be used but Valve's steamcmd can fetch the mods (T82c).
+    pub cmd: bool,
+    /// The player chose the steamcmd route.
+    pub via_cmd: bool,
 }
 
 impl PackPreview {
@@ -134,6 +138,8 @@ pub fn build_preview(plan: UnpackPlan, game: Option<&GameInstall>) -> PackPrevie
         steam: None,
         steam_note: None,
         offline: false,
+        cmd: false,
+        via_cmd: false,
     }
 }
 
@@ -186,6 +192,9 @@ impl App {
                         let mut preview = build_preview(plan, game.as_ref());
                         // Asking the helper starts a process, so it is done here, off the UI.
                         (preview.steam, preview.steam_note) = steam_route(&exe, game.as_ref());
+                        preview.cmd = preview.steam.is_none()
+                            && preview.checked
+                            && !preview.missing.is_empty();
                         Box::new(preview)
                     },
                     Message::PackOpened,
@@ -235,6 +244,9 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
     }
     notes.extend(preview.game_note.clone());
     notes.extend(preview.steam_note.clone());
+    if cmd_applies(preview) {
+        notes.push(t::CMD_NOTE.to_owned());
+    }
     if !preview.missing_dlc.is_empty() {
         notes.push(t::pack_dlc_missing(&preview.missing_dlc));
     }
@@ -272,6 +284,11 @@ fn steam_applies(preview: &PackPreview) -> bool {
     preview.steam.is_some() && !preview.missing.is_empty()
 }
 
+/// Whether steamcmd is offered: Steam is not usable, and there are mods to get.
+fn cmd_applies(preview: &PackPreview) -> bool {
+    preview.cmd && preview.steam.is_none() && !preview.missing.is_empty()
+}
+
 /// "Make it an OFFLINE profile": download private copies instead of subscribing (T83d).
 fn offline_choice(preview: &PackPreview) -> Element<'_, Message> {
     if !steam_applies(preview) {
@@ -286,15 +303,17 @@ fn offline_choice(preview: &PackPreview) -> Element<'_, Message> {
 /// Cancel and Restore. With a Steam route and mods to get, also "Restore and subscribe…",
 /// the main button: restoring alone leaves the mods to the player.
 fn pack_buttons(preview: &PackPreview, ok: Option<Message>) -> Element<'_, Message> {
-    if !steam_applies(preview) {
+    if !steam_applies(preview) && !cmd_applies(preview) {
         return buttons(t::OPEN_PACK_IT, ok, false);
     }
-    let subscribe = ok.as_ref().map(|_| Message::PackSubscribe);
-    let main = if preview.offline {
-        t::DOWNLOAD_MENU
+    let (main, route) = if cmd_applies(preview) {
+        (t::DOWNLOAD_MENU, Message::PackSteamcmd)
+    } else if preview.offline {
+        (t::DOWNLOAD_MENU, Message::PackSubscribe)
     } else {
-        t::SUBSCRIBE_MENU
+        (t::SUBSCRIBE_MENU, Message::PackSubscribe)
     };
+    let subscribe = ok.as_ref().map(|_| route);
     row![
         space::horizontal(),
         button(t::CANCEL)

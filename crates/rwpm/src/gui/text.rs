@@ -973,6 +973,37 @@ pub const DOWNLOAD_KEEPS: &str =
 pub const OFFLINE_NOT_ALL: &str = "not every mod arrived as the pack named it";
 pub const OFFLINE_CONFLICTS: &str = "some mods are installed in more than one place";
 
+// The steamcmd route: Valve's own downloader, for a machine with no Steam client (T82c).
+pub const CMD_NOTE: &str = "Steam cannot be reached here, so Valve's steamcmd can download the mods into an OFFLINE profile instead.";
+pub const CMD_VIA: &str = "Valve's steamcmd does the download. No Steam client is needed.";
+pub const CMD_CONSENT_TITLE: &str = "Download steamcmd";
+pub const CMD_CONSENT_ABOUT: &str =
+    "steamcmd is Valve's own command-line downloader for Steam. To get the mods, this app will:";
+pub const CMD_CONSENT_POINTS: [&str; 4] = [
+    "Download steamcmd (about 2 MB) from Valve over HTTPS into this app's own folder.",
+    "Keep a fingerprint of that file, and refuse it if the file ever changes.",
+    "Run steamcmd, signed in anonymously. steamcmd then updates itself from Valve.",
+    "Download the mods from the Steam Workshop. Their authors wrote them; this app does not check them.",
+];
+pub const CMD_CONSENT_GO: &str = "Download steamcmd and continue";
+pub const CMD_NO_CONSENT: &str = "steamcmd is not downloaded until you agree to it.";
+pub const CMD_CHANGED_TITLE: &str = "steamcmd file changed";
+pub const CMD_TRUST_IT: &str = "Trust the new file";
+
+pub fn cmd_changed_about(first: &str, found: &str) -> String {
+    format!(
+        "Valve's steamcmd file is not the one this app saw the first time.\nFirst seen: {first}\nNow: {found}\nValve may have updated it, or something changed it on the way. Trust the new file only if you expect a change."
+    )
+}
+
+/// A steamcmd problem in plain words, with the technical text on a line of its own.
+pub fn cmd_failed(plain: &str, details: Option<&str>) -> String {
+    match details {
+        Some(details) => format!("{plain}\nDetails: {details}"),
+        None => plain.to_owned(),
+    }
+}
+
 pub fn download_about(n: usize) -> String {
     let mods = count(n, "mod", "mods");
     format!(

@@ -123,6 +123,8 @@ pub enum Message {
     PackSubscribe,
     /// Open dialog: the box "Make it an OFFLINE profile" ticked or unticked (T83d).
     PackOffline(bool),
+    /// Open dialog: "Restore and download…" through Valve's steamcmd (T82c).
+    PackSteamcmd,
     /// The Cancel button on the progress bar of a job that can be stopped.
     CancelJob,
     /// More → "Remove subscriptions from the pack".
@@ -173,6 +175,12 @@ pub enum Outcome {
     Restored {
         id: ProfileId,
         line: String,
+    },
+    /// steamcmd's file changed since it was first seen: nothing was restored; ask first.
+    SteamcmdChanged {
+        preview: Box<PackPreview>,
+        first: String,
+        found: String,
     },
 }
 
@@ -245,6 +253,14 @@ pub enum Dialog {
     OpenPack(Box<PackPreview>),
     /// What opening the pack would subscribe the player to (T83c).
     ConfirmSubscribe(Box<PackPreview>),
+    /// First use of steamcmd: what will be downloaded and run, asked before anything is (T82c).
+    ConsentSteamcmd(Box<PackPreview>),
+    /// Valve's steamcmd file differs from the one first seen (T82 review M1).
+    TrustSteamcmd {
+        preview: Box<PackPreview>,
+        first: String,
+        found: String,
+    },
     /// Unsubscribe from the mods that a pack subscribed this profile's player to.
     ConfirmUnsubscribe {
         id: ProfileId,

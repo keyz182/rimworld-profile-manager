@@ -141,6 +141,8 @@ impl App {
                         | Dialog::Share(_)
                         | Dialog::OpenPack(_)
                         | Dialog::ConfirmSubscribe(_)
+                        | Dialog::ConsentSteamcmd(_)
+                        | Dialog::TrustSteamcmd { .. }
                         | Dialog::ConfirmUnsubscribe { .. }
                 )
             }))
@@ -253,6 +255,7 @@ impl App {
             | Message::PackOpened(_)
             | Message::OpenUrl(_) => return self.pack_update(message),
             Message::PackSubscribe
+            | Message::PackSteamcmd
             | Message::PackOffline(_)
             | Message::CancelJob
             | Message::RemovePackSubs => {
@@ -356,7 +359,7 @@ impl App {
         task
     }
 
-    fn finished(&mut self, result: Result<Outcome, String>) -> Task<Message> {
+    pub(super) fn finished(&mut self, result: Result<Outcome, String>) -> Task<Message> {
         self.job = None;
         self.cancel = None;
         match result {
@@ -387,6 +390,17 @@ impl App {
                 return self.read_builds_task();
             }
             Ok(Outcome::Restored { id, line }) => self.changed(Some(id), line),
+            Ok(Outcome::SteamcmdChanged {
+                preview,
+                first,
+                found,
+            }) => {
+                self.dialog = Some(Dialog::TrustSteamcmd {
+                    preview,
+                    first,
+                    found,
+                });
+            }
             Ok(Outcome::ReadyToPlay(id)) => {
                 self.reload();
                 self.selected = id;
@@ -458,6 +472,8 @@ impl App {
             }
             Some(Dialog::OpenPack(preview)) => return self.pack_restore_job(*preview),
             Some(Dialog::ConfirmSubscribe(preview)) => return self.subscribe_job(*preview),
+            Some(Dialog::ConsentSteamcmd(preview)) => self.grant_steamcmd(*preview),
+            Some(Dialog::TrustSteamcmd { preview, .. }) => return self.trust_steamcmd(*preview),
             Some(Dialog::ConfirmUnsubscribe { id, .. }) => return self.unsubscribe_job(id),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}

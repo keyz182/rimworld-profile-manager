@@ -179,6 +179,8 @@ pub struct App {
     pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// How the Steam helper is run; tests replace it so none of them starts a process.
     pub fetcher: pack_fetch::Fetcher,
+    /// How steamcmd is installed and run; tests replace it too (T82c).
+    pub cmd: pack_fetch::CmdRunner,
     pub notice: Option<Notice>,
     /// The OS asks for dark colours.
     pub dark: bool,
@@ -220,6 +222,7 @@ impl App {
             job: None,
             cancel: None,
             fetcher: pack_fetch::Fetcher::real(),
+            cmd: pack_fetch::CmdRunner::real(),
             notice: None,
             dark: false,
             search: String::new(),

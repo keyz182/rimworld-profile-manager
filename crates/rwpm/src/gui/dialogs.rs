@@ -82,6 +82,10 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         Dialog::Share(draft) => share_dialog(draft),
         Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview),
         Dialog::ConfirmSubscribe(preview) => super::pack_fetch::confirm_subscribe_dialog(preview),
+        Dialog::ConsentSteamcmd(_) => super::pack_fetch::consent_steamcmd_dialog(),
+        Dialog::TrustSteamcmd { first, found, .. } => {
+            super::pack_fetch::trust_steamcmd_dialog(first, found)
+        }
         Dialog::ConfirmUnsubscribe { count, .. } => {
             super::pack_fetch::confirm_unsubscribe_dialog(*count)
         }

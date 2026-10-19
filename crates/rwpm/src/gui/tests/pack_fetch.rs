@@ -330,7 +330,7 @@ fn recording(ops: &Arc<std::sync::Mutex<Vec<Op>>>, answer: fn(u64, usize) -> Sta
     ))
 }
 
-fn mode_of(sb: &Sandbox, name: &str) -> Option<(Mode, std::path::PathBuf)> {
+pub(super) fn mode_of(sb: &Sandbox, name: &str) -> Option<(Mode, std::path::PathBuf)> {
     let store = sb.ctx().store().ok()?;
     let profile = store
         .list()
