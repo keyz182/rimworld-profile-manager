@@ -302,3 +302,35 @@ fn too_little_free_space_stops_before_steamcmd_starts() {
     );
     assert!(matches!(out[0].status, Status::Done(_)), "{out:?}");
 }
+
+/// macOS: a program with no slice this Mac can run fails with `EBADARCH` ("Bad CPU type in
+/// executable"), the same error that an x86_64 steamcmd gives on a Mac without Rosetta. A
+/// header-only i386 Mach-O (macOS no longer runs 32-bit) stands in for steamcmd, and the fake
+/// `steamcmd.sh` calls it the way Valve's script calls its program.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_program_this_mac_cannot_run_is_explained_as_a_missing_rosetta() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = Layout::new(tmp.path());
+    std::fs::create_dir_all(layout.root()).expect("root");
+    // magic, cputype i386, cpusubtype, filetype EXECUTE, ncmds, sizeofcmds, flags
+    let header: Vec<u8> = [0xfeed_face_u32, 7, 3, 2, 0, 0, 0]
+        .iter()
+        .flat_map(|word| word.to_le_bytes())
+        .collect();
+    let stub = layout.root().join("badarch");
+    std::fs::write(&stub, header).expect("stub");
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    std::fs::write(
+        layout.program(),
+        "#!/bin/bash\nhere=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n\"$here/badarch\" \"$@\"\nexit $?\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(layout.program(), std::fs::Permissions::from_mode(0o755))
+        .expect("chmod");
+    let out = run(&layout, &[111], Duration::from_secs(30));
+    assert!(
+        matches!(&out[0], Status::Failed(why) if why.contains("Rosetta")),
+        "{out:?}"
+    );
+}
