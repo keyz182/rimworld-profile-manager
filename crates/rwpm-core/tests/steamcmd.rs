@@ -193,7 +193,14 @@ fn cancel_stops_steamcmd_and_the_program_it_started() {
     let began = Instant::now();
     let out = std::thread::scope(|scope| {
         scope.spawn(|| {
-            std::thread::sleep(Duration::from_millis(700));
+            // Cancel only once the fake has started its child, however slow the machine is.
+            let pid_file = layout.root().join("child.pid");
+            let started = Instant::now();
+            while started.elapsed() < Duration::from_secs(30)
+                && !std::fs::read_to_string(&pid_file).is_ok_and(|t| !t.trim().is_empty())
+            {
+                std::thread::sleep(Duration::from_millis(20));
+            }
             cancel.store(true, Ordering::Relaxed);
         });
         download_with(
@@ -211,6 +218,8 @@ fn cancel_stops_steamcmd_and_the_program_it_started() {
         "{out:?}"
     );
     let pid = std::fs::read_to_string(layout.root().join("child.pid")).expect("pid");
+    // An empty id would make `alive` false for the wrong reason.
+    assert!(pid.trim().parse::<u32>().is_ok(), "no process id: {pid:?}");
     // Given a moment to be reaped.
     let gone = (0..50).any(|_| {
         std::thread::sleep(Duration::from_millis(100));
@@ -226,12 +235,15 @@ fn cancel_stops_steamcmd_and_the_program_it_started() {
 fn silence_ends_it_the_same_way() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let layout = layout_with_fake(tmp.path());
-    let out = run(&layout, &[666], Duration::from_millis(800));
+    // Long enough that a slow start (a busy or cold machine) still writes `child.pid` first.
+    let out = run(&layout, &[666], Duration::from_secs(4));
     assert!(
         matches!(&out[0], Status::Failed(why) if why.contains("stopped answering")),
         "{out:?}"
     );
     let pid = std::fs::read_to_string(layout.root().join("child.pid")).expect("pid");
+    // An empty id would make `alive` false for the wrong reason.
+    assert!(pid.trim().parse::<u32>().is_ok(), "no process id: {pid:?}");
     let gone = (0..50).any(|_| {
         std::thread::sleep(Duration::from_millis(100));
         !alive(&pid)
