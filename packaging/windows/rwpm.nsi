@@ -15,9 +15,11 @@ ManifestDPIAware true
 !define APP "RimWorld Profile Manager"
 !define EXE "rwpm.exe"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\rwpm"
-; V83: `.rimrim` backups open in this app. Per user (HKCU), like the rest of the install.
+; V83: `.rimrim` backups and `.rimpack` modpacks open in this app. Per user (HKCU), like the
+; rest of the install.
 !define CLASSES "Software\Classes"
 !define BACKUP_CLASS "rwpm.backup"
+!define PACK_CLASS "rwpm.modpack"
 ; Tells Explorer that file associations changed, so icons and "open with" update at once.
 !define SHCNE_ASSOCCHANGED 0x08000000
 !define ICON "${__FILEDIR__}\..\..\crates\rwpm\assets\icon\rwpm.ico"
@@ -111,6 +113,10 @@ Section "Install"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}" "" "${APP} backup"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}\DefaultIcon" "" "$INSTDIR\${EXE},0"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
+  WriteRegStr HKCU "${CLASSES}\.rimpack" "" "${PACK_CLASS}"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}" "" "${APP} modpack"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\DefaultIcon" "" "$INSTDIR\${EXE},0"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (${SHCNE_ASSOCCHANGED}, 0, 0, 0)'
 SectionEnd
 
@@ -132,5 +138,9 @@ Section "Uninstall"
   StrCmp $0 "${BACKUP_CLASS}" 0 +2
     DeleteRegKey HKCU "${CLASSES}\.rimrim"
   DeleteRegKey HKCU "${CLASSES}\${BACKUP_CLASS}"
+  ReadRegStr $0 HKCU "${CLASSES}\.rimpack" ""
+  StrCmp $0 "${PACK_CLASS}" 0 +2
+    DeleteRegKey HKCU "${CLASSES}\.rimpack"
+  DeleteRegKey HKCU "${CLASSES}\${PACK_CLASS}"
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (${SHCNE_ASSOCCHANGED}, 0, 0, 0)'
 SectionEnd
