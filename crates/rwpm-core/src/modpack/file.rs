@@ -17,6 +17,10 @@ pub const FILE_NAME: &str = "rimpack.toml";
 const MAX_MODS: usize = 5_000;
 const MAX_TEXT: usize = 512;
 const MAX_ID: usize = 128;
+/// Text a person reads is shown in the app, so it is short (counted in characters).
+const MAX_NAME_CHARS: usize = 100;
+const MAX_DESCRIPTION_CHARS: usize = 2_000;
+const MAX_VERSION_CHARS: usize = 128;
 
 /// What the pack creator chose to put in. `ModsConfig.xml` is always in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +118,16 @@ impl Manifest {
         if self.name.trim().is_empty() {
             return Err("the pack has no name".into());
         }
+        check_text(&self.name, "the pack name", MAX_NAME_CHARS, false)?;
+        check_text(
+            &self.description,
+            "the description",
+            MAX_DESCRIPTION_CHARS,
+            true,
+        )?;
+        if let Some(version) = &self.game_version {
+            check_text(version, "the game version", MAX_VERSION_CHARS, false)?;
+        }
         if self.mods.len() > MAX_MODS {
             return Err(format!("it lists more than {MAX_MODS} mods"));
         }
@@ -144,10 +158,7 @@ impl Manifest {
 
 fn check_mod(entry: &ModEntry) -> Result<(), String> {
     check_package_id(&entry.package_id)?;
-    if entry.name.is_empty()
-        || entry.name.len() > MAX_TEXT
-        || entry.name.chars().any(char::is_control)
-    {
+    if entry.name.is_empty() || check_text(&entry.name, "a mod name", MAX_TEXT, false).is_err() {
         return Err(format!("`{}` has no usable name", entry.package_id));
     }
     if entry.workshop_id == Some(0) {
@@ -157,9 +168,24 @@ fn check_mod(entry: &ModEntry) -> Result<(), String> {
         check_link(url)?;
     }
     if let Some(version) = &entry.version
-        && (version.len() > MAX_ID || version.chars().any(char::is_control))
+        && check_text(version, "a version", MAX_VERSION_CHARS, false).is_err()
     {
         return Err(format!("`{}` has an unusable version", entry.package_id));
+    }
+    Ok(())
+}
+
+/// Text the app shows: at most `max` characters, no control characters (a multi-line text
+/// may keep line breaks and tabs) and none of the characters that reorder the text around
+/// them, which could make one name read as another.
+fn check_text(text: &str, what: &str, max: usize, multiline: bool) -> Result<(), String> {
+    if text.chars().count() > max {
+        return Err(format!("{what} is longer than {max} characters"));
+    }
+    let reorders = |c: char| matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}');
+    let control = |c: char| c.is_control() && !(multiline && matches!(c, '\n' | '\t'));
+    if text.chars().any(|c| control(c) || reorders(c)) {
+        return Err(format!("{what} has a character that is not allowed"));
     }
     Ok(())
 }

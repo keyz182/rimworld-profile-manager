@@ -135,6 +135,81 @@ fn manifest_holds_the_start_save_to_its_saves() {
     assert!(refused(&m));
 }
 
+fn accepted(manifest: &Manifest) -> bool {
+    let text = manifest.to_toml().expect("toml");
+    parse(&text).is_ok()
+}
+
+#[test]
+fn text_a_person_reads_has_limits() {
+    let ok = |edit: fn(&mut Manifest)| {
+        let mut m = sample();
+        edit(&mut m);
+        accepted(&m)
+    };
+    // The edges are allowed, one past them is refused.
+    assert!(ok(|m| m.name = "n".repeat(100)));
+    assert!(!ok(|m| m.name = "n".repeat(101)));
+    assert!(ok(|m| m.description = "d".repeat(2_000)));
+    assert!(!ok(|m| m.description = "d".repeat(2_001)));
+    assert!(ok(|m| m.game_version = Some("v".repeat(128))));
+    assert!(!ok(|m| m.game_version = Some("v".repeat(129))));
+    // Counted in characters, not bytes: 100 multi-byte letters are fine.
+    assert!(ok(|m| m.name = "é".repeat(100)));
+    // A description may have line breaks and tabs; nothing else that is a control character.
+    assert!(ok(|m| m.description = "line one\n\tline two".into()));
+    assert!(!ok(|m| m.description = "bell\u{7}".into()));
+    assert!(!ok(|m| m.description = "nul\u{0}".into()));
+    // A name and a version are one line.
+    assert!(!ok(|m| m.name = "two\nlines".into()));
+    assert!(!ok(|m| m.game_version = Some("1.0\r\n".into())));
+}
+
+#[test]
+fn text_that_reorders_other_text_is_refused() {
+    let hostile = [
+        "\u{202E}", "\u{202D}", "\u{202A}", "\u{202B}", "\u{202C}", "\u{2066}", "\u{2069}",
+    ];
+    for mark in hostile {
+        let mut m = sample();
+        m.name = format!("Safe{mark}Pack");
+        assert!(!accepted(&m), "name with {mark:?}");
+        let mut m = sample();
+        m.description = format!("Plain{mark}text");
+        assert!(!accepted(&m), "description with {mark:?}");
+        let mut m = sample();
+        m.mods[0].name = format!("Harmony{mark}");
+        assert!(!accepted(&m), "mod name with {mark:?}");
+        let mut m = sample();
+        m.mods[0].version = Some(format!("1.0{mark}"));
+        assert!(!accepted(&m), "mod version with {mark:?}");
+    }
+    // Ordinary right-to-left and accented text is not touched.
+    let mut m = sample();
+    m.name = "حزمة Ünïcode 日本語".into();
+    assert!(accepted(&m));
+}
+
+#[test]
+fn a_pack_with_a_huge_description_is_refused_before_anything_is_shown() {
+    let fx = fixture();
+    let mut m = sample();
+    m.description = "x".repeat(3 * 1024 * 1024);
+    let entries = [list()];
+    let mut m_for = manifest_for(&entries, &[]);
+    m_for.description = m.description.clone();
+    let path = archive(fx.tmp.path(), &m_for, &entries);
+    assert!(matches!(
+        read_manifest(&path),
+        Err(ProfileError::BadModpack { .. })
+    ));
+    assert!(matches!(
+        plan_unpack(&path, &fx.target),
+        Err(ProfileError::BadModpack { .. })
+    ));
+    assert!(fx.leftovers().is_empty());
+}
+
 #[test]
 fn classify_accepts_only_the_manifest_and_save_data() {
     assert_eq!(classify(Path::new("rimpack.toml")), Ok(Place::Manifest));
