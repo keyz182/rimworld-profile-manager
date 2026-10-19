@@ -151,13 +151,15 @@ pub fn helper_beside(exe: &Path) -> Option<PathBuf> {
 fn spawn(helper: &Path, op: &str, args: &[String]) -> Result<Child, String> {
     let mut tries = 0;
     loop {
-        let started = Command::new(helper)
+        let mut command = Command::new(helper);
+        command
             .arg(op)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn();
+            .stderr(Stdio::null());
+        no_window(&mut command);
+        let started = command.spawn();
         match started {
             Ok(child) => return Ok(child),
             // A program written a moment ago is "busy" while another thread's fork still
@@ -170,6 +172,20 @@ fn spawn(helper: &Path, op: &str, args: &[String]) -> Result<Child, String> {
         }
     }
 }
+
+/// Starts a console program without a console window. The app has no console of its own, so
+/// without this Windows opens a window for every helper and steamcmd run, and Windows Terminal
+/// keeps it open afterwards when the exit code is not 0 (found in the real Windows window,
+/// T82). A no-op elsewhere.
+#[cfg(windows)]
+pub(crate) fn no_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+pub(crate) fn no_window(_command: &mut Command) {}
 
 pub(crate) const BUSY_TRIES: u32 = 10;
 pub(crate) const BUSY_WAIT: Duration = Duration::from_millis(30);

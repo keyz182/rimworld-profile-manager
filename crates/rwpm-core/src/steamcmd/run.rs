@@ -17,7 +17,9 @@ use super::output::{self, Event, Reader};
 use super::{Error, SOURCE, Seen, check_hash, download, unpack};
 use crate::consent::{Consent, Scope};
 use crate::fetch::plain_id;
-use crate::fetch::{BUSY_TRIES, BUSY_WAIT, Fresh, Outcome, Status, check_identity, is_busy};
+use crate::fetch::{
+    BUSY_TRIES, BUSY_WAIT, Fresh, Outcome, Status, check_identity, is_busy, no_window,
+};
 
 /// RimWorld's Steam app id.
 const APP: &str = "294100";
@@ -268,6 +270,7 @@ fn command(layout: &Layout, ids: &[u64]) -> Command {
             .env_remove("XDG_DATA_HOME")
             .env_remove("XDG_CONFIG_HOME");
     }
+    no_window(&mut cmd);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
