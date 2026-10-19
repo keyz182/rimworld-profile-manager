@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use iced::widget::{Column, button, column, row, scrollable, text, text_input};
+use iced::widget::{Column, button, column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length, Task};
 use rwpm_core::ProfileError;
 use rwpm_core::builds::acf;
@@ -21,7 +21,9 @@ use super::{App, Notice, support, text as t, theme};
 /// Rows drawn per list; the rest is "and N more", so a huge pack cannot slow the window.
 const MAX_ROWS: usize = 200;
 const STEAM_PAGE: &str = "https://steamcommunity.com/sharedfiles/filedetails/?id=";
-const LIST_HEIGHT: f32 = 220.0;
+/// The part of the Open dialog that scrolls. In the smallest window (600 px high, V33) the
+/// title, the name field, the notice and the buttons need about 340 px of it.
+const DETAILS_HEIGHT: f32 = 240.0;
 
 /// One mod of the pack, for the preview.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,16 +210,7 @@ enum Row {
 /// The pack, its notes and its lists, before the player agrees.
 pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
     let m = &preview.plan.manifest;
-    let mut body = column![
-        heading(t::OPEN_PACK_TITLE),
-        text(t::pack_about(&m.name, m.mods.len(), &m.description)),
-        text(t::RESTORE_NAME),
-        text_input(t::NAME_HINT, &preview.plan.name)
-            .padding(8)
-            .on_input(|v| Message::Input(Field::Name, v))
-            .on_submit(Message::Confirm),
-    ]
-    .spacing(10);
+    let mut details = Column::new().spacing(10);
     let mut notes = Vec::new();
     if !preview.checked {
         notes.push(t::PACK_NO_GAME.to_owned());
@@ -230,26 +223,38 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
         notes.push(t::pack_newer(&preview.newer));
     }
     for note in notes {
-        body = body.push(text(note).size(13).style(theme::warning));
+        details = details.push(text(note).size(13).style(theme::warning));
     }
-    body = body.push(lists(preview));
+    details = details.push(lists(preview));
     if preview.still_needed() > 0 {
-        body = body.push(text(t::PACK_HINT).size(13));
+        details = details.push(text(t::PACK_HINT).size(13));
     }
     let ok = preview.ready().then_some(Message::Confirm);
-    body.push(text(t::SHARE_NOTICE).size(13))
-        .push(buttons(t::OPEN_PACK_IT, ok, false))
-        .into()
+    // The title, the name and the buttons stay on screen; the notes and lists scroll (V33).
+    column![
+        heading(t::OPEN_PACK_TITLE),
+        text(t::pack_about(&m.name, m.mods.len(), &m.description)),
+        text(t::RESTORE_NAME),
+        text_input(t::NAME_HINT, &preview.plan.name)
+            .padding(8)
+            .on_input(|v| Message::Input(Field::Name, v))
+            .on_submit(Message::Confirm),
+        container(scrollable(details)).max_height(DETAILS_HEIGHT),
+        text(t::SHARE_NOTICE).size(13),
+        buttons(t::OPEN_PACK_IT, ok, false),
+    ]
+    .spacing(10)
+    .into()
 }
 
 fn lists(preview: &PackPreview) -> Element<'_, Message> {
-    let all = column![
+    column![
         section(t::PACK_MISSING, &preview.missing, Row::Page),
         section(t::PACK_MANUAL, &preview.manual, Row::Text),
         section(t::PACK_PRESENT, &preview.present, Row::Plain),
     ]
-    .spacing(10);
-    scrollable(all).height(Length::Fixed(LIST_HEIGHT)).into()
+    .spacing(10)
+    .into()
 }
 
 fn section<'a>(title: &str, rows: &'a [PackMod], kind: Row) -> Element<'a, Message> {

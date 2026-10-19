@@ -12,7 +12,7 @@ use crate::gui::Job;
 use crate::gui::modpack::ShareTick;
 
 /// A LIVE profile listing `active` mods.
-fn live_profile(sb: &Sandbox, name: &str, active: &[&str]) -> ProfileId {
+pub(super) fn live_profile(sb: &Sandbox, name: &str, active: &[&str]) -> ProfileId {
     let id = sb
         .ctx()
         .store()
@@ -31,7 +31,7 @@ fn live_profile(sb: &Sandbox, name: &str, active: &[&str]) -> ProfileId {
 }
 
 /// A file below the profile's save data.
-fn put(sb: &Sandbox, id: &ProfileId, rel: &str, body: &str) {
+pub(super) fn put(sb: &Sandbox, id: &ProfileId, rel: &str, body: &str) {
     let path = sb
         .ctx()
         .store()
@@ -61,6 +61,97 @@ fn share_is_in_the_menu_of_every_profile() {
         let _ = app.update(Message::ToggleMenu);
         assert!(found(&app, text::SHARE_MENU), "{id}");
     }
+}
+
+/// Where `label` lies in a window of the smallest size the layout is designed for (V33):
+/// 960 × 600. When a dialog is too tall the layout squeezes the content to no height instead
+/// of pushing it off screen, so a test must check the height, not only the position.
+pub(super) fn smallest_window_bounds(app: &App, label: &str) -> iced::Rectangle {
+    let settings = iced::Settings {
+        fonts: crate::gui::icon::fonts(),
+        default_font: crate::gui::icon::UI,
+        ..iced::Settings::default()
+    };
+    let mut ui = iced_test::Simulator::with_size(settings, (960.0, 600.0), app.view());
+    ui.find(label).expect("laid out").bounds()
+}
+
+/// A line of text is about 21 px high; squeezed content is 0.
+const TEXT_LINE: f32 = 18.0;
+
+/// `label` has its full height: it was not squeezed away.
+pub(super) fn assert_not_squeezed(app: &App, label: &str) {
+    let b = smallest_window_bounds(app, label);
+    assert!(
+        b.height >= TEXT_LINE,
+        "{label:?} is squeezed to {} px",
+        b.height
+    );
+}
+
+/// `label` has its full height and lies inside the window: it is on screen without scrolling.
+pub(super) fn assert_on_screen(app: &App, label: &str) {
+    assert_not_squeezed(app, label);
+    let b = smallest_window_bounds(app, label);
+    assert!(
+        b.y >= 0.0 && b.y + b.height <= 600.0,
+        "{label:?} spans {} to {}",
+        b.y,
+        b.y + b.height
+    );
+}
+
+/// The dialog's title and its Share button stay on screen at the smallest window, even with
+/// many saves ticked and every warning showing; the form between them scrolls.
+#[test]
+fn the_share_dialog_keeps_its_title_and_button_on_screen_at_the_smallest_window() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    for i in 0..40 {
+        put(&sb, &id, &format!("Saves/colony{i:02}.rws"), "save");
+    }
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    for i in 0..40 {
+        let _ = app.update(Message::ShareSave(i, true));
+    }
+    let _ = app.update(Message::ShareStart(Some(3)));
+    let _ = app.update(Message::Input(Field::Link, "nope".into()));
+    let long = "x".repeat(modpack::file::MAX_DESCRIPTION_CHARS + 1);
+    let _ = app.update(Message::Input(Field::Description, long));
+    // The title and the button are pinned on screen. The parts of the form are all laid out
+    // with their full height (the long ones scroll); none is squeezed away.
+    assert_on_screen(&app, text::SHARE_TITLE);
+    assert_on_screen(&app, text::SHARE_IT);
+    for label in [
+        text::SHARE_SAVES,
+        text::SHARE_START,
+        text::SHARE_DESCRIPTION,
+        text::SHARE_LINK,
+    ] {
+        assert_not_squeezed(&app, label);
+    }
+}
+
+/// V34 style budget: from the list to a saved pack in ≤ 4 steps (select, More, Share as
+/// modpack…, Share). The last step opens the system's file dialog, which is not driven here:
+/// the check is that the button is there and asks for it.
+#[test]
+fn sharing_takes_at_most_four_steps() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    let mut app = sb.app();
+    let mut steps = 0;
+    for label in ["Ironman", text::MORE, text::SHARE_MENU] {
+        super::click(&mut app, label);
+        steps += 1;
+    }
+    assert_eq!(app.selected, id);
+    assert!(matches!(app.dialog, Some(Dialog::Share(_))));
+    let last = clicked(&app, text::SHARE_IT);
+    assert!(matches!(last.as_slice(), [Message::Confirm]), "{last:?}");
+    steps += 1;
+    assert!(steps <= 4, "{steps} steps");
 }
 
 #[test]

@@ -13,7 +13,7 @@ use crate::gui::support;
 const PAGE: &str = "https://steamcommunity.com/sharedfiles/filedetails/?id=";
 const HARMONY: u64 = 2009463077;
 
-fn entry(id: &str, name: &str, workshop_id: Option<u64>) -> ModEntry {
+pub(super) fn entry(id: &str, name: &str, workshop_id: Option<u64>) -> ModEntry {
     ModEntry {
         package_id: id.into(),
         name: name.into(),
@@ -25,7 +25,7 @@ fn entry(id: &str, name: &str, workshop_id: Option<u64>) -> ModEntry {
 }
 
 /// A pack made through core from a LIVE profile, listing `mods`.
-fn make_pack(
+pub(super) fn make_pack(
     sb: &Sandbox,
     mods: Vec<ModEntry>,
     game_version: Option<&str>,
@@ -63,14 +63,14 @@ fn make_pack(
     dest
 }
 
-fn preview(sb: &Sandbox, pack: &Path, game: bool) -> PackPreview {
+pub(super) fn preview(sb: &Sandbox, pack: &Path, game: bool) -> PackPreview {
     let store = sb.ctx().store().expect("store");
     let plan = modpack::plan_unpack(pack, &store).expect("plan");
     let installed = sb.app().game.ok();
     build_preview(plan, installed.as_ref().filter(|_| game))
 }
 
-fn shown(sb: &Sandbox, preview: PackPreview) -> App {
+pub(super) fn shown(sb: &Sandbox, preview: PackPreview) -> App {
     let mut app = sb.app();
     let _ = app.update(Message::PackOpened(Box::new(preview)));
     app
@@ -78,6 +78,45 @@ fn shown(sb: &Sandbox, preview: PackPreview) -> App {
 
 fn ids(mods: &[crate::gui::modpack_open::PackMod]) -> Vec<&str> {
     mods.iter().map(|m| m.package_id.as_str()).collect()
+}
+
+/// The title and the Restore button stay on screen at the smallest window, with every note
+/// showing and a long list; the notes and lists between them scroll.
+#[test]
+fn the_open_dialog_keeps_its_title_and_button_on_screen_at_the_smallest_window() {
+    use super::modpacks::{assert_not_squeezed, assert_on_screen};
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let mods: Vec<ModEntry> = (0..250)
+        .map(|i| entry(&format!("m.mod{i}"), &format!("Mod {i}"), Some(1000 + i)))
+        .collect();
+    let pack = make_pack(&sb, mods, Some("0.0.1 rev1"), &["ludeon.rimworld.royalty"]);
+    let mut p = preview(&sb, &pack, true);
+    p.newer = vec!["Harmony".into()];
+    assert!(p.game_note.is_some() && !p.missing_dlc.is_empty());
+    let app = shown(&sb, p);
+    assert_on_screen(&app, text::OPEN_PACK_TITLE);
+    assert_on_screen(&app, text::OPEN_PACK_IT);
+    assert_on_screen(&app, text::RESTORE_NAME);
+    assert_not_squeezed(&app, &text::pack_section(text::PACK_MISSING, 250));
+    assert_not_squeezed(&app, text::PACK_HINT);
+}
+
+/// Budget: from the list to a restored profile in ≤ 3 steps (Open modpack…, then the
+/// question's Restore). The first step opens the system's file dialog, which is not driven
+/// here; the pack it would choose is handed over as the app does after the dialog.
+#[test]
+fn opening_takes_at_most_three_steps() {
+    let sb = Sandbox::new();
+    let pack = make_pack(&sb, vec![entry("a.b", "A", Some(5))], None, &[]);
+    let mut steps = 1;
+    let first = clicked(&sb.app(), text::OPEN_PACK_MENU);
+    assert!(matches!(first.as_slice(), [Message::OpenPack]), "{first:?}");
+    let app = shown(&sb, preview(&sb, &pack, true));
+    let last = clicked(&app, text::OPEN_PACK_IT);
+    assert!(matches!(last.as_slice(), [Message::Confirm]), "{last:?}");
+    steps += 1;
+    assert!(steps <= 3, "{steps} steps");
 }
 
 #[test]

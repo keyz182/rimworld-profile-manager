@@ -19,6 +19,10 @@ use super::{App, text as t, theme};
 
 const GAP: u32 = 10;
 
+/// The part of the Share dialog that scrolls. In the smallest window (600 px high, V33) the
+/// title, the padding and the buttons need about 150 px of it.
+const SHARE_FORM_HEIGHT: f32 = 400.0;
+
 pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message> {
     match dialog {
         Dialog::Name {
@@ -431,7 +435,6 @@ fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
             .on_toggle(move |v| Message::ShareTick(which, v))
     };
     let mut body = column![
-        heading(t::SHARE_TITLE),
         text(t::share_about(&draft.name)),
         tick(
             t::share_group(
@@ -496,13 +499,19 @@ fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
             body = body.push(text(words).size(13).style(theme::error));
         }
     }
-    body.push(text(t::SHARE_NOTICE).size(13))
-        .push(buttons(
+    // The title and the buttons stay on screen; the form scrolls (V33).
+    column![
+        heading(t::SHARE_TITLE),
+        container(scrollable(body.push(text(t::SHARE_NOTICE).size(13))))
+            .max_height(SHARE_FORM_HEIGHT),
+        buttons(
             t::SHARE_IT,
             draft.ready().then_some(Message::Confirm),
-            false,
-        ))
-        .into()
+            false
+        ),
+    ]
+    .spacing(GAP)
+    .into()
 }
 
 /// The saves to include, and which of them the pack starts from.
@@ -518,11 +527,7 @@ fn saves_section(draft: &ShareDraft) -> Element<'_, Message> {
                 .on_toggle(move |v| Message::ShareSave(i, v)),
         );
     }
-    let mut section = column![
-        text(t::SHARE_SAVES),
-        scrollable(list).height(iced::Length::Fixed(120.0))
-    ]
-    .spacing(6);
+    let mut section = column![text(t::SHARE_SAVES), list].spacing(6);
     if draft.saves.iter().any(|s| s.on) {
         section = section.push(text(t::SHARE_START));
         section = section.push(radio(
