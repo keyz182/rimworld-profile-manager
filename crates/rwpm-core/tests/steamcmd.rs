@@ -29,6 +29,8 @@ while [ $# -gt 0 ]; do
       222) printf '\033[31mERROR! Download item 222 failed (File Not Found).\033[0m' ;;
       444) ;;
       555) echo "linux32/steamcmd: error while loading shared libraries: libc.so.6" >&2; exit 127 ;;
+      556) echo "./steamcmd.sh: line 85: $here/linux32/steamcmd: cannot execute: required file not found" >&2; exit 127 ;;
+      557) echo "./steamcmd.sh: line 85: $here/linux32/steamcmd: cannot execute: Permission denied" >&2; exit 126 ;;
       666) sleep 60 & echo $! > "$here/child.pid"; wait ;;
       *)
         mkdir -p "$content/$id/About"
@@ -150,6 +152,24 @@ fn missing_32_bit_libraries_are_explained_in_plain_words() {
     let out = run(&layout, &[555], Duration::from_secs(30));
     assert!(
         matches!(&out[0], Status::Failed(why) if why.contains("32-bit")),
+        "{out:?}"
+    );
+}
+
+/// The exact line bash printed when steamcmd's 32-bit loader was hidden (Linux, 2026-10-19),
+/// and the one for a folder that does not allow programs, which is a different problem.
+#[test]
+fn the_real_missing_loader_line_is_explained_and_a_no_exec_folder_is_not_blamed_on_it() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = layout_with_fake(tmp.path());
+    let out = run(&layout, &[556], Duration::from_secs(30));
+    assert!(
+        matches!(&out[0], Status::Failed(why) if why.contains("32-bit")),
+        "{out:?}"
+    );
+    let out = run(&layout, &[557], Duration::from_secs(30));
+    assert!(
+        matches!(&out[0], Status::Failed(why) if !why.contains("32-bit")),
         "{out:?}"
     );
 }

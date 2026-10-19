@@ -68,16 +68,19 @@ pub fn explain(reader: &Reader) -> String {
 
 /// What a silence means, in plain words, judged from what steamcmd printed (or the system said).
 pub fn explain_text(text: &str) -> String {
-    let has = |words: &[&str]| words.iter().any(|w| text.contains(w));
-    if has(&["Bad CPU type"]) {
+    // Shells write the same system text in different cases (bash: "Bad CPU type in
+    // executable", zsh: "bad CPU type in executable"), so case is ignored.
+    let lower = text.to_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| lower.contains(w));
+    if has(&["bad cpu type"]) {
         "steamcmd could not start. It needs Rosetta 2 on this Mac: run `softwareupdate --install-rosetta` and try again."
     } else if has(&[
         "shared libraries",
-        "No such file or directory",
-        "cannot execute",
+        "no such file or directory",
+        "required file not found",
     ]) {
         "steamcmd could not start. On Linux it needs the 32-bit system libraries (for example `lib32-glibc` on Arch, `libc6-i386` on Debian and Ubuntu, `glibc.i686` on Fedora). Install them and try again."
-    } else if has(&["Login Failure", "FAILED login", "FAILED (No Connection)"]) {
+    } else if has(&["login failure", "failed login", "failed (no connection)"]) {
         "steamcmd could not sign in to Steam. Check the internet connection and try again."
     } else {
         "steamcmd gave no answer for this mod."
@@ -239,6 +242,27 @@ mod tests {
         assert!(explain_text("error while loading shared libraries: libc.so.6").contains("32-bit"));
         assert!(explain_text("sh: linux32/steamcmd: No such file or directory").contains("32-bit"));
         assert!(explain_text("zsh: bad CPU type\nBad CPU type in executable").contains("Rosetta"));
+        // Real text, from running steamcmd.sh with its 32-bit loader hidden (Linux, 2026-10-19):
+        let linux =
+            "./steamcmd.sh: line 85: /x/linux32/steamcmd: cannot execute: required file not found";
+        assert!(
+            explain_text(linux).contains("32-bit"),
+            "the real Linux message"
+        );
+        // macOS's own text for a missing Rosetta (strerror(EBADARCH)), in bash's and zsh's wording.
+        assert!(
+            explain_text("./steamcmd.sh: line 9: /x/steamcmd: Bad CPU type in executable")
+                .contains("Rosetta")
+        );
+        assert!(explain_text("zsh: bad CPU type in executable: ./steamcmd").contains("Rosetta"));
+        // A folder that does not allow programs is not a 32-bit problem.
+        let noexec =
+            "./steamcmd.sh: line 85: /x/linux32/steamcmd: cannot execute: Permission denied";
+        assert!(
+            !explain_text(noexec).contains("32-bit"),
+            "{}",
+            explain_text(noexec)
+        );
         assert!(explain_text("FAILED login with result code Timeout").contains("sign in"));
         assert_eq!(explain_text(""), "steamcmd gave no answer for this mod.");
         assert!(plain_reason("File Not Found").contains("no such mod"));
