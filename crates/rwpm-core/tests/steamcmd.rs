@@ -1,4 +1,5 @@
-//! T82b: running steamcmd. Each test puts a fake `steamcmd.sh` where the real one would be, so
+//! T82b: running steamcmd. Every test here sets the free space wanted to 0, so none depends
+//! on the disk it runs on. Each test puts a fake `steamcmd.sh` where the real one would be, so
 //! these start processes, and so they live in their own test program (a forked child can hold
 //! another test's lock file open until it runs its program).
 
@@ -10,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use rwpm_core::fetch::Status;
-use rwpm_core::steamcmd::run::{Layout, download};
+use rwpm_core::steamcmd::run::{Layout, download, download_with};
 
 /// Prints coloured results with no line break between them, like the real one (R52).
 /// Id 222 fails, 333 delivers another mod, 444 prints nothing, 555 needs 32-bit libraries,
@@ -58,7 +59,7 @@ fn wanted(ids: &[u64]) -> Vec<(u64, String)> {
 
 fn run(layout: &Layout, ids: &[u64], quiet: Duration) -> Vec<Status> {
     let never = AtomicBool::new(false);
-    download(layout, &wanted(ids), &never, quiet, &mut |_, _| {})
+    download_with(layout, &wanted(ids), &never, quiet, 0, &mut |_, _| {})
         .into_iter()
         .map(|o| o.status)
         .collect()
@@ -169,11 +170,12 @@ fn cancel_stops_steamcmd_and_the_program_it_started() {
             std::thread::sleep(Duration::from_millis(700));
             cancel.store(true, Ordering::Relaxed);
         });
-        download(
+        download_with(
             &layout,
             &wanted(&[666]),
             &cancel,
             Duration::from_secs(60),
+            0,
             &mut |_, _| {},
         )
     });
@@ -253,4 +255,53 @@ fn real_steamcmd_installs_and_downloads_a_mod() {
             .join("3552152340/About/About.xml")
             .is_file()
     );
+}
+
+#[test]
+fn what_an_earlier_run_left_is_gone_before_this_run_delivers() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = layout_with_fake(tmp.path());
+    let stale = layout.content_dir().join("999/About");
+    std::fs::create_dir_all(&stale).expect("stale");
+    std::fs::write(stale.join("About.xml"), "old").expect("old");
+    run(&layout, &[111], Duration::from_secs(30));
+    assert!(
+        !layout.content_dir().join("999").exists(),
+        "a leftover stayed"
+    );
+    assert!(layout.content_dir().join("111").is_dir());
+}
+
+#[test]
+fn too_little_free_space_stops_before_steamcmd_starts() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = layout_with_fake(tmp.path());
+    let never = AtomicBool::new(false);
+    let out = download_with(
+        &layout,
+        &wanted(&[111, 112]),
+        &never,
+        Duration::from_secs(30),
+        u64::MAX,
+        &mut |_, _| {},
+    );
+    assert_eq!(out.len(), 2);
+    assert!(
+        out.iter().all(|o| matches!(&o.status, Status::Failed(why) if why.contains("not enough free disk space"))),
+        "{out:?}"
+    );
+    assert!(
+        !layout.root().join("runs.txt").exists(),
+        "steamcmd was started anyway"
+    );
+    // With room enough, the same call runs.
+    let out = download_with(
+        &layout,
+        &wanted(&[111]),
+        &never,
+        Duration::from_secs(30),
+        0,
+        &mut |_, _| {},
+    );
+    assert!(matches!(out[0].status, Status::Done(_)), "{out:?}");
 }

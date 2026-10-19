@@ -25,6 +25,9 @@ const APP: &str = "294100";
 /// costs less.
 pub const BATCH: usize = 100;
 const POLL: Duration = Duration::from_millis(100);
+/// Free space wanted in steamcmd's folder before each batch. An ESTIMATE, not a measured
+/// number: mods are usually a few MB to a few hundred MB, and a batch holds up to 100.
+pub const MIN_FREE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Where steamcmd lives: `<app data>/steamcmd/`.
 #[derive(Debug, Clone)]
@@ -78,6 +81,16 @@ impl Layout {
         self.root.join(".rwpm-installed")
     }
 
+    /// Empties the folder the mods are downloaded into. It is steamcmd's own copy: nothing
+    /// else lives there, and what a cancelled or earlier run left must not be mistaken for
+    /// this run's delivery (T82 review M2).
+    pub fn clear_content(&self) -> std::io::Result<()> {
+        match std::fs::remove_dir_all(self.content_dir()) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
+    }
+
     pub fn installed(&self) -> bool {
         self.program().is_file() && self.marker().is_file()
     }
@@ -125,9 +138,30 @@ pub fn download(
     quiet: Duration,
     progress: &mut dyn FnMut(usize, usize),
 ) -> Vec<Outcome> {
+    download_with(layout, wanted, cancel, quiet, MIN_FREE_BYTES, progress)
+}
+
+/// `download` with the free space wanted before each batch given (tests set it).
+pub fn download_with(
+    layout: &Layout,
+    wanted: &[(u64, String)],
+    cancel: &AtomicBool,
+    quiet: Duration,
+    min_free: u64,
+    progress: &mut dyn FnMut(usize, usize),
+) -> Vec<Outcome> {
     let total = wanted.len();
     let mut outcomes: Vec<Outcome> = Vec::with_capacity(total);
+    if let Err(e) = layout.clear_content() {
+        let why = format!("steamcmd's folder could not be emptied first: {e}");
+        return failed_all(wanted, &why);
+    }
     for batch in wanted.chunks(BATCH) {
+        if let Some(free) = crate::space::free_space(layout.root()).filter(|f| *f < min_free) {
+            let why = low_space(free);
+            outcomes.extend(failed_all(batch, &why));
+            continue;
+        }
         let before = outcomes.len();
         let mut part = run_batch(layout, batch, cancel, quiet, &mut |n| {
             progress(before + n, total);
@@ -135,6 +169,23 @@ pub fn download(
         outcomes.append(&mut part);
     }
     outcomes
+}
+
+fn failed_all(wanted: &[(u64, String)], why: &str) -> Vec<Outcome> {
+    wanted
+        .iter()
+        .map(|(id, _)| Outcome {
+            id: *id,
+            status: Status::Failed(why.to_owned()),
+        })
+        .collect()
+}
+
+fn low_space(free: u64) -> String {
+    format!(
+        "There is not enough free disk space for steamcmd ({} MB left). Free some space and try again.",
+        free / 1024 / 1024
+    )
 }
 
 fn run_batch(
