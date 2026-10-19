@@ -190,6 +190,7 @@ fn clicks_ignored_while_a_job_runs() {
         label: "Copying".into(),
         done: 0,
         total: 10,
+        percent: false,
     });
     let _ = app.update(Message::New);
     assert!(app.dialog.is_none());
@@ -455,6 +456,7 @@ fn render_screens_manual() {
         label: "Freezing mods".into(),
         done: 300 << 20,
         total: 1200 << 20,
+        percent: false,
     });
     shot(&app, "11-busy");
     app.job = None;
@@ -878,6 +880,7 @@ fn busy_job_blocks_changes_but_not_browsing() {
         label: "Freezing mods".into(),
         done: 0,
         total: 0,
+        percent: false,
     });
     let _ = app.update(Message::Select(id.clone()));
     assert_eq!(app.selected, id, "the list stays browsable");

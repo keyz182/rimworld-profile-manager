@@ -334,6 +334,7 @@ impl App {
             label,
             done: 0,
             total,
+            percent: false,
         });
         jobs::spawn(work)
     }
@@ -355,6 +356,10 @@ impl App {
             let flag = std::sync::Arc::clone(&flag);
             move |progress| work(progress, &flag)
         });
+        // The totals of these jobs are steps (restore, then fetch), not bytes.
+        if let Some(job) = &mut self.job {
+            job.percent = true;
+        }
         self.cancel = Some(flag);
         task
     }

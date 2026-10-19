@@ -170,6 +170,7 @@ fn share_waits_while_something_runs() {
         label: "Copying".into(),
         done: 0,
         total: 0,
+        percent: false,
     });
     let _ = app.update(Message::Share);
     assert!(app.dialog.is_none());

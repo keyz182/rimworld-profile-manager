@@ -98,6 +98,7 @@ fn restore_is_on_the_list_and_waits_while_something_runs() {
         label: "Copying".into(),
         done: 0,
         total: 0,
+        percent: false,
     });
     assert!(clicked(&app, text::RESTORE_MENU).is_empty());
 }
@@ -272,6 +273,7 @@ fn backup_and_restore_wait_for_a_job_or_a_running_game() {
         label: "Copying".into(),
         done: 0,
         total: 0,
+        percent: false,
     });
     for message in messages(&id) {
         let why = app.blocked().expect("busy");

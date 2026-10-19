@@ -340,3 +340,20 @@ fn the_consent_and_changed_file_dialogs_keep_their_buttons_on_screen() {
     assert_on_screen(&big, text::DOWNLOAD_MENU);
     assert_on_screen(&big, text::OPEN_PACK_IT);
 }
+
+#[test]
+fn a_job_counted_in_steps_shows_a_percentage_not_sizes() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.job = Some(crate::gui::Job {
+        label: "Restoring".into(),
+        done: 500,
+        total: 1000,
+        percent: true,
+    });
+    assert!(found(&app, &text::progress_percent("Restoring", 500, 1000)));
+    assert!(found(&app, "Restoring… 50%"));
+    assert!(!found(&app, "less than 1 MB"), "steps are not bytes");
+    assert_eq!(text::progress_percent("X", 5, 0), "X…");
+    assert_eq!(text::progress_percent("X", 2000, 1000), "X… 100%");
+}

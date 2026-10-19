@@ -487,6 +487,14 @@ pub fn progress(label: &str, done: u64, total: u64) -> String {
     }
 }
 
+/// Progress counted in steps out of `total`, shown as a percentage.
+pub fn progress_percent(label: &str, done: u64, total: u64) -> String {
+    if total == 0 {
+        return format!("{label}…");
+    }
+    format!("{label}… {}%", done.min(total) * 100 / total)
+}
+
 pub fn confirm_delete(name: &str) -> String {
     format!("Delete “{name}”? It goes to the recycle bin, so you can still get it back.")
 }

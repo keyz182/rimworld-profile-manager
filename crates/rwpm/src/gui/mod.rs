@@ -157,6 +157,8 @@ pub struct Job {
     pub label: String,
     pub done: u64,
     pub total: u64,
+    /// `done` and `total` are steps, not bytes: shown as a percentage (T82 click-through).
+    pub percent: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

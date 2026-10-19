@@ -487,7 +487,11 @@ impl App {
             };
             let mut head = row![
                 icon(Icon::Busy),
-                text(t::progress(&job.label, job.done, job.total)),
+                text(if job.percent {
+                    t::progress_percent(&job.label, job.done, job.total)
+                } else {
+                    t::progress(&job.label, job.done, job.total)
+                }),
                 text(t::OTHERS_WAIT).style(theme::muted)
             ]
             .spacing(8)

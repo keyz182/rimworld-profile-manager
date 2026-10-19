@@ -221,6 +221,7 @@ fn a_job_without_cancel_shows_no_cancel_button() {
         label: "Copying".into(),
         done: 0,
         total: 10,
+        percent: false,
     });
     assert!(!found(&app, text::CANCEL));
 }
