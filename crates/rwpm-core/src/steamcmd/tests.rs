@@ -291,3 +291,68 @@ fn a_tar_with_folders_is_unpacked_the_same_on_every_system() {
         b"elf"
     );
 }
+
+/// The archive this system's Valve file would be, with a fake program inside.
+fn fake_bootstrap() -> Vec<u8> {
+    if cfg!(windows) {
+        zip_of(&[("steamcmd.exe", b"MZ", 0o755)])
+    } else {
+        tar_gz(&[Item::File("steamcmd.sh", b"#!/bin/sh\n", 0o755)])
+    }
+}
+
+#[test]
+fn installing_needs_consent_and_records_the_first_checksum() {
+    use super::run::{Layout, install_with};
+    use crate::consent::{ConsentStore, Scope};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let app = tmp.path().join("app");
+    let layout = Layout::new(&app);
+    let store = ConsentStore::open(&app);
+    // Another folder's consent is not this one's.
+    let other = store
+        .record(Scope::Steamcmd, &app.join("other"))
+        .expect("other");
+    let err = install_with(&layout, &other, None, || {
+        panic!("no download without consent")
+    })
+    .expect_err("no consent");
+    assert!(matches!(err, Error::NoConsent), "{err}");
+    assert!(!layout.installed());
+
+    let consent = store
+        .record(Scope::Steamcmd, layout.root())
+        .expect("consent");
+    let first = install_with(&layout, &consent, None, || Ok(fake_bootstrap())).expect("install");
+    assert_eq!(first.as_deref().map(str::len), Some(64));
+    assert!(layout.installed());
+    // Already there: nothing is downloaded and nothing new is recorded.
+    let again = install_with(&layout, &consent, first.as_deref(), || {
+        panic!("already installed")
+    })
+    .expect("again");
+    assert_eq!(again, None);
+}
+
+#[test]
+fn a_changed_archive_is_refused_before_anything_is_unpacked() {
+    use super::run::{Layout, install_with};
+    use crate::consent::{ConsentStore, Scope};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = Layout::new(tmp.path());
+    let consent = ConsentStore::open(tmp.path())
+        .record(Scope::Steamcmd, layout.root())
+        .expect("consent");
+    let recorded = "ab".repeat(32);
+    let err = install_with(&layout, &consent, Some(&recorded), || Ok(fake_bootstrap()))
+        .expect_err("changed");
+    assert!(matches!(err, Error::Changed { .. }), "{err}");
+    assert!(!layout.installed());
+    assert!(is_empty(layout.root()));
+    // The same bytes under their real checksum pass.
+    let Seen::First(real) = check_hash(None, &fake_bootstrap()).expect("hash") else {
+        panic!("first");
+    };
+    install_with(&layout, &consent, Some(&real), || Ok(fake_bootstrap())).expect("install");
+    assert!(layout.installed());
+}

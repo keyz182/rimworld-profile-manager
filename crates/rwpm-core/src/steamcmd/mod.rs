@@ -9,6 +9,8 @@
 use std::path::PathBuf;
 
 pub mod download;
+pub mod output;
+pub mod run;
 pub mod unpack;
 
 #[cfg(test)]
@@ -58,6 +60,8 @@ pub const MAX_ENTRIES: usize = 1000;
 pub enum Error {
     #[error("Could not download steamcmd from Valve: {0}")]
     Download(String),
+    #[error("steamcmd is not downloaded until you agree to it.")]
+    NoConsent,
     #[error(
         "Valve's steamcmd file is bigger than {} MB, so it was thrown away.",
         MAX_ARCHIVE_BYTES / 1024 / 1024

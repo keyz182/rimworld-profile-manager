@@ -17,6 +17,8 @@ pub enum Scope {
     RimsortSettings,
     /// Put our `winhttp.dll` beside `RimWorldWin64.exe` (Windows OFFLINE, V6).
     WinhttpDll,
+    /// Download steamcmd from Valve into this app's own `steamcmd` folder and run it (T82).
+    Steamcmd,
 }
 
 /// Proof of recorded consent for one scope and target path.

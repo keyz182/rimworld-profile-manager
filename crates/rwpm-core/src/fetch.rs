@@ -167,10 +167,10 @@ fn spawn(helper: &Path, op: &str, args: &[String]) -> Result<Child, String> {
     }
 }
 
-const BUSY_TRIES: u32 = 10;
-const BUSY_WAIT: Duration = Duration::from_millis(30);
+pub(crate) const BUSY_TRIES: u32 = 10;
+pub(crate) const BUSY_WAIT: Duration = Duration::from_millis(30);
 
-fn is_busy(error: &std::io::Error) -> bool {
+pub(crate) fn is_busy(error: &std::io::Error) -> bool {
     error.kind() == std::io::ErrorKind::ExecutableFileBusy
 }
 
@@ -249,7 +249,7 @@ fn run_helper(
 }
 
 /// The package id the pack names, as the mod's own About.xml would write it.
-fn plain_id(id: &str) -> String {
+pub(crate) fn plain_id(id: &str) -> String {
     let lower = id.to_lowercase();
     lower
         .strip_suffix(STEAM_POSTFIX)
@@ -257,7 +257,7 @@ fn plain_id(id: &str) -> String {
 }
 
 /// `Ok` when the folder Steam delivered holds the mod the pack named; `Err` says what is there.
-fn check_identity(workshop_dir: &Path, id: u64, expected: &str) -> Result<(), String> {
+pub(crate) fn check_identity(workshop_dir: &Path, id: u64, expected: &str) -> Result<(), String> {
     let folder = workshop_dir.join(id.to_string());
     let found = about_field(&folder, "packageId").map(|f| f.to_lowercase());
     match found {
