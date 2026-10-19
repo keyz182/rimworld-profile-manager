@@ -11,6 +11,14 @@ use crate::event::{Event, Fresh};
 
 /// No change in an item for this long fails it.
 pub const STALL: Duration = Duration::from_secs(60);
+/// Wait this long before the first subscribe or unsubscribe call. To Steam, starting this
+/// program starts the game, and Steam then fetches the account's subscription list; a call
+/// that lands before that list arrives can be undone by it (SPEC T82, stall trials). The list
+/// came within about 1 s in about 10 runs, so this is an ESTIMATE with some margin.
+pub const SETTLE: Duration = Duration::from_secs(3);
+/// No answer to a call for this long: ask once more. An ESTIMATE: calls that worked took
+/// 4-7 s including the download.
+pub const RESEND_AFTER: Duration = Duration::from_secs(15);
 const STEP: Duration = Duration::from_millis(200);
 
 /// What Steam says about one item right now.
@@ -72,6 +80,10 @@ struct Pending {
     fresh: Fresh,
     last: Item,
     changed_at: Duration,
+    /// Steam's state has shown what was asked while waiting for the answer.
+    seen: bool,
+    /// The call has been made a second time.
+    resent: bool,
 }
 
 enum Begin {
@@ -106,6 +118,50 @@ fn finished(op: Op, item: Item) -> bool {
     }
 }
 
+/// One step of waiting for the answer to a subscribe or unsubscribe call. `Err` fails the id.
+///
+/// The call is made once more when it looks lost: Steam's state showed what was asked and then
+/// went back (the subscription list Steam fetched at start undid it), or no answer came for
+/// [`RESEND_AFTER`].
+fn wait_answer(
+    op: Op,
+    p: &mut Pending,
+    answer: Option<&Result<(), String>>,
+    backend: &mut dyn Backend,
+    now: Duration,
+) -> Result<(), String> {
+    match answer {
+        // After a second call, an error may belong to the lost first one, and a second call to
+        // what Steam already holds may answer with one (T82 review M4, M5): Steam's own state
+        // and the stall limit decide instead.
+        Some(Err(_)) if p.resent => {}
+        Some(Err(reason)) => return Err(reason.clone()),
+        // Steam has acknowledged the call. It is not done until Steam's own state shows it
+        // (stage `Download`): a program that exits on the acknowledgement alone can leave the
+        // change unsaved.
+        Some(Ok(())) => {
+            p.stage = Stage::Download;
+            p.changed_at = now;
+            return Ok(());
+        }
+        None => {}
+    }
+    let asked = backend.item(p.id).subscribed == matches!(op, Op::Subscribe);
+    if p.resent {
+        if asked {
+            p.stage = Stage::Download;
+        }
+    } else if asked {
+        p.seen = true;
+    } else if p.seen || now.saturating_sub(p.changed_at) >= RESEND_AFTER {
+        eprintln!("rwpm-steam: no answer for {}, asking again", p.id);
+        backend.start(op, p.id)?;
+        p.resent = true;
+        p.changed_at = now;
+    }
+    Ok(())
+}
+
 /// Runs `op` on `ids`. Returns how many ids failed.
 pub fn run(
     op: Op,
@@ -115,6 +171,21 @@ pub fn run(
     stop: &AtomicBool,
     emit: &mut dyn FnMut(Event),
 ) -> usize {
+    let mut now = Duration::ZERO;
+    if matches!(op, Op::Subscribe | Op::Unsubscribe) {
+        while now < SETTLE {
+            if stop.load(Ordering::Relaxed) {
+                for &id in ids {
+                    emit(Event::Fail {
+                        id,
+                        reason: "cancelled".into(),
+                    });
+                }
+                return ids.len();
+            }
+            now = clock.step();
+        }
+    }
     let mut failed = 0;
     let mut pending = Vec::new();
     for &id in ids {
@@ -131,7 +202,9 @@ pub fn run(
                 stage,
                 fresh,
                 last: Item::default(),
-                changed_at: Duration::ZERO,
+                changed_at: now,
+                seen: false,
+                resent: false,
             }),
         }
     }
@@ -150,25 +223,12 @@ pub fn run(
         let answers = backend.poll();
         let mut still = Vec::new();
         for mut p in pending {
-            if let (Stage::Answer, Some((_, answer))) =
-                (p.stage, answers.iter().find(|(id, _)| *id == p.id))
-            {
-                match answer {
-                    Err(reason) => {
-                        failed += 1;
-                        emit(Event::Fail {
-                            id: p.id,
-                            reason: reason.clone(),
-                        });
-                        continue;
-                    }
-                    // Steam has acknowledged the call. It is not done until Steam's own
-                    // state shows it (below): a program that exits on the acknowledgement
-                    // alone can leave the change unsaved.
-                    Ok(()) => {
-                        p.stage = Stage::Download;
-                        p.changed_at = now;
-                    }
+            if let Stage::Answer = p.stage {
+                let answer = answers.iter().find(|(id, _)| *id == p.id).map(|(_, a)| a);
+                if let Err(reason) = wait_answer(op, &mut p, answer, backend, now) {
+                    failed += 1;
+                    emit(Event::Fail { id: p.id, reason });
+                    continue;
                 }
             }
             if let Stage::Download = p.stage {

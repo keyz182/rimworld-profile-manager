@@ -1,4 +1,6 @@
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use super::*;
 
@@ -36,8 +38,21 @@ struct Fake {
     script: HashMap<u64, Vec<Item>>,
     at: usize,
     started: Vec<(Op, u64)>,
+    /// The clock's seconds at each start.
+    started_at: Vec<u64>,
+    clock: Rc<Cell<u64>>,
     refuse: HashSet<u64>,
+    /// Refused only when asked a second time.
+    refuse_again: HashSet<u64>,
+    /// Given at the first poll after the id was started (`starts_needed` times, default once).
     answers: HashMap<u64, Result<(), String>>,
+    starts_needed: HashMap<u64, usize>,
+}
+
+impl Fake {
+    fn starts(&self, id: u64) -> usize {
+        self.started.iter().filter(|(_, i)| *i == id).count()
+    }
 }
 
 impl Backend for Fake {
@@ -48,7 +63,8 @@ impl Backend for Fake {
 
     fn start(&mut self, op: Op, id: u64) -> Result<(), String> {
         self.started.push((op, id));
-        if self.refuse.contains(&id) {
+        self.started_at.push(self.clock.get());
+        if self.refuse.contains(&id) || (self.refuse_again.contains(&id) && self.starts(id) > 1) {
             Err("Steam said no".into())
         } else {
             Ok(())
@@ -57,17 +73,25 @@ impl Backend for Fake {
 
     fn poll(&mut self) -> Vec<(u64, Result<(), String>)> {
         self.at += 1;
-        self.answers.drain().collect()
+        let due: Vec<u64> = self
+            .answers
+            .keys()
+            .copied()
+            .filter(|id| self.starts(*id) >= self.starts_needed.get(id).copied().unwrap_or(1))
+            .collect();
+        due.into_iter()
+            .filter_map(|id| self.answers.remove(&id).map(|a| (id, a)))
+            .collect()
     }
 }
 
-/// One second per step.
-struct Seconds(u64);
+/// One second per step, shared with the fake so it can note when calls were made.
+struct Seconds(Rc<Cell<u64>>);
 
 impl Clock for Seconds {
     fn step(&mut self) -> Duration {
-        self.0 += 1;
-        Duration::from_secs(self.0)
+        self.0.set(self.0.get() + 1);
+        Duration::from_secs(self.0.get())
     }
 }
 
@@ -77,7 +101,8 @@ fn go(op: Op, ids: &[u64], fake: &mut Fake) -> (usize, Vec<String>) {
 
 fn go_stopping(op: Op, ids: &[u64], fake: &mut Fake, stop: &AtomicBool) -> (usize, Vec<String>) {
     let mut lines = Vec::new();
-    let failed = run(op, ids, fake, &mut Seconds(0), stop, &mut |e| {
+    let mut clock = Seconds(Rc::clone(&fake.clock));
+    let failed = run(op, ids, fake, &mut clock, stop, &mut |e| {
         lines.push(e.to_string());
     });
     (failed, lines)
@@ -249,4 +274,124 @@ fn the_stop_flag_ends_the_run_and_fails_what_is_left() {
     let (failed, lines) = go_stopping(Op::Download, &[1, 2], &mut f, &stop);
     assert_eq!(failed, 1);
     assert_eq!(lines, ["ok 2 already", "fail 1 cancelled"]);
+}
+
+#[test]
+fn no_subscribe_or_unsubscribe_call_is_made_before_the_settle_time() {
+    let settle = SETTLE.as_secs();
+    assert!(settle >= 1, "there is a settle time at all");
+    for op in [Op::Subscribe, Op::Unsubscribe] {
+        let before = if op == Op::Subscribe {
+            ABSENT
+        } else {
+            SUBSCRIBED
+        };
+        let mut f = fake(&[(7, vec![before])]);
+        let _ = go(op, &[7], &mut f);
+        assert_eq!(f.started_at.first(), Some(&settle), "{op:?}");
+    }
+    let mut f = fake(&[(5, vec![ABSENT, INSTALLED])]);
+    let _ = go(Op::Download, &[5], &mut f);
+    assert_eq!(f.started_at, [0], "a download does not wait");
+}
+
+#[test]
+fn the_stop_flag_during_the_settle_time_cancels_everything_without_a_call() {
+    let mut f = fake(&[(1, vec![ABSENT]), (2, vec![ABSENT])]);
+    let stop = AtomicBool::new(true);
+    let (failed, lines) = go_stopping(Op::Subscribe, &[1, 2], &mut f, &stop);
+    assert_eq!(failed, 2);
+    assert_eq!(lines, ["fail 1 cancelled", "fail 2 cancelled"]);
+    assert!(f.started.is_empty());
+}
+
+/// What Steam's log showed: the subscription arrives, then the list Steam fetched at start
+/// removes it, and no answer ever comes. The call is made once more.
+#[test]
+fn a_subscription_that_steam_undoes_is_asked_for_once_more() {
+    let arriving = item(true, false, true, None);
+    let mut f = fake(&[(
+        7,
+        vec![
+            ABSENT,
+            arriving,
+            ABSENT,
+            ABSENT,
+            item(true, false, true, Some((1, 2))),
+            SUBSCRIBED,
+        ],
+    )]);
+    f.answers.insert(7, Ok(()));
+    f.starts_needed.insert(7, 2);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(
+        (failed, lines),
+        (0, vec!["progress 7 1 2".into(), "ok 7 new".into()])
+    );
+    assert_eq!(f.started, [(Op::Subscribe, 7), (Op::Subscribe, 7)]);
+    assert!(
+        f.started_at[1] < SETTLE.as_secs() + RESEND_AFTER.as_secs(),
+        "asked again at once, not after the resend time"
+    );
+}
+
+#[test]
+fn an_unsubscribe_that_steam_undoes_is_asked_for_once_more() {
+    let mut f = fake(&[(
+        4,
+        vec![SUBSCRIBED, INSTALLED, SUBSCRIBED, SUBSCRIBED, INSTALLED],
+    )]);
+    f.answers.insert(4, Ok(()));
+    f.starts_needed.insert(4, 2);
+    let (failed, lines) = go(Op::Unsubscribe, &[4], &mut f);
+    assert_eq!((failed, lines), (0, vec!["ok 4 new".to_owned()]));
+    assert_eq!(f.started, [(Op::Unsubscribe, 4), (Op::Unsubscribe, 4)]);
+    assert!(f.started_at[1] < SETTLE.as_secs() + RESEND_AFTER.as_secs());
+}
+
+#[test]
+fn no_answer_for_the_resend_time_asks_once_more() {
+    let mut steps = vec![ABSENT; 25];
+    steps.push(SUBSCRIBED);
+    let mut f = fake(&[(7, steps)]);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!((failed, lines), (0, vec!["ok 7 new".to_owned()]));
+    let resend = SETTLE.as_secs() + RESEND_AFTER.as_secs();
+    assert_eq!(f.started_at, [SETTLE.as_secs(), resend]);
+}
+
+/// Review M4, M5: after the second call an error may belong to the lost first one, so Steam's
+/// own state decides.
+#[test]
+fn after_a_resend_an_error_answer_does_not_fail_what_steam_shows_done() {
+    let arriving = item(true, false, true, None);
+    let mut f = fake(&[(
+        7,
+        vec![ABSENT, arriving, ABSENT, ABSENT, arriving, SUBSCRIBED],
+    )]);
+    f.answers.insert(7, Err("timeout".into()));
+    f.starts_needed.insert(7, 2);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!((failed, lines), (0, vec!["ok 7 new".to_owned()]));
+}
+
+#[test]
+fn the_call_is_repeated_at_most_once_then_the_stall_limit_fails_it() {
+    let mut f = fake(&[(7, vec![ABSENT])]);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(failed, 1);
+    assert_eq!(lines, ["fail 7 Steam made no progress for 60 seconds"]);
+    assert_eq!(f.started.len(), 2);
+}
+
+#[test]
+fn a_refused_second_call_fails_with_steams_reason() {
+    let mut f = fake(&[(7, vec![ABSENT])]);
+    f.refuse_again.insert(7);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(
+        (failed, lines),
+        (1, vec!["fail 7 Steam said no".to_owned()])
+    );
+    assert_eq!(f.started.len(), 2);
 }
