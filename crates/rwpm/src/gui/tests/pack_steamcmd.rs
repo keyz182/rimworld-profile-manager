@@ -174,8 +174,13 @@ fn agreeing_records_it_and_shows_the_mods_and_the_next_time_skips_the_question()
     for name in ["Mod 0", "Mod 1", "Mod 2"] {
         assert!(found(&app, name), "{name}");
     }
-    assert!(found(&app, &text::download_about(3)));
-    assert!(found(&app, text::CMD_VIA));
+    assert!(found(&app, text::CMD_DOWNLOAD_TITLE));
+    assert!(found(&app, &text::cmd_download_about(3)));
+    assert!(found(&app, text::CMD_DOWNLOAD_KEEPS));
+    assert!(
+        !found(&app, text::DOWNLOAD_TITLE),
+        "it must not say Steam does the download"
+    );
     assert!(found(&app, text::SUBSCRIBE_TRUST), "the warning stays");
     assert!(!found(&app, text::SUBSCRIBE_KEEPS), "nothing is subscribed");
     assert!(app.job.is_none(), "nothing starts before the player agrees");

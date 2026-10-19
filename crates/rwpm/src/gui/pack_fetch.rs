@@ -519,7 +519,14 @@ pub fn confirm_subscribe_dialog(preview: &PackPreview) -> Element<'_, Message> {
     }
     let count = preview.missing.len();
     // OFFLINE downloads private copies and does not subscribe; the wording says which.
-    let (title, about, keeps, go) = if preview.offline {
+    let (title, about, keeps, go) = if preview.via_cmd {
+        (
+            t::CMD_DOWNLOAD_TITLE,
+            t::cmd_download_about(count),
+            t::CMD_DOWNLOAD_KEEPS,
+            t::DOWNLOAD_IT,
+        )
+    } else if preview.offline {
         (
             t::DOWNLOAD_TITLE,
             t::download_about(count),
@@ -543,7 +550,6 @@ pub fn confirm_subscribe_dialog(preview: &PackPreview) -> Element<'_, Message> {
             .font(UI_BOLD)
             .style(theme::warning),
         text(keeps).size(13),
-        text(if preview.via_cmd { t::CMD_VIA } else { "" }).size(13),
         buttons(go, Some(Message::Confirm), false),
     ]
     .spacing(10)

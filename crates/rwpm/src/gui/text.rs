@@ -975,7 +975,9 @@ pub const OFFLINE_CONFLICTS: &str = "some mods are installed in more than one pl
 
 // The steamcmd route: Valve's own downloader, for a machine with no Steam client (T82c).
 pub const CMD_NOTE: &str = "Steam cannot be reached here, so Valve's steamcmd can download the mods into an OFFLINE profile instead.";
-pub const CMD_VIA: &str = "Valve's steamcmd does the download. No Steam client is needed.";
+pub const CMD_DOWNLOAD_TITLE: &str = "Download with steamcmd";
+pub const CMD_DOWNLOAD_KEEPS: &str =
+    "You are not subscribed to anything, so the mods do not update. No Steam client is needed.";
 pub const CMD_CONSENT_TITLE: &str = "Download steamcmd";
 pub const CMD_CONSENT_ABOUT: &str =
     "steamcmd is Valve's own command-line downloader for Steam. To get the mods, this app will:";
@@ -989,6 +991,11 @@ pub const CMD_CONSENT_GO: &str = "Download steamcmd and continue";
 pub const CMD_NO_CONSENT: &str = "steamcmd is not downloaded until you agree to it.";
 pub const CMD_CHANGED_TITLE: &str = "steamcmd file changed";
 pub const CMD_TRUST_IT: &str = "Trust the new file";
+
+pub fn cmd_download_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("This makes a new OFFLINE profile and downloads {mods} with steamcmd into it:")
+}
 
 pub fn cmd_changed_about(first: &str, found: &str) -> String {
     format!(
