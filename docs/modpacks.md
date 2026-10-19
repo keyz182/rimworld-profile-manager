@@ -65,7 +65,33 @@ Each list shows the first 200 mods. A longer list ends with "and N more".
 1. Choose "Open Steam page" for each mod in the first list. Subscribe to it in Steam.
 2. Or use "Export to RimSort" on the new profile. RimSort then offers to download the missing mods. It can only do this when its Steam database is switched on. That is RimSort's default.
 
-This version does not download or subscribe by itself.
+The app can also get the mods for you, by one of two routes. It offers only the route that works on your computer.
+
+#### With the Steam client
+
+Use this when Steam is running. Choose "Restore and subscribe…". The app lists the mod names from the pack and then subscribes you in Steam. Steam keeps the subscriptions and updates the mods. "Remove subscriptions from the pack" in the More menu removes exactly the ones the app added.
+
+Tick "Make it an OFFLINE profile" first to download private copies instead. The app does not subscribe you then, and the mods do not update.
+
+#### With steamcmd
+
+Use this when the app cannot reach Steam. It makes an OFFLINE profile and downloads the mods into it.
+
+1. Open the pack. Choose "Restore and download…".
+2. The first time, the app says what it will download and run. Choose "Download steamcmd and continue" to agree.
+3. Check the list of mods. Choose "Download".
+
+What happens:
+
+- steamcmd is Valve's own downloader. The app downloads it from Valve once, over HTTPS, and keeps it in its own folder.
+- The app saves a fingerprint of that file. If Valve's file changes later, the app stops before it makes a profile. It shows both fingerprints. Trust the new file only if you expect a change.
+- steamcmd signs in to Steam without an account. It then updates itself from Valve. The app does not check those updates.
+- The app downloads in batches. A pack can have any number of mods.
+- If one mod fails, the profile stays LIVE and the app lists what failed.
+- The app deletes steamcmd's copies of the mods after the profile has its own.
+- On Linux, steamcmd needs the 32-bit system libraries. On a Mac, it needs Rosetta 2. The app says so when it cannot start.
+
+In both routes, a mod must name the package id that the pack promised. If it does not, the app does not keep it.
 
 ## Limits
 

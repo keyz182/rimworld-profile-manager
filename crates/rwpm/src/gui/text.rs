@@ -144,7 +144,7 @@ pub const HELP_SECTIONS: [(&str, &str); 9] = [
     ),
     (
         "Modpacks",
-        "\"Share as modpack…\" in the More menu saves a profile's mod list as one .rimpack file, with the mod settings, creations and saves you choose. A pack holds no mods and no game files. \"Open modpack…\" under the profile list reads a pack, shows which mods you have, which to get from Steam and which to find yourself, and makes a new profile. Get the missing mods before you play. Mod settings can hold private details, such as account logins: only share settings you have checked.",
+        "\"Share as modpack…\" in the More menu saves a profile's mod list as one .rimpack file, with the mod settings, creations and saves you choose. A pack holds no mods and no game files. \"Open modpack…\" under the profile list reads a pack, shows which mods you have, which to get from Steam and which to find yourself, and makes a new profile. The app can subscribe to the missing mods in Steam, or download them into an OFFLINE profile with Valve's steamcmd when Steam cannot be reached. Otherwise, get the missing mods before you play. Mod settings can hold private details, such as account logins: only share settings you have checked.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";
