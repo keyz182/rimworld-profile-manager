@@ -19,6 +19,7 @@ pub mod profile;
 pub mod rimsort;
 pub mod settings;
 pub mod space;
+pub mod steamcmd;
 pub mod winhttp;
 
 pub use error::ProfileError;
