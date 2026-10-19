@@ -500,6 +500,32 @@ fn render_screens_manual() {
     let _ = app.update(Message::RestorePicked(Some(file)));
     shot(&app, "25-restore-dialog");
 
+    // T81: the Share dialog (two saves, one chosen to start from; the privacy notice
+    // shows) and the Open modpack question on a computer that lacks some of the mods.
+    let shared = Sandbox::new();
+    let id = modpacks::live_profile(&shared, "Ironman", &["ludeon.rimworld"]);
+    modpacks::put(&shared, &id, "Config/Mod_1_A.xml", "<a/>");
+    modpacks::put(&shared, &id, "Saves/colony.rws", "save");
+    modpacks::put(&shared, &id, "Saves/start.rws", "save");
+    let mut app = backups::selected(&shared, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(Message::ShareSave(1, true));
+    let _ = app.update(Message::ShareStart(Some(1)));
+    shot(&app, "26-share-dialog");
+    let opened = Sandbox::new();
+    let pack = pack_open::make_pack(
+        &opened,
+        vec![
+            pack_open::entry("brrainz.harmony", "Harmony", Some(2009463077)),
+            pack_open::entry("x.missing", "Get Me", Some(123)),
+            pack_open::entry("y.manual", "Find Me", None),
+        ],
+        Some("1.5.1 rev1"),
+        &["ludeon.rimworld.royalty"],
+    );
+    let app = pack_open::shown(&opened, pack_open::preview(&opened, &pack, true));
+    shot(&app, "27-open-pack-dialog");
+
     let many = Sandbox::new();
     let store = many.ctx().store().expect("store");
     store
@@ -1614,10 +1640,11 @@ fn help_keeps_ok_on_screen_at_the_smallest_window() {
 fn help_grows_only_as_tall_as_its_text() {
     let (tall_ok, _) = help_bounds(1400.0);
     let (short_ok, _) = help_bounds(600.0);
-    // Centred, with the dialog as tall as its text: well clear of the window's bottom edge
-    // (it sat at y=1350 when the dialog filled the window).
+    // Centred, with the dialog as tall as its text: clear of the window's bottom edge (it sat
+    // at y=1350 when the dialog filled the window). Each new Help section makes the text
+    // taller, so the line sits between the natural height and that failure.
     assert!(
-        tall_ok.y + tall_ok.height < 1200.0,
+        tall_ok.y + tall_ok.height < 1300.0,
         "OK sits at {} in a 1400 px window",
         tall_ok.y
     );

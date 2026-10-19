@@ -54,6 +54,18 @@ To use a backup, choose "Restore backup…" under the profile list and pick the 
 
 A backup holds other people's mods. Check each mod's licence or ask its author before you share a backup. A backup with game files holds RimWorld's own files: do not share it. See [Backups](docs/backups.md) for the steps and the limits.
 
+## Modpacks
+
+A modpack is a small file that names the mods of a profile, in load order. The file name ends in `.rimpack`. It holds no mods and no game files. Use it to share a setup.
+
+1. Select a profile. Choose "⋯", then "Share as modpack…".
+2. Tick what goes in: mod settings, your own scenarios and similar, game settings and saves. The mod list is always in.
+3. Choose "Share", then choose where to save the file.
+
+To use a modpack, choose "Open modpack…" under the profile list and pick the `.rimpack` file. The app makes a new profile and shows which mods you have, which to get from Steam and which to find yourself. On Windows (installer) and Linux you can also double-click a `.rimpack` file.
+
+Mod settings can hold private details, such as account logins. Only share settings you have checked. See [Modpacks](docs/modpacks.md) for the steps and the limits.
+
 ## How it works
 
 - Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.

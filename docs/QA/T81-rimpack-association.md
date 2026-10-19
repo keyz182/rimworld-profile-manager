@@ -5,7 +5,7 @@ Check that a double-click on a `.rimpack` file opens this app on the "Open a mod
 - **Platform:** Windows 10 or 11 (installer), and Linux (tar.gz and AppImage). macOS is out of scope (T76).
 - **Time:** about 20 minutes.
 - **Needs:** one `.rimpack` file made with "Share as modpack…" (see the T81 runbook).
-- **Not covered by the automated tests:** the Windows steps and every double-click. The tests check the files the installers write, run the Linux script against a scratch home folder, and check that a `.rimpack` argument reaches the Open dialog. The Windows installer was not compiled where these tests ran.
+- **Not covered by the automated tests:** the Windows steps and every double-click. The tests check the files the installers write, run the Linux script against a scratch home folder, and check that a `.rimpack` argument reaches the Open dialog. The tests do not compile the Windows installer. CI does, and it was also compiled once by hand with warnings as errors.
 
 ## What this does to your computer
 

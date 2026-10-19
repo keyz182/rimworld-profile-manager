@@ -109,7 +109,7 @@ pub const TIP_GO_LIVE: &str =
 
 // Help.
 pub const HELP_TITLE: &str = "How profiles work";
-pub const HELP_SECTIONS: [(&str, &str); 8] = [
+pub const HELP_SECTIONS: [(&str, &str); 9] = [
     (
         "Profiles",
         "Each profile has its own saves, settings and mod list. Playing one never touches another.",
@@ -141,6 +141,10 @@ pub const HELP_SECTIONS: [(&str, &str); 8] = [
     (
         "Backups",
         "\"Back up…\" in the More menu saves an OFFLINE profile as one .rimrim file: its mods and settings, and, if you choose, its saves, log files and game files. \"Restore backup…\" makes a new profile from a .rimrim file and never changes a profile you already have. A backup holds other people's mods. Check each mod's licence or ask its author before you share it. Game files are RimWorld's own: do not share them.",
+    ),
+    (
+        "Modpacks",
+        "\"Share as modpack…\" in the More menu saves a profile's mod list as one .rimpack file, with the mod settings, creations and saves you choose. A pack holds no mods and no game files. \"Open modpack…\" under the profile list reads a pack, shows which mods you have, which to get from Steam and which to find yourself, and makes a new profile. Get the missing mods before you play. Mod settings can hold private details, such as account logins: only share settings you have checked.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";
