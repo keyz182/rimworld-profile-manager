@@ -152,6 +152,12 @@ impl App {
                 t::RESTORE_MENU,
                 self.blocked().is_none().then_some(Message::RestoreBackup),
                 theme::ghost
+            ),
+            action(
+                Icon::Folder,
+                t::OPEN_PACK_MENU,
+                self.blocked().is_none().then_some(Message::OpenPack),
+                theme::ghost
             )
         ]
         .spacing(GAP)

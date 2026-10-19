@@ -76,11 +76,12 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         Dialog::Backup(draft) => backup_dialog(draft),
         Dialog::Restore(plan) => restore_dialog(plan),
         Dialog::Share(draft) => share_dialog(draft),
+        Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview),
         Dialog::Help => help_dialog(help_list_height(600.0)),
     }
 }
 
-fn heading(words: &str) -> iced::widget::Text<'_> {
+pub(super) fn heading(words: &str) -> iced::widget::Text<'_> {
     text(words).size(18).font(UI_BOLD)
 }
 
@@ -130,7 +131,7 @@ pub fn help_layer(window_height: f32) -> Element<'static, Message> {
 }
 
 /// Cancel and the main button; the main button is disabled until `ok` is set.
-fn buttons(label: &str, ok: Option<Message>, danger: bool) -> Element<'_, Message> {
+pub(super) fn buttons(label: &str, ok: Option<Message>, danger: bool) -> Element<'_, Message> {
     row![
         space::horizontal(),
         button(t::CANCEL)

@@ -5,9 +5,6 @@
 //! manifest rules, and an entry that fails is left out and named in `skipped`, so one odd
 //! mod cannot make the whole pack invalid.
 
-use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
-
 use super::file::{ModEntry, check_link, check_package_id};
 use crate::builds::{EffectiveGame, acf};
 use crate::error::ProfileError;
@@ -16,11 +13,11 @@ use crate::mods::{
 };
 use crate::profile::file::FILE_NAME as PROFILE_FILE;
 use crate::profile::{ModSource, Mode, Profile, ProfileFile};
+use std::collections::{BTreeMap, HashMap};
 
 /// Core is always on, so it is not a choice a pack records.
 const CORE: &str = "ludeon.rimworld";
 const WORKSHOP_PAGE: &str = "https://steamcommunity.com/sharedfiles/filedetails/?id=";
-const WORKSHOP_ACF: &str = "appworkshop_294100.acf";
 const MAX_NAME: usize = 200;
 const MAX_VERSION: usize = 128;
 
@@ -55,7 +52,7 @@ pub fn gather_mods(profile: &Profile, game: &EffectiveGame) -> Result<Gathered, 
     let workshop = game.steam.as_ref().map(|s| s.workshop_dir.as_path());
     let index = ModIndex::scan(&game.data_dir(), &local, workshop);
     let times = workshop
-        .and_then(workshop_acf)
+        .and_then(acf::workshop_manifest_path)
         .map(|path| acf::read_workshop_times(&path))
         .unwrap_or_default();
     let frozen = if offline {
@@ -147,11 +144,6 @@ fn clean_name(name: &str, id: &str) -> String {
     } else {
         clean.to_owned()
     }
-}
-
-/// `<library>/steamapps/workshop/appworkshop_294100.acf`, two folders above the content dir.
-fn workshop_acf(workshop_dir: &Path) -> Option<PathBuf> {
-    Some(workshop_dir.parent()?.parent()?.join(WORKSHOP_ACF))
 }
 
 /// Source of each frozen copy in an OFFLINE profile, by folder name. An unreadable

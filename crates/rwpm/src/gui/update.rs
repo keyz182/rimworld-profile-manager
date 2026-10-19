@@ -94,6 +94,8 @@ impl App {
                     | M::RestorePicked(_)
                     | M::Share
                     | M::SharePicked(..)
+                    | M::OpenPack
+                    | M::OpenPackPicked(_)
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -118,6 +120,8 @@ impl App {
                     | M::RestorePicked(_)
                     | M::Share
                     | M::SharePicked(..)
+                    | M::OpenPack
+                    | M::OpenPackPicked(_)
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -133,6 +137,7 @@ impl App {
                         | Dialog::Backup(_)
                         | Dialog::Restore(_)
                         | Dialog::Share(_)
+                        | Dialog::OpenPack(_)
                 )
             }))
     }
@@ -239,6 +244,10 @@ impl App {
             | Message::ShareSave(..)
             | Message::ShareStart(_)
             | Message::SharePicked(..) => return self.modpack_update(message),
+            Message::OpenPack
+            | Message::OpenPackPicked(_)
+            | Message::PackOpened(_)
+            | Message::OpenUrl(_) => return self.pack_update(message),
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -283,6 +292,7 @@ impl App {
         match (&mut self.dialog, field) {
             (Some(Dialog::Name { value: v, .. }), Field::Name) => *v = value,
             (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
+            (Some(Dialog::OpenPack(preview)), Field::Name) => preview.plan.name = value,
             (Some(Dialog::Share(draft)), Field::Description) => draft.description = value,
             (Some(Dialog::Share(draft)), Field::Link) => draft.link = value,
             (
@@ -410,6 +420,11 @@ impl App {
                 self.dialog = Some(Dialog::Share(draft));
             }
             Some(Dialog::Share(draft)) => return self.pick_share_save(*draft),
+            Some(Dialog::OpenPack(preview)) if !preview.ready() => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::OpenPack(preview));
+            }
+            Some(Dialog::OpenPack(preview)) => return self.pack_restore_job(*preview),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}

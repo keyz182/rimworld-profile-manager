@@ -10,6 +10,7 @@ use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
 use super::modpack::{ShareDraft, ShareTick};
+use super::modpack_open::PackPreview;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -110,6 +111,14 @@ pub enum Message {
     ShareStart(Option<usize>),
     /// The file chosen to save the pack in; `None` when the dialog was closed.
     SharePicked(Box<ShareDraft>, Option<PathBuf>),
+    /// "Open modpack…": open the file dialog (T81b).
+    OpenPack,
+    /// The pack chosen to open; `None` when the dialog was closed.
+    OpenPackPicked(Option<PathBuf>),
+    /// A pack's contents, checked against what is installed.
+    PackOpened(Box<PackPreview>),
+    /// A Steam page link in the Open dialog (Steam pages only).
+    OpenUrl(String),
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -224,5 +233,7 @@ pub enum Dialog {
     Restore(Box<RestorePlan>),
     /// What goes in a modpack (T81).
     Share(Box<ShareDraft>),
+    /// A modpack's contents and the name of the profile it will become (T81b).
+    OpenPack(Box<PackPreview>),
     Help,
 }

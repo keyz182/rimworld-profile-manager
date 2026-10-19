@@ -18,6 +18,7 @@ mod builds;
 mod docs;
 mod gating;
 mod modpacks;
+mod pack_open;
 mod picker;
 
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings

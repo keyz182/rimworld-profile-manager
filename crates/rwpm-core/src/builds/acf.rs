@@ -13,7 +13,7 @@
 //! between a branch switch and the download that follows it.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::error::ProfileError;
 
@@ -102,6 +102,17 @@ fn parse(text: &str) -> Option<AppManifest> {
         beta,
         beta_source,
     })
+}
+
+/// `<library>/steamapps/workshop/appworkshop_294100.acf`: two folders above the Workshop
+/// content folder (`<library>/steamapps/workshop/content/294100`).
+pub fn workshop_manifest_path(workshop_dir: &Path) -> Option<PathBuf> {
+    Some(
+        workshop_dir
+            .parent()?
+            .parent()?
+            .join("appworkshop_294100.acf"),
+    )
 }
 
 /// `timeupdated` (unix seconds) of every installed Workshop item, by item id, from

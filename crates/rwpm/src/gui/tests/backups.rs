@@ -10,7 +10,7 @@ use crate::gui::Job;
 use crate::gui::backup::{GameFiles, Tick};
 
 /// No RimWorld running, whatever is on this machine.
-struct Idle;
+pub(super) struct Idle;
 
 impl rwpm_core::profile::RunningProbe for Idle {
     fn is_running(&self, _: &Path) -> bool {

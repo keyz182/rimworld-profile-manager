@@ -879,6 +879,69 @@ pub fn share_description_long(max: usize) -> String {
     format!("The description is longer than {max} characters.")
 }
 
+// Opening a modpack (T81b).
+pub const OPEN_PACK_MENU: &str = "Open modpack…";
+pub const OPEN_PACK_TITLE: &str = "Open a modpack";
+pub const OPEN_PACK_IT: &str = "Restore";
+pub const PICK_PACK_OPEN_TITLE: &str = "Choose a modpack to open";
+pub const PACK_PRESENT: &str = "Mods you already have";
+pub const PACK_MISSING: &str = "Mods to get from Steam";
+pub const PACK_MANUAL: &str = "Mods to find yourself";
+pub const OPEN_STEAM_PAGE: &str = "Open Steam page";
+pub const PACK_NO_GAME: &str =
+    "RimWorld was not found, so the mods could not be checked against what is installed.";
+pub const PACK_HINT: &str = "Get the missing mods before you play. RimSort can fetch them if its Steam database is on: use Export to RimSort, then let RimSort download the rest.";
+
+pub fn pack_about(name: &str, mods: usize, description: &str) -> String {
+    let mods = count(mods, "mod", "mods");
+    if description.trim().is_empty() {
+        format!("“{name}” lists {mods}.")
+    } else {
+        format!("“{name}” lists {mods}.\n{}", description.trim())
+    }
+}
+
+pub fn pack_section(title: &str, shown: usize) -> String {
+    format!("{title} ({shown})")
+}
+
+pub fn and_more(more: usize) -> String {
+    format!("and {more} more")
+}
+
+pub fn pack_dlc_missing(ids: &[String]) -> String {
+    format!(
+        "The pack needs expansions you do not have: {}.",
+        ids.join(", ")
+    )
+}
+
+pub fn pack_newer(names: &[String]) -> String {
+    let mods = count(names.len(), "mod", "mods");
+    format!("{mods} you already have changed on Steam since the pack was made.")
+}
+
+pub fn pack_version_differs(pack: &str, here: &str) -> String {
+    format!("The pack was made on game version {pack}. This computer plays {here}.")
+}
+
+pub fn opening_pack(name: &str) -> String {
+    format!("Restoring “{name}”")
+}
+
+pub fn pack_restored(name: &str, still_needed: usize) -> String {
+    let mut line = format!("Restored “{name}” from the modpack.");
+    if still_needed > 0 {
+        let mods = count(still_needed, "mod", "mods");
+        line.push_str(&format!(" {mods} still to get. {PACK_HINT}"));
+    }
+    line
+}
+
+pub fn open_page_failed(reason: &str) -> String {
+    format!("Could not open the page: {reason}")
+}
+
 pub fn sharing(name: &str) -> String {
     format!("Sharing “{name}”")
 }
@@ -1050,6 +1113,7 @@ mod tests {
             ("copy.rs", include_str!("copy.rs")),
             ("backup.rs", include_str!("backup.rs")),
             ("modpack.rs", include_str!("modpack.rs")),
+            ("modpack_open.rs", include_str!("modpack_open.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

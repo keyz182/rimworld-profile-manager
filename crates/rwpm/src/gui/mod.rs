@@ -12,6 +12,7 @@ mod jobs;
 mod keys;
 mod message;
 mod modpack;
+mod modpack_open;
 mod mods;
 mod picker;
 mod setup;
