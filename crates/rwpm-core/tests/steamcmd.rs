@@ -65,8 +65,14 @@ fn run(layout: &Layout, ids: &[u64], quiet: Duration) -> Vec<Status> {
         .collect()
 }
 
+/// Whether a process with this id exists. `kill -0` sends no signal, and works on Linux and
+/// macOS alike (there is no `/proc` on a Mac, which would make this always false).
 fn alive(pid: &str) -> bool {
-    Path::new("/proc").join(pid.trim()).exists()
+    std::process::Command::new("kill")
+        .args(["-0", pid.trim()])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 #[test]
