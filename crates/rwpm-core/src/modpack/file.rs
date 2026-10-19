@@ -18,8 +18,8 @@ const MAX_MODS: usize = 5_000;
 const MAX_TEXT: usize = 512;
 const MAX_ID: usize = 128;
 /// Text a person reads is shown in the app, so it is short (counted in characters).
-const MAX_NAME_CHARS: usize = 100;
-const MAX_DESCRIPTION_CHARS: usize = 2_000;
+pub const MAX_NAME_CHARS: usize = 100;
+pub const MAX_DESCRIPTION_CHARS: usize = 2_000;
 const MAX_VERSION_CHARS: usize = 128;
 
 /// What the pack creator chose to put in. `ModsConfig.xml` is always in.

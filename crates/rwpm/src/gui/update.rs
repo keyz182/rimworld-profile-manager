@@ -92,6 +92,8 @@ impl App {
                     | M::RestoreBackup
                     | M::BackupPicked(..)
                     | M::RestorePicked(_)
+                    | M::Share
+                    | M::SharePicked(..)
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -114,6 +116,8 @@ impl App {
                     | M::RestoreBackup
                     | M::BackupPicked(..)
                     | M::RestorePicked(_)
+                    | M::Share
+                    | M::SharePicked(..)
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -128,6 +132,7 @@ impl App {
                         | Dialog::ConfirmDowngrade { .. }
                         | Dialog::Backup(_)
                         | Dialog::Restore(_)
+                        | Dialog::Share(_)
                 )
             }))
     }
@@ -229,6 +234,11 @@ impl App {
             | Message::BackupPicked(..)
             | Message::RestoreBackup
             | Message::RestorePicked(_) => return self.backup_update(message),
+            Message::Share
+            | Message::ShareTick(..)
+            | Message::ShareSave(..)
+            | Message::ShareStart(_)
+            | Message::SharePicked(..) => return self.modpack_update(message),
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -273,6 +283,8 @@ impl App {
         match (&mut self.dialog, field) {
             (Some(Dialog::Name { value: v, .. }), Field::Name) => *v = value,
             (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
+            (Some(Dialog::Share(draft)), Field::Description) => draft.description = value,
+            (Some(Dialog::Share(draft)), Field::Link) => draft.link = value,
             (
                 Some(Dialog::Settings {
                     game, game_check, ..
@@ -393,6 +405,11 @@ impl App {
                 self.dialog = Some(Dialog::Restore(plan));
             }
             Some(Dialog::Restore(plan)) => return self.restore_job(*plan),
+            Some(Dialog::Share(draft)) if !draft.ready() => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::Share(draft));
+            }
+            Some(Dialog::Share(draft)) => return self.pick_share_save(*draft),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}

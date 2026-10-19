@@ -834,6 +834,76 @@ pub fn restoring(name: &str) -> String {
     format!("Restoring “{name}”")
 }
 
+// Modpacks (T81). A pack holds no mods, so it carries its own notice, not the licence one.
+pub const SHARE_MENU: &str = "Share as modpack…";
+pub const SHARE_TITLE: &str = "Share as a modpack";
+pub const SHARE_IT: &str = "Share";
+pub const SHARE_NOTICE: &str = "This pack holds no mods. Mods may have changed since it was made.";
+pub const SHARE_SETTINGS_NOTICE: &str = "Mod settings can hold private details, such as account logins. Only share settings you have checked.";
+pub const SHARE_MOD_SETTINGS: &str = "Mod settings";
+pub const SHARE_CREATIONS: &str = "Scenarios, ideoligions, xenotypes and exported pawns";
+pub const SHARE_GAME_SETTINGS: &str = "Game settings (screen size, key bindings)";
+pub const SHARE_SAVES: &str = "Saves to include";
+pub const SHARE_NO_SAVES: &str = "This profile has no saves.";
+pub const SHARE_START: &str = "Save to start from";
+pub const SHARE_START_NONE: &str = "No start save";
+pub const SHARE_DESCRIPTION: &str = "Description (optional)";
+pub const SHARE_LINK: &str = "Link to a Steam collection (optional)";
+pub const SHARE_LINK_BAD: &str = "That is not a web address. It must start with https://";
+pub const PICK_SHARE_SAVE_TITLE: &str = "Save the modpack";
+pub const PACK_FILTER: &str = "RimWorld Profile Manager modpack";
+pub const PACK_EXTENSION: &str = "rimpack";
+
+pub fn share_about(name: &str) -> String {
+    format!("“{name}” goes into one .rimpack file: its mod list and the settings you choose below.")
+}
+
+pub fn share_group(label: &str, files: u64, bytes: u64) -> String {
+    let files = count(
+        usize::try_from(files).unwrap_or(usize::MAX),
+        "file",
+        "files",
+    );
+    format!("{label} ({files}, {})", size(bytes))
+}
+
+pub fn share_save(name: &str, bytes: u64) -> String {
+    format!("{name} ({})", size(bytes))
+}
+
+pub fn share_name_long(max: usize) -> String {
+    format!("The profile name is longer than {max} characters. Rename the profile to share it.")
+}
+
+pub fn share_description_long(max: usize) -> String {
+    format!("The description is longer than {max} characters.")
+}
+
+pub fn sharing(name: &str) -> String {
+    format!("Sharing “{name}”")
+}
+
+pub fn shared(
+    name: &str,
+    path: &str,
+    bytes: u64,
+    mods_left_out: usize,
+    files_left_out: usize,
+) -> String {
+    let mut line = format!("Shared “{name}” as {path} ({}).", size(bytes));
+    if mods_left_out > 0 {
+        let mods = count(mods_left_out, "mod", "mods");
+        line.push_str(&format!(" {mods} could not be listed."));
+    }
+    if files_left_out > 0 {
+        let files = count(files_left_out, "file", "files");
+        line.push_str(&format!(
+            " {files} in the chosen settings are not plain data and were left out."
+        ));
+    }
+    line
+}
+
 /// The notes are rwpm-core's own plain words; they follow the line as they are.
 pub fn restored(name: &str, notes: &[rwpm_core::backup::RestoreNote]) -> String {
     let mut line = format!("Restored “{name}”.");
@@ -979,6 +1049,7 @@ mod tests {
             ("health.rs", include_str!("health.rs")),
             ("copy.rs", include_str!("copy.rs")),
             ("backup.rs", include_str!("backup.rs")),
+            ("modpack.rs", include_str!("modpack.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

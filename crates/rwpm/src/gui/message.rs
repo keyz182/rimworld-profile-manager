@@ -9,6 +9,8 @@ use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
+use super::modpack::{ShareDraft, ShareTick};
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Select(ProfileId),
@@ -98,6 +100,16 @@ pub enum Message {
     RestoreBackup,
     /// The backup file chosen to restore; `None` when the dialog was closed.
     RestorePicked(Option<PathBuf>),
+    /// More → "Share as modpack…" (T81).
+    Share,
+    /// Share dialog: a settings box ticked or unticked.
+    ShareTick(ShareTick, bool),
+    /// Share dialog: save number `.0` (in the dialog's list) ticked or unticked.
+    ShareSave(usize, bool),
+    /// Share dialog: the save to start from, by its number; `None` = no start save.
+    ShareStart(Option<usize>),
+    /// The file chosen to save the pack in; `None` when the dialog was closed.
+    SharePicked(Box<ShareDraft>, Option<PathBuf>),
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -114,6 +126,10 @@ pub enum Field {
     GameDir,
     SteamDir,
     MoveTo,
+    /// Share dialog: the pack's description.
+    Description,
+    /// Share dialog: the link to a Steam collection.
+    Link,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -206,5 +222,7 @@ pub enum Dialog {
     Backup(Box<super::backup::Draft>),
     /// A backup file's contents and the name of the profile it will become.
     Restore(Box<RestorePlan>),
+    /// What goes in a modpack (T81).
+    Share(Box<ShareDraft>),
     Help,
 }

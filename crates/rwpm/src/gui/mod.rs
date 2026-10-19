@@ -11,6 +11,7 @@ mod icon;
 mod jobs;
 mod keys;
 mod message;
+mod modpack;
 mod mods;
 mod picker;
 mod setup;

@@ -431,6 +431,7 @@ impl App {
         if !p.is_default() && p.mode == Mode::Offline {
             items.push(item(Icon::Copy, t::BACKUP_MENU, Message::Backup, !wait));
         }
+        items.push(item(Icon::Copy, t::SHARE_MENU, Message::Share, !wait));
         if Os::current() == Os::Windows {
             items.push(item(
                 Icon::Close,

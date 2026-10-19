@@ -53,7 +53,7 @@ pub(super) fn make_backup(sb: &Sandbox, id: &ProfileId, includes: Includes) -> P
     dest
 }
 
-fn wait_for(what: &str, ready: impl Fn() -> bool) {
+pub(super) fn wait_for(what: &str, ready: impl Fn() -> bool) {
     for _ in 0..500 {
         if ready() {
             return;

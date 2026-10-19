@@ -1,0 +1,250 @@
+//! T81: "Share as modpack…". The core's own tests cover the format, the checks on every
+//! string and every refusal; these cover what the window adds: who is offered what, the
+//! defaults and notices, the form's limits, and one real share through the job thread.
+
+use rwpm_core::ProfileError;
+use rwpm_core::modpack;
+
+use super::backups::{selected, wait_for};
+use super::builds::{clicked, found};
+use super::*;
+use crate::gui::Job;
+use crate::gui::modpack::ShareTick;
+
+/// A LIVE profile listing `active` mods.
+fn live_profile(sb: &Sandbox, name: &str, active: &[&str]) -> ProfileId {
+    let id = sb
+        .ctx()
+        .store()
+        .expect("store")
+        .create(name)
+        .expect("create")
+        .id;
+    let items: String = active.iter().map(|a| format!("<li>{a}</li>")).collect();
+    put(
+        sb,
+        &id,
+        "Config/ModsConfig.xml",
+        &format!("<ModsConfigData><activeMods>{items}</activeMods></ModsConfigData>"),
+    );
+    id
+}
+
+/// A file below the profile's save data.
+fn put(sb: &Sandbox, id: &ProfileId, rel: &str, body: &str) {
+    let path = sb
+        .ctx()
+        .store()
+        .expect("store")
+        .root()
+        .join(id.as_str())
+        .join("SaveData")
+        .join(rel);
+    std::fs::create_dir_all(path.parent().expect("parent")).expect("dirs");
+    std::fs::write(path, body).expect("write");
+}
+
+fn draft(app: &App) -> Box<crate::gui::modpack::ShareDraft> {
+    let Some(Dialog::Share(draft)) = app.dialog.clone() else {
+        panic!("{:?}", app.dialog);
+    };
+    draft
+}
+
+#[test]
+fn share_is_in_the_menu_of_every_profile() {
+    let sb = Sandbox::new();
+    let live = live_profile(&sb, "Loose", &["ludeon.rimworld"]);
+    let offline = sb.offline_profile("Frozen", &["ludeon.rimworld"]);
+    for id in [live, offline, ProfileId::default_id()] {
+        let mut app = selected(&sb, &id);
+        let _ = app.update(Message::ToggleMenu);
+        assert!(found(&app, text::SHARE_MENU), "{id}");
+    }
+}
+
+#[test]
+fn share_waits_while_something_runs() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Loose", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::ToggleMenu);
+    let messages = clicked(&app, text::SHARE_MENU);
+    assert!(
+        matches!(messages.as_slice(), [Message::Share]),
+        "{messages:?}"
+    );
+    // The gate is in `update`: a click while a job runs does nothing.
+    app.job = Some(Job {
+        label: "Copying".into(),
+        done: 0,
+        total: 0,
+    });
+    let _ = app.update(Message::Share);
+    assert!(app.dialog.is_none());
+    app.job = None;
+    app.game_running = true;
+    let _ = app.update(Message::Share);
+    assert!(app.dialog.is_none(), "a running game blocks it too");
+}
+
+#[test]
+fn the_share_dialog_starts_with_settings_and_creations_and_warns_about_private_details() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    put(&sb, &id, "Config/Mod_1_A.xml", "<a/>");
+    put(&sb, &id, "Config/Mod_2_B.xml", "<bb/>");
+    put(&sb, &id, "Config/Prefs.xml", "<prefs/>");
+    put(&sb, &id, "Scenarios/s.rsc", "<scenario/>");
+    put(&sb, &id, "Saves/b.rws", "bbb");
+    put(&sb, &id, "Saves/a.rws", "a");
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let d = draft(&app);
+    assert!(d.mod_settings && d.creations && !d.game_settings);
+    assert_eq!(
+        (d.mod_settings_count.files, d.mod_settings_count.bytes),
+        (2, 9)
+    );
+    assert_eq!(d.creations_count.files, 1);
+    assert_eq!(d.game_settings_count.files, 1);
+    let names: Vec<_> = d.saves.iter().map(|s| (s.name.as_str(), s.on)).collect();
+    assert_eq!(names, [("a.rws", false), ("b.rws", false)]);
+    assert_eq!(d.start, None);
+    assert!(found(&app, text::SHARE_SETTINGS_NOTICE));
+    assert!(found(&app, text::SHARE_NOTICE));
+    assert!(d.ready());
+}
+
+#[test]
+fn the_start_save_is_always_a_ticked_save() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    put(&sb, &id, "Saves/a.rws", "a");
+    put(&sb, &id, "Saves/b.rws", "b");
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(Message::ShareStart(Some(0)));
+    assert_eq!(draft(&app).start, None, "an unticked save cannot start");
+    let _ = app.update(Message::ShareSave(0, true));
+    let _ = app.update(Message::ShareStart(Some(0)));
+    assert_eq!(draft(&app).start, Some(0));
+    let _ = app.update(Message::ShareStart(Some(7)));
+    assert_eq!(draft(&app).start, None, "no such save");
+    let _ = app.update(Message::ShareStart(Some(0)));
+    let _ = app.update(Message::ShareSave(0, false));
+    assert_eq!(
+        draft(&app).start,
+        None,
+        "unticking the start save clears it"
+    );
+    let _ = app.update(Message::ShareTick(ShareTick::GameSettings, true));
+    assert!(draft(&app).game_settings);
+}
+
+#[test]
+fn a_profile_with_no_mod_list_cannot_be_shared() {
+    let sb = Sandbox::new();
+    let id = sb
+        .ctx()
+        .store()
+        .expect("store")
+        .create("Fresh")
+        .expect("create")
+        .id;
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    assert!(app.dialog.is_none());
+    let words = ProfileError::NoModList("Fresh".into()).to_string();
+    assert_eq!(app.notice, Some(Notice::Error(words)));
+}
+
+#[test]
+fn the_form_will_not_share_what_the_core_would_refuse() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+
+    let _ = app.update(Message::Input(Field::Link, "javascript:alert(1)".into()));
+    assert!(found(&app, text::SHARE_LINK_BAD));
+    let _ = app.update(Message::Confirm);
+    assert!(matches!(app.dialog, Some(Dialog::Share(_))), "stays open");
+    assert!(app.job.is_none());
+
+    let _ = app.update(Message::Input(
+        Field::Link,
+        "https://steamcommunity.com/x".into(),
+    ));
+    assert!(draft(&app).ready());
+
+    let long = "x".repeat(modpack::file::MAX_DESCRIPTION_CHARS + 1);
+    let _ = app.update(Message::Input(Field::Description, long));
+    assert!(found(
+        &app,
+        &text::share_description_long(modpack::file::MAX_DESCRIPTION_CHARS)
+    ));
+    assert!(!draft(&app).ready());
+    let _ = app.update(Message::Confirm);
+    assert!(matches!(app.dialog, Some(Dialog::Share(_))));
+
+    let name = "n".repeat(modpack::file::MAX_NAME_CHARS + 1);
+    let long_named = live_profile(&sb, &name, &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &long_named);
+    let _ = app.update(Message::Share);
+    assert!(found(
+        &app,
+        &text::share_name_long(modpack::file::MAX_NAME_CHARS)
+    ));
+    assert!(!draft(&app).ready());
+}
+
+/// The one test that uses the real job thread and the real process probe: it needs the
+/// pack to be written (the thread starts when the task is made). It fails if a RimWorld is
+/// open.
+#[test]
+fn a_pack_shared_in_the_app_holds_the_list_and_the_choices() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(
+        &sb,
+        "Shared",
+        &["ludeon.rimworld", "brrainz.harmony", "gone.missing"],
+    );
+    put(&sb, &id, "Config/Mod_1_A.xml", "<a/>");
+    put(&sb, &id, "Saves/colony.rws", "save");
+    std::fs::create_dir_all(sb.path("out")).expect("out");
+
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(Message::ShareSave(0, true));
+    let _ = app.update(Message::ShareStart(Some(0)));
+    let _ = app.update(Message::Input(Field::Description, "  Hard mode  ".into()));
+    let chosen = draft(&app);
+    // The player typed no extension: the file still becomes `.rimpack`.
+    let _ = app.update(Message::SharePicked(chosen, Some(sb.path("out/mine"))));
+    assert!(app.job.is_some());
+    let pack = sb.path("out/mine.rimpack");
+    wait_for("the modpack file", || pack.is_file());
+
+    let manifest = modpack::read_manifest(&pack).expect("manifest");
+    assert_eq!(manifest.name, "Shared");
+    assert_eq!(manifest.description, "Hard mode");
+    assert_eq!(manifest.includes.saves, ["colony.rws"]);
+    assert_eq!(manifest.start_save.as_deref(), Some("colony.rws"));
+    assert!(manifest.includes.mod_settings && manifest.includes.creations);
+    assert!(!manifest.includes.game_settings);
+    assert!(manifest.game_version.is_some(), "from the game install");
+    let ids: Vec<_> = manifest
+        .mods
+        .iter()
+        .map(|m| m.package_id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        ["brrainz.harmony", "gone.missing"],
+        "Core is not a choice"
+    );
+    assert_eq!(manifest.mods[0].workshop_id, Some(2009463077));
+    assert_eq!(manifest.mods[1].workshop_id, None);
+}
