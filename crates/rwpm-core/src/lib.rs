@@ -8,6 +8,7 @@ pub mod builds;
 pub mod consent;
 pub mod discovery;
 pub mod error;
+pub mod fetch;
 pub mod flatpak;
 mod fs_copy;
 pub mod launch;
