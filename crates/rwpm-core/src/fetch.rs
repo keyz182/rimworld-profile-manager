@@ -302,7 +302,14 @@ pub fn fetch(
     // A pack can name any number of mods, and the helper takes a limited number of ids per
     // run (T82 review H2), so they go in batches. A batch that was cancelled or went silent
     // ends the run: the mods after it are reported with that reason.
-    let mut ended = Ok(());
+    // A quick check first: on Windows the first helper run after a quiet spell went silent for
+    // about 60 s in 3 of 3 trials, and none did with a check just before it (SPEC, stall trials).
+    // A failed check ends the run before anything is asked of Steam.
+    let mut ended = if ids.is_empty() {
+        Ok(())
+    } else {
+        check(helper)
+    };
     for batch in ids.chunks(BATCH) {
         if ended.is_err() {
             break;

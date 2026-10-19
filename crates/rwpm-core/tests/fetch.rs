@@ -16,8 +16,17 @@ use std::time::{Duration, Instant};
 
 use rwpm_core::fetch::{Fresh, HELPER, Op, Outcome, Request, Status, check, fetch, helper_beside};
 
-/// A helper that runs `body` (shell) when started.
+/// A helper that says it is ready to `check` (which `fetch` runs first) and runs `body` (shell)
+/// for anything else.
 fn helper(dir: &Path, body: &str) -> PathBuf {
+    helper_raw(
+        dir,
+        &format!("[ \"$1\" = check ] && {{ echo ok; exit 0; }}\n{body}"),
+    )
+}
+
+/// A helper that runs `body` (shell) whatever it is asked, `check` included.
+fn helper_raw(dir: &Path, body: &str) -> PathBuf {
     let path = dir.join(HELPER);
     std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("script");
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
@@ -270,20 +279,71 @@ fn a_helper_that_goes_quiet_is_ended_and_its_mods_fail() {
 #[test]
 fn check_says_ok_or_why_not() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    assert_eq!(check(&helper(tmp.path(), "printf 'ok\\n'")), Ok(()));
+    assert_eq!(check(&helper_raw(tmp.path(), "printf 'ok\\n'")), Ok(()));
     assert_eq!(
-        check(&helper(
+        check(&helper_raw(
             tmp.path(),
             "printf 'error Steam is not running\\n'"
         )),
         Err("Steam is not running".to_owned())
     );
     assert_eq!(
-        check(&helper(tmp.path(), "exit 0")),
+        check(&helper_raw(tmp.path(), "exit 0")),
         Err("The Steam helper gave no answer.".to_owned())
     );
     let nowhere = tmp.path().join("nowhere");
     assert!(check(&nowhere).is_err());
+}
+
+/// Logs the word it was started with, answers `check` as `check_says`, and `ok <id> new` for
+/// every id of anything else.
+fn logging(dir: &Path, check_says: &str) -> PathBuf {
+    helper_raw(
+        dir,
+        &format!(
+            "echo \"$1\" >> \"$(dirname \"$0\")/words.txt\"\n\
+             if [ \"$1\" = check ]; then echo '{check_says}'; exit 0; fi\n\
+             shift\nfor id in \"$@\"; do echo \"ok $id new\"; done"
+        ),
+    )
+}
+
+fn words(dir: &Path) -> Vec<String> {
+    std::fs::read_to_string(dir.join("words.txt"))
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn a_check_runs_just_before_the_real_run() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let h = logging(tmp.path(), "ok");
+    let pairs = wanted(&[(5, "a.b")]);
+    let (out, _) = go(&h, &request(Op::Unsubscribe, &pairs, None));
+    assert_eq!(statuses(&out), [Status::Done(Fresh::New)]);
+    assert_eq!(words(tmp.path()), ["check", "unsubscribe"]);
+}
+
+#[test]
+fn a_failed_check_fails_every_mod_with_its_reason_and_asks_steam_nothing() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let h = logging(tmp.path(), "error Steam is not running");
+    let pairs = wanted(&[(5, "a.b"), (6, "c.d")]);
+    let (out, _) = go(&h, &request(Op::Subscribe, &pairs, None));
+    let said = Status::Failed("Steam is not running".into());
+    assert_eq!(statuses(&out), [said.clone(), said]);
+    assert_eq!(words(tmp.path()), ["check"], "no subscribe was started");
+}
+
+#[test]
+fn nothing_wanted_starts_no_helper() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let h = logging(tmp.path(), "ok");
+    let (out, _) = go(&h, &request(Op::Download, &[], None));
+    assert!(out.is_empty());
+    assert!(words(tmp.path()).is_empty());
 }
 
 /// A helper that answers `ok <id> new` for every id it is given and logs how many it got.

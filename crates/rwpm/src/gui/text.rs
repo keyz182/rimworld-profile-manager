@@ -1126,12 +1126,21 @@ pub fn pack_subscribed(
     line
 }
 
-pub fn pack_unsubscribed(done: usize, failed: usize) -> String {
+/// `failed` holds one reason per mod that could not be removed; each reason is said once.
+pub fn pack_unsubscribed(done: usize, failed: &[String]) -> String {
     let mut line = format!("Unsubscribed from {}.", count(done, "mod", "mods"));
-    if failed > 0 {
+    if !failed.is_empty() {
+        let mut reasons: Vec<&str> = Vec::new();
+        for why in failed {
+            let why = why.trim_end_matches('.');
+            if !reasons.contains(&why) {
+                reasons.push(why);
+            }
+        }
         line.push_str(&format!(
-            " {} could not be removed.",
-            count(failed, "mod", "mods")
+            " {} could not be removed: {}.",
+            count(failed.len(), "mod", "mods"),
+            reasons.join("; ")
         ));
     }
     line
@@ -1196,6 +1205,27 @@ mod tests {
         assert_eq!(size(512), "less than 1 MB");
         assert_eq!(size(1536 * 1024), "1.5 MB");
         assert_eq!(size(3 * 1024 * 1024 * 1024), "3.0 GB");
+    }
+
+    #[test]
+    fn the_unsubscribe_notice_says_why_each_reason_once() {
+        assert_eq!(pack_unsubscribed(2, &[]), "Unsubscribed from 2 mods.");
+        let why = |s: &str| s.to_owned();
+        assert_eq!(
+            pack_unsubscribed(0, &[why("The Steam helper stopped answering.")]),
+            "Unsubscribed from 0 mods. 1 mod could not be removed: The Steam helper stopped answering."
+        );
+        assert_eq!(
+            pack_unsubscribed(
+                1,
+                &[
+                    why("Steam is not running"),
+                    why("x"),
+                    why("Steam is not running")
+                ]
+            ),
+            "Unsubscribed from 1 mod. 3 mods could not be removed: Steam is not running; x."
+        );
     }
 
     #[test]

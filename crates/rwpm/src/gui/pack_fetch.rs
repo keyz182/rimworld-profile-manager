@@ -497,11 +497,17 @@ impl App {
                     .filter(|o| matches!(o.status, Status::Done(_)))
                     .map(|o| o.id)
                     .collect();
+                let failed: Vec<String> = outcomes
+                    .iter()
+                    .filter_map(|o| match &o.status {
+                        Status::Done(_) => None,
+                        Status::Failed(why) => Some(why.clone()),
+                        // Unsubscribing has no identity check, so this does not happen.
+                        Status::Mismatch { .. } => Some("not the mod the pack named".to_owned()),
+                    })
+                    .collect();
                 record::remove(&dir, &done).map_err(|e| e.to_string())?;
-                Ok(Outcome::Changed(t::pack_unsubscribed(
-                    done.len(),
-                    outcomes.len() - done.len(),
-                )))
+                Ok(Outcome::Changed(t::pack_unsubscribed(done.len(), &failed)))
             },
         )
     }
