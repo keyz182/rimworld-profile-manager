@@ -72,8 +72,14 @@ impl Layout {
             .join(APP)
     }
 
+    /// Written last, once everything is unpacked. Without it the folder may hold half an
+    /// install (the program file comes first), so it is installed again (T82 review H1).
+    fn marker(&self) -> PathBuf {
+        self.root.join(".rwpm-installed")
+    }
+
     pub fn installed(&self) -> bool {
-        self.program().is_file()
+        self.program().is_file() && self.marker().is_file()
     }
 }
 
@@ -102,6 +108,8 @@ pub(super) fn install_with(
     let bytes = fetch()?;
     let seen = check_hash(first_hash, &bytes)?;
     unpack::install(SOURCE.kind, &bytes, layout.root())?;
+    std::fs::write(layout.marker(), b"unpacked completely\n")
+        .map_err(Error::io("write", &layout.marker()))?;
     Ok(match seen {
         Seen::First(hash) => Some(hash),
         Seen::Same => None,
@@ -235,18 +243,37 @@ fn spawn(layout: &Layout, ids: &[u64]) -> Result<Child, String> {
     }
 }
 
+/// Ends steamcmd and what it started. `false` when that could not be done.
 #[cfg(unix)]
-fn stop(child: &mut Child) {
-    // A negative process id names the group the child leads.
-    let _ = Command::new("kill")
-        .args(["-s", "KILL", "--", &format!("-{}", child.id())])
-        .status();
+fn stop(child: &mut Child) -> bool {
+    // The shell's own `kill`, so it works where no `kill` program is installed (T82 review
+    // M3). A negative process id names the group the child leads; the id is an argument,
+    // never part of the script text.
+    let signalled = Command::new("sh")
+        .args([
+            "-c",
+            "kill -s KILL -- \"-$1\"",
+            "sh",
+            &child.id().to_string(),
+        ])
+        .status()
+        .is_ok_and(|status| status.success());
     let _ = child.kill();
+    signalled
 }
 
 #[cfg(not(unix))]
-fn stop(child: &mut Child) {
-    let _ = child.kill();
+fn stop(child: &mut Child) -> bool {
+    child.kill().is_ok()
+}
+
+/// What the player is told when the run was ended early.
+pub(super) fn ended_reason(why: &str, stopped: bool) -> String {
+    if stopped {
+        why.to_owned()
+    } else {
+        format!("{why}, but steamcmd may still be running")
+    }
 }
 
 fn pump(mut from: impl Read + Send + 'static, to: mpsc::Sender<String>) {
@@ -302,8 +329,9 @@ fn run_process(
             Err(RecvTimeoutError::Disconnected) => break,
         }
     }
-    if ended.is_err() {
-        stop(&mut child);
+    if let Err(why) = &ended {
+        let stopped = stop(&mut child);
+        ended = Err(ended_reason(why, stopped));
     }
     let _ = child.wait();
     ended

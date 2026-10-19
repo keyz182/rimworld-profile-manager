@@ -285,3 +285,69 @@ fn check_says_ok_or_why_not() {
     let nowhere = tmp.path().join("nowhere");
     assert!(check(&nowhere).is_err());
 }
+
+/// A helper that answers `ok <id> new` for every id it is given and logs how many it got.
+const COUNTING: &str = r#"echo $(( $# - 1 )) >> "$(dirname "$0")/calls.txt"
+shift
+for id in "$@"; do echo "ok $id new"; done"#;
+
+#[test]
+fn a_pack_with_more_than_five_hundred_mods_goes_in_batches() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let h = helper(tmp.path(), COUNTING);
+    let pairs: Vec<(u64, String)> = (1..=501).map(|id| (id, "x.y".to_owned())).collect();
+    let req = request(Op::Unsubscribe, &pairs, None);
+    let (out, _) = go(&h, &req);
+    assert_eq!(out.len(), 501);
+    assert!(
+        out.iter().all(|o| o.status == Status::Done(Fresh::New)),
+        "every mod has its own outcome"
+    );
+    assert_eq!(
+        out.iter().map(|o| o.id).collect::<Vec<_>>(),
+        (1..=501).collect::<Vec<u64>>(),
+        "in the order asked"
+    );
+    let calls = std::fs::read_to_string(tmp.path().join("calls.txt")).expect("calls");
+    let sizes: Vec<usize> = calls.lines().map(|l| l.parse().expect("number")).collect();
+    assert_eq!(sizes, [200, 200, 101]);
+    assert!(
+        sizes.iter().all(|n| *n <= rwpm_core::fetch::BATCH),
+        "the helper never sees more than a batch"
+    );
+}
+
+#[test]
+fn cancelling_a_big_pack_cancels_every_mod_and_starts_no_later_batch() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // The first run sets the flag's file; the test thread watches it and cancels.
+    let h = helper(
+        tmp.path(),
+        &format!("touch \"$(dirname \"$0\")/started\"\nsleep 1\n{COUNTING}"),
+    );
+    let pairs: Vec<(u64, String)> = (1..=401).map(|id| (id, "x.y".to_owned())).collect();
+    let req = request(Op::Unsubscribe, &pairs, None);
+    let cancel = AtomicBool::new(false);
+    let started = tmp.path().join("started");
+    let out = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            while !started.exists() {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            cancel.store(true, Ordering::Relaxed);
+        });
+        fetch(&h, &req, &cancel, &mut |_, _| {})
+    });
+    assert_eq!(out.len(), 401);
+    assert!(
+        out.iter()
+            .all(|o| matches!(&o.status, Status::Failed(why) if why == "cancelled")),
+        "{:?}",
+        out.first()
+    );
+    let calls = std::fs::read_to_string(tmp.path().join("calls.txt")).unwrap_or_default();
+    assert!(
+        calls.lines().count() <= 1,
+        "no batch ran after the cancel: {calls}"
+    );
+}

@@ -356,3 +356,57 @@ fn a_changed_archive_is_refused_before_anything_is_unpacked() {
     install_with(&layout, &consent, Some(&real), || Ok(fake_bootstrap())).expect("install");
     assert!(layout.installed());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_half_finished_install_is_done_again_not_trusted() {
+    use super::run::{Layout, install_with};
+    use crate::consent::{ConsentStore, Scope};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = Layout::new(tmp.path());
+    let consent = ConsentStore::open(tmp.path())
+        .record(Scope::Steamcmd, layout.root())
+        .expect("consent");
+    let archive = || {
+        Ok(tar_gz(&[
+            Item::File("steamcmd.sh", b"#!/bin/sh\n", 0o755),
+            Item::File("linux32/steamcmd", b"elf", 0o755),
+        ]))
+    };
+    // A file where the folder `linux32` must go: the first entry is written, the second fails.
+    std::fs::create_dir_all(layout.root()).expect("root");
+    std::fs::write(layout.root().join("linux32"), "in the way").expect("blocker");
+    install_with(&layout, &consent, None, archive).expect_err("fails half way");
+    assert!(
+        layout.program().is_file(),
+        "the program file was written first"
+    );
+    assert!(!layout.installed(), "half an install is not an install");
+    std::fs::remove_file(layout.root().join("linux32")).expect("clear");
+    install_with(&layout, &consent, None, archive).expect("installs again");
+    assert!(layout.installed());
+    assert!(layout.root().join("linux32/steamcmd").is_file());
+}
+
+#[test]
+fn a_download_error_is_plain_and_keeps_the_technical_text_apart() {
+    let port = {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.local_addr().expect("addr").port()
+    };
+    let url = format!("http://127.0.0.1:{port}/x");
+    let err = download::fetch(&url, false, 100, Duration::from_secs(5)).expect_err("refused");
+    assert!(!err.to_string().contains("127.0.0.1"), "{err}");
+    assert!(err.to_string().contains("internet connection"), "{err}");
+    assert!(err.details().is_some_and(|d| !d.is_empty()));
+}
+
+#[test]
+fn a_cancel_that_could_not_stop_steamcmd_says_so() {
+    use super::run::ended_reason;
+    assert_eq!(ended_reason("cancelled", true), "cancelled");
+    assert_eq!(
+        ended_reason("cancelled", false),
+        "cancelled, but steamcmd may still be running"
+    );
+}

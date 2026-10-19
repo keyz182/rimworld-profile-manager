@@ -25,6 +25,10 @@ pub const HELPER: &str = if cfg!(windows) {
     "rwpm-steam"
 };
 
+/// Ids per helper run. The helper refuses more than 500; this is well under that. Not
+/// measured: an estimate that keeps each run short.
+pub const BATCH: usize = 200;
+
 /// No line from the helper for this long means it is stuck.
 pub const QUIET: Duration = Duration::from_secs(120);
 /// Workshop copies of a package id that also exists locally carry this suffix (R1).
@@ -279,30 +283,39 @@ pub fn fetch(
     let mut results: BTreeMap<u64, Status> = BTreeMap::new();
     let mut sizes: BTreeMap<u64, (u64, u64)> = BTreeMap::new();
     let mut fatal: Option<String> = None;
-    let ended = run_helper(
-        helper,
-        request.op,
-        &ids,
-        cancel,
-        request.quiet,
-        |line| match line {
-            Line::Progress { id, done, total } if ids.contains(&id) => {
-                sizes.insert(id, (done, total));
-                let (done, total) = sizes
-                    .values()
-                    .fold((0, 0), |(d, t), (sd, st)| (d + sd, t + st));
-                progress(done, total);
-            }
-            Line::Ok { id, fresh } if ids.contains(&id) => {
-                results.insert(id, Status::Done(fresh));
-            }
-            Line::Fail { id, reason } if ids.contains(&id) => {
-                results.insert(id, Status::Failed(reason));
-            }
-            Line::Error(reason) => fatal = Some(reason),
-            Line::Ready | Line::Progress { .. } | Line::Ok { .. } | Line::Fail { .. } => {}
-        },
-    );
+    // A pack can name any number of mods, and the helper takes a limited number of ids per
+    // run (T82 review H2), so they go in batches. A batch that was cancelled or went silent
+    // ends the run: the mods after it are reported with that reason.
+    let mut ended = Ok(());
+    for batch in ids.chunks(BATCH) {
+        if ended.is_err() {
+            break;
+        }
+        ended = run_helper(
+            helper,
+            request.op,
+            batch,
+            cancel,
+            request.quiet,
+            |line| match line {
+                Line::Progress { id, done, total } if ids.contains(&id) => {
+                    sizes.insert(id, (done, total));
+                    let (done, total) = sizes
+                        .values()
+                        .fold((0, 0), |(d, t), (sd, st)| (d + sd, t + st));
+                    progress(done, total);
+                }
+                Line::Ok { id, fresh } if ids.contains(&id) => {
+                    results.insert(id, Status::Done(fresh));
+                }
+                Line::Fail { id, reason } if ids.contains(&id) => {
+                    results.insert(id, Status::Failed(reason));
+                }
+                Line::Error(reason) => fatal = Some(reason),
+                Line::Ready | Line::Progress { .. } | Line::Ok { .. } | Line::Fail { .. } => {}
+            },
+        );
+    }
     let unanswered = match (&ended, fatal) {
         (Err(why), _) => why.clone(),
         (Ok(()), Some(reason)) => reason,

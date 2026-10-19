@@ -58,7 +58,10 @@ pub const MAX_ENTRIES: usize = 1000;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Could not download steamcmd from Valve: {0}")]
+    /// The text inside is the technical reason, for a details line (T82 review M1).
+    #[error(
+        "Could not download steamcmd from Valve. Check the internet connection, then try again."
+    )]
     Download(String),
     #[error("steamcmd is not downloaded until you agree to it.")]
     NoConsent,
@@ -88,6 +91,14 @@ pub enum Error {
 }
 
 impl Error {
+    /// The technical reason behind a plain message, when there is one.
+    pub fn details(&self) -> Option<&str> {
+        match self {
+            Self::Download(details) => Some(details),
+            _ => None,
+        }
+    }
+
     fn io(op: &'static str, path: &std::path::Path) -> impl FnOnce(std::io::Error) -> Self {
         let path = path.to_path_buf();
         move |source| Self::Io { op, path, source }
