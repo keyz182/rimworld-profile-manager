@@ -252,7 +252,10 @@ impl App {
             | Message::OpenPackPicked(_)
             | Message::PackOpened(_)
             | Message::OpenUrl(_) => return self.pack_update(message),
-            Message::PackSubscribe | Message::CancelJob | Message::RemovePackSubs => {
+            Message::PackSubscribe
+            | Message::PackOffline(_)
+            | Message::CancelJob
+            | Message::RemovePackSubs => {
                 return self.pack_fetch_update(message);
             }
             Message::ModsRead(list) => self.mods = Some(list),

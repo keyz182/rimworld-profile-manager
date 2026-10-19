@@ -5,7 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
-use iced::widget::{Column, button, column, container, row, scrollable, space, text, text_input};
+use iced::widget::{
+    Column, button, checkbox, column, container, row, scrollable, space, text, text_input,
+};
 use iced::{Alignment, Element, Length, Task};
 use rwpm_core::ProfileError;
 use rwpm_core::builds::acf;
@@ -67,6 +69,8 @@ pub struct PackPreview {
     pub steam: Option<SteamRoute>,
     /// Why Steam cannot be used, when a helper is there but Steam is not reachable.
     pub steam_note: Option<String>,
+    /// The player ticked "Make it an OFFLINE profile": download copies, never subscribe (T83d).
+    pub offline: bool,
 }
 
 impl PackPreview {
@@ -129,6 +133,7 @@ pub fn build_preview(plan: UnpackPlan, game: Option<&GameInstall>) -> PackPrevie
         game_note,
         steam: None,
         steam_note: None,
+        offline: false,
     }
 }
 
@@ -255,19 +260,41 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
             .on_submit(Message::Confirm),
         container(scrollable(details)).max_height(DETAILS_HEIGHT),
         text(t::SHARE_NOTICE).size(13),
+        offline_choice(preview),
         pack_buttons(preview, ok),
     ]
     .spacing(10)
     .into()
 }
 
+/// Whether the Steam route is there to use: a helper that reaches Steam, and mods to get.
+fn steam_applies(preview: &PackPreview) -> bool {
+    preview.steam.is_some() && !preview.missing.is_empty()
+}
+
+/// "Make it an OFFLINE profile": download private copies instead of subscribing (T83d).
+fn offline_choice(preview: &PackPreview) -> Element<'_, Message> {
+    if !steam_applies(preview) {
+        return Column::new().into();
+    }
+    checkbox(preview.offline)
+        .label(t::PACK_OFFLINE_TICK)
+        .on_toggle(Message::PackOffline)
+        .into()
+}
+
 /// Cancel and Restore. With a Steam route and mods to get, also "Restore and subscribe…",
 /// the main button: restoring alone leaves the mods to the player.
 fn pack_buttons(preview: &PackPreview, ok: Option<Message>) -> Element<'_, Message> {
-    if preview.steam.is_none() || preview.missing.is_empty() {
+    if !steam_applies(preview) {
         return buttons(t::OPEN_PACK_IT, ok, false);
     }
     let subscribe = ok.as_ref().map(|_| Message::PackSubscribe);
+    let main = if preview.offline {
+        t::DOWNLOAD_MENU
+    } else {
+        t::SUBSCRIBE_MENU
+    };
     row![
         space::horizontal(),
         button(t::CANCEL)
@@ -276,9 +303,7 @@ fn pack_buttons(preview: &PackPreview, ok: Option<Message>) -> Element<'_, Messa
         button(t::OPEN_PACK_IT)
             .on_press_maybe(ok)
             .style(theme::secondary),
-        button(t::SUBSCRIBE_MENU)
-            .on_press_maybe(subscribe)
-            .style(theme::primary),
+        button(main).on_press_maybe(subscribe).style(theme::primary),
     ]
     .spacing(10)
     .into()

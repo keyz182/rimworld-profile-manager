@@ -17,13 +17,14 @@ use rwpm_core::ProfileError;
 use rwpm_core::discovery::GameInstall;
 use rwpm_core::fetch::{self, Fresh, Op, Outcome as Fetched, Request, Status, record};
 use rwpm_core::modpack;
-use rwpm_core::profile::{ProcessProbe, ProfileId, RunningProbe};
+use rwpm_core::profile::offline;
+use rwpm_core::profile::{ProcessProbe, Profile, ProfileId, RunningProbe};
 
 use super::dialogs::{buttons, heading};
 use super::icon::UI_BOLD;
 use super::message::{Dialog, Message, Outcome};
 use super::modpack_open::PackPreview;
-use super::{App, Notice, text as t, theme};
+use super::{App, Ctx, Notice, text as t, theme};
 
 /// Names drawn in the confirm; the rest is "and N more".
 const MAX_NAMES: usize = 200;
@@ -113,10 +114,50 @@ fn summarise(outcomes: &[Fetched], names: &BTreeMap<u64, String>) -> Summary {
     summary
 }
 
+/// Makes the new profile OFFLINE, but only when every mod arrived and passed the identity
+/// check; otherwise it stays as restored (LIVE), and the line says why and what failed (M3).
+fn offline_line(
+    ctx: &Ctx,
+    game: Option<&GameInstall>,
+    profile: &Profile,
+    s: &Summary,
+    still_to_find: usize,
+) -> String {
+    let attempt = (|| -> Result<(), String> {
+        if !s.failed.is_empty() || !s.mismatched.is_empty() {
+            return Err(t::OFFLINE_NOT_ALL.to_owned());
+        }
+        let fail = |e: ProfileError| e.to_string();
+        let store = ctx.store().map_err(fail)?;
+        let effective = ctx
+            .effective_game(profile, game)
+            .map_err(|e| e.to_string())?;
+        let plan = offline::plan_offline(&store, &profile.id, &effective, false).map_err(fail)?;
+        if !plan.conflicts.is_empty() {
+            return Err(t::OFFLINE_CONFLICTS.to_owned());
+        }
+        if !plan.missing.is_empty() {
+            return Err(t::offline_missing(plan.missing.len()));
+        }
+        offline::apply_offline(&store, &plan, &[], &ProcessProbe, &mut |_| {})
+            .map(|_| ())
+            .map_err(fail)
+    })();
+    match attempt {
+        Ok(()) => t::pack_downloaded(&profile.name, s.subscribed + s.already, still_to_find),
+        Err(why) => t::pack_kept_live(&profile.name, &s.failed, &s.mismatched, &why),
+    }
+}
+
 impl App {
     /// The actions of this file; `update` hands them over together.
     pub(super) fn pack_fetch_update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::PackOffline(on) => {
+                if let Some(Dialog::OpenPack(preview)) = &mut self.dialog {
+                    preview.offline = on && preview.steam.is_some();
+                }
+            }
             Message::PackSubscribe => self.ask_subscribe(),
             Message::CancelJob => {
                 if let Some(flag) = &self.cancel {
@@ -175,6 +216,11 @@ impl App {
             .filter_map(|m| Some((m.workshop_id?, m.name.clone())))
             .collect();
         let still_to_find = preview.manual.len();
+        // OFFLINE downloads private copies and never subscribes; LIVE needs the subscription
+        // because the game only loads Workshop mods that Steam says are subscribed (R56).
+        let offline = preview.offline;
+        let op = if offline { Op::Download } else { Op::Subscribe };
+        let game = self.game.as_ref().ok().cloned();
         let plan = preview.plan;
         let label = t::opening_pack(&plan.name);
         self.start_cancellable(label, TOTAL, move |progress, cancel| {
@@ -189,7 +235,7 @@ impl App {
             })
             .map_err(fail)?;
             let request = Request {
-                op: Op::Subscribe,
+                op,
                 wanted: &wanted,
                 workshop_dir: Some(&route.workshop_dir),
                 quiet: fetch::QUIET,
@@ -197,6 +243,14 @@ impl App {
             let outcomes = (fetcher.0)(&route.helper, &request, cancel, &mut |done, total| {
                 progress(scaled(done, total, RESTORE_SHARE, TOTAL));
             });
+            if offline {
+                let s = summarise(&outcomes, &names);
+                let line = offline_line(&ctx, game.as_ref(), &report.profile, &s, still_to_find);
+                return Ok(Outcome::Restored {
+                    line,
+                    id: report.profile.id,
+                });
+            }
             let new: Vec<u64> = outcomes
                 .iter()
                 .filter(|o| o.status == Status::Done(Fresh::New))
@@ -280,16 +334,33 @@ pub fn confirm_subscribe_dialog(preview: &PackPreview) -> Element<'_, Message> {
         let more = t::and_more(preview.missing.len() - MAX_NAMES);
         names = names.push(text(more).size(13).style(theme::muted));
     }
+    let count = preview.missing.len();
+    // OFFLINE downloads private copies and does not subscribe; the wording says which.
+    let (title, about, keeps, go) = if preview.offline {
+        (
+            t::DOWNLOAD_TITLE,
+            t::download_about(count),
+            t::DOWNLOAD_KEEPS,
+            t::DOWNLOAD_IT,
+        )
+    } else {
+        (
+            t::SUBSCRIBE_TITLE,
+            t::subscribe_about(count),
+            t::SUBSCRIBE_KEEPS,
+            t::SUBSCRIBE_IT,
+        )
+    };
     column![
-        heading(t::SUBSCRIBE_TITLE),
-        text(t::subscribe_about(preview.missing.len())),
+        heading(title),
+        text(about),
         container(scrollable(names)).max_height(NAMES_HEIGHT),
         text(t::SUBSCRIBE_TRUST)
             .size(13)
             .font(UI_BOLD)
             .style(theme::warning),
-        text(t::SUBSCRIBE_KEEPS).size(13),
-        buttons(t::SUBSCRIBE_IT, Some(Message::Confirm), false),
+        text(keeps).size(13),
+        buttons(go, Some(Message::Confirm), false),
     ]
     .spacing(10)
     .into()

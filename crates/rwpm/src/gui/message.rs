@@ -121,6 +121,8 @@ pub enum Message {
     OpenUrl(String),
     /// Open dialog: "Restore and subscribe…" (T83c).
     PackSubscribe,
+    /// Open dialog: the box "Make it an OFFLINE profile" ticked or unticked (T83d).
+    PackOffline(bool),
     /// The Cancel button on the progress bar of a job that can be stopped.
     CancelJob,
     /// More → "Remove subscriptions from the pack".

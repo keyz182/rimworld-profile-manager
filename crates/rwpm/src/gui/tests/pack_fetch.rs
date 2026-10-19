@@ -311,3 +311,154 @@ fn the_confirm_keeps_its_title_and_buttons_on_screen_in_the_smallest_window() {
     assert_on_screen(&big, text::SUBSCRIBE_MENU);
     let _ = Op::Download;
 }
+
+/// A fetcher that records the operation it was asked for, then answers with `answer`.
+fn recording(ops: &Arc<std::sync::Mutex<Vec<Op>>>, answer: fn(u64, usize) -> Status) -> Fetcher {
+    let ops = Arc::clone(ops);
+    Fetcher(Arc::new(
+        move |_: &Path, req: &Request<'_>, _: &AtomicBool, _: &mut dyn FnMut(u64, u64)| {
+            ops.lock().expect("ops").push(req.op);
+            req.wanted
+                .iter()
+                .enumerate()
+                .map(|(i, (id, _))| Fetched {
+                    id: *id,
+                    status: answer(*id, i),
+                })
+                .collect()
+        },
+    ))
+}
+
+fn mode_of(sb: &Sandbox, name: &str) -> Option<(Mode, std::path::PathBuf)> {
+    let store = sb.ctx().store().ok()?;
+    let profile = store
+        .list()
+        .ok()?
+        .profiles
+        .into_iter()
+        .find(|p| p.name == name)?;
+    let dir = store.root().join(profile.id.as_str());
+    let file = ProfileFile::read(&dir.join("profile.toml")).ok()?;
+    Some((file.mode, dir))
+}
+
+#[test]
+fn the_offline_box_is_offered_with_the_steam_route_and_changes_the_main_button() {
+    let sb = Sandbox::new();
+    let mut app = shown(&sb, with_steam(&sb, 2));
+    assert!(found(&app, text::PACK_OFFLINE_TICK));
+    assert!(found(&app, text::SUBSCRIBE_MENU));
+    assert!(!found(&app, text::DOWNLOAD_MENU));
+    let _ = app.update(Message::PackOffline(true));
+    assert!(found(&app, text::DOWNLOAD_MENU));
+    assert!(!found(&app, text::SUBSCRIBE_MENU));
+    let _ = app.update(Message::PackOffline(false));
+    assert!(found(&app, text::SUBSCRIBE_MENU));
+
+    let mut no_route = with_steam(&sb, 2);
+    no_route.steam = None;
+    let mut app = shown(&sb, no_route);
+    assert!(!found(&app, text::PACK_OFFLINE_TICK));
+    let _ = app.update(Message::PackOffline(true));
+    let Some(Dialog::OpenPack(p)) = &app.dialog else {
+        panic!("{:?}", app.dialog);
+    };
+    assert!(!p.offline, "no Steam route, so no OFFLINE download");
+}
+
+#[test]
+fn the_offline_confirm_says_download_not_subscribe() {
+    let sb = Sandbox::new();
+    let mut app = shown(&sb, with_steam(&sb, 3));
+    let _ = app.update(Message::PackOffline(true));
+    let _ = app.update(Message::PackSubscribe);
+    assert!(found(&app, &text::download_about(3)));
+    assert!(found(&app, text::DOWNLOAD_KEEPS));
+    assert!(found(&app, text::SUBSCRIBE_TRUST), "the warning stays");
+    assert!(
+        !found(&app, text::SUBSCRIBE_KEEPS),
+        "no subscription is made"
+    );
+    assert!(found(&app, "Mod 0"));
+}
+
+/// Drives the whole OFFLINE restore with a fake helper and returns what was asked of it.
+fn offline_restore(name: &str, answer: fn(u64, usize) -> Status) -> (Sandbox, Vec<Op>) {
+    let sb = Sandbox::new();
+    let ops = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let mut app = shown(&sb, with_steam(&sb, 2));
+    app.fetcher = recording(&ops, answer);
+    let _ = app.update(Message::PackOffline(true));
+    let _ = app.update(Message::Input(Field::Name, name.into()));
+    let _ = app.update(Message::PackSubscribe);
+    let _ = app.update(Message::Confirm);
+    assert!(app.job.is_some());
+    wait_for("the restored profile", || mode_of(&sb, name).is_some());
+    // The job ends a moment after the profile exists: wait for the fetch to have run too.
+    wait_for("the helper to be asked", || {
+        !ops.lock().expect("ops").is_empty()
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    let asked = ops.lock().expect("ops").clone();
+    (sb, asked)
+}
+
+/// The job thread is real, the helper is the fake. Fails if a RimWorld is open.
+#[test]
+fn an_offline_restore_downloads_never_subscribes_and_makes_the_profile_offline() {
+    let (sb, asked) = offline_restore("Offline Pack", |_, _| Status::Done(Fresh::New));
+    assert_eq!(asked, [Op::Download], "never a subscribe");
+    let (mode, dir) = mode_of(&sb, "Offline Pack").expect("profile");
+    assert_eq!(mode, Mode::Offline);
+    assert!(
+        record::read(&dir).is_empty(),
+        "nothing subscribed, nothing to remove"
+    );
+}
+
+#[test]
+fn one_failed_mod_leaves_the_profile_live() {
+    let (sb, asked) = offline_restore("Partly Fetched", |_, i| {
+        if i == 0 {
+            Status::Done(Fresh::New)
+        } else {
+            Status::Failed("Steam said no".into())
+        }
+    });
+    assert_eq!(asked, [Op::Download]);
+    let (mode, dir) = mode_of(&sb, "Partly Fetched").expect("profile");
+    assert_eq!(mode, Mode::Live, "not every mod arrived");
+    assert!(record::read(&dir).is_empty());
+}
+
+#[test]
+fn a_mod_that_is_not_the_one_promised_leaves_the_profile_live() {
+    let (sb, _) = offline_restore("Wrong Mod", |_, i| {
+        if i == 0 {
+            Status::Mismatch {
+                expected: "m.mod0".into(),
+                found: "evil.mod".into(),
+            }
+        } else {
+            Status::Done(Fresh::New)
+        }
+    });
+    let (mode, _) = mode_of(&sb, "Wrong Mod").expect("profile");
+    assert_eq!(mode, Mode::Live);
+}
+
+#[test]
+fn the_open_dialog_with_every_note_and_the_offline_box_keeps_its_buttons_on_screen() {
+    let sb = Sandbox::new();
+    let mut p = with_steam(&sb, 250);
+    p.newer = vec!["Harmony".into()];
+    p.game_note = Some(text::pack_version_differs("0.0.1 rev1", "1.6.4871 rev598"));
+    p.missing_dlc = vec!["ludeon.rimworld.royalty".into()];
+    p.steam_note = Some(text::steam_unreachable("Steam is not running"));
+    let app = shown(&sb, p);
+    assert_on_screen(&app, text::OPEN_PACK_TITLE);
+    assert_on_screen(&app, text::PACK_OFFLINE_TICK);
+    assert_on_screen(&app, text::SUBSCRIBE_MENU);
+    assert_on_screen(&app, text::OPEN_PACK_IT);
+}

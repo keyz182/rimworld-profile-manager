@@ -962,6 +962,66 @@ pub const STEAM_HELPER_MISSING: &str = "The Steam helper is missing, so this can
 pub const STEAM_NO_LIBRARY: &str =
     "Steam's Workshop folder was not found, so mods cannot be fetched from Steam.";
 
+// Downloading private copies into an OFFLINE profile (T83d).
+pub const PACK_OFFLINE_TICK: &str =
+    "Make it an OFFLINE profile: download private copies, and do not subscribe";
+pub const DOWNLOAD_MENU: &str = "Restore and download…";
+pub const DOWNLOAD_TITLE: &str = "Download from Steam";
+pub const DOWNLOAD_IT: &str = "Download";
+pub const DOWNLOAD_KEEPS: &str =
+    "Steam is only asked to download. You are not subscribed, so the mods do not update.";
+pub const OFFLINE_NOT_ALL: &str = "not every mod arrived as the pack named it";
+pub const OFFLINE_CONFLICTS: &str = "some mods are installed in more than one place";
+
+pub fn download_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!(
+        "This makes a new OFFLINE profile and downloads {mods} from Steam into it, without subscribing:"
+    )
+}
+
+pub fn offline_missing(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("{mods} the pack lists could not be found")
+}
+
+pub fn pack_downloaded(name: &str, mods: usize, still_to_find: usize) -> String {
+    let mut line = format!(
+        "Restored “{name}” as an OFFLINE profile with {} downloaded.",
+        count(mods, "mod", "mods")
+    );
+    if still_to_find > 0 {
+        let more = count(still_to_find, "mod", "mods");
+        line.push_str(&format!(" {more} to find yourself."));
+    }
+    line
+}
+
+/// The profile stays LIVE: what failed, and why it was not made OFFLINE.
+pub fn pack_kept_live(
+    name: &str,
+    failed: &[(String, String)],
+    mismatched: &[String],
+    why: &str,
+) -> String {
+    let mut line = format!("Restored “{name}”, but it was not made OFFLINE: {why}.");
+    if !failed.is_empty() {
+        let list: Vec<String> = failed
+            .iter()
+            .map(|(n, why)| format!("{n} ({why})"))
+            .collect();
+        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+    }
+    if !mismatched.is_empty() {
+        line.push_str(&format!(
+            " Not the mod the pack named, so not kept: {}.",
+            mismatched.join(", ")
+        ));
+    }
+    line.push_str(" The profile still works as a LIVE profile; open the pack again to retry.");
+    line
+}
+
 pub fn steam_unreachable(why: &str) -> String {
     format!("Steam cannot be used now: {why}")
 }
