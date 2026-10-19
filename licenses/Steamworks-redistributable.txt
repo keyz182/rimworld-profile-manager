@@ -1,0 +1,11 @@
+Steamworks library (libsteam_api.so, libsteam_api.dylib, steam_api64.dll)
+
+These files are made by Valve Corporation. They are the Steamworks redistributable
+library, and Valve publishes them for other programs to ship. They are not covered by
+the licence of RimWorld Profile Manager.
+
+They are used by one program only: rwpm-steam. It asks the Steam client that is already
+running to download, subscribe to or unsubscribe from RimWorld Workshop mods, when you
+restore a modpack and choose that. The main program, rwpm, never loads them.
+
+Valve's terms for the library are in its Steamworks SDK Access Agreement.

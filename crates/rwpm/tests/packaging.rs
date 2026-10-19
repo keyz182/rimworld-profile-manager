@@ -141,3 +141,64 @@ fn the_linux_installer_adds_and_removes_the_entry_and_the_type() {
     assert!(!data.join("icons/hicolor/256x256/apps/rwpm.png").exists());
     run(&["--remove"]); // nothing left: still fine
 }
+
+const THIRD_PARTY_PY: &str = include_str!("../../../scripts/third_party.py");
+const VALVE_NOTE: &str = include_str!("../../../licenses/Steamworks-redistributable.txt");
+
+/// (helper, Valve library) per bundle, as `package.sh` sets them (T83e).
+const STEAM_FILES: [(&str, &str); 3] = [
+    ("rwpm-steam", "libsteam_api.so"),
+    ("rwpm-steam.exe", "steam_api64.dll"),
+    ("rwpm-steam", "libsteam_api.dylib"),
+];
+
+#[test]
+fn every_bundle_builds_and_ships_the_steam_helper_and_valves_library() {
+    for (exe, lib) in STEAM_FILES {
+        assert!(
+            PACKAGE_SH.contains(&format!("steam_exe=\"{exe}\"")),
+            "{exe}"
+        );
+        assert!(
+            PACKAGE_SH.contains(&format!("steam_lib=\"{lib}\"")),
+            "{lib}"
+        );
+    }
+    assert!(PACKAGE_SH.contains("-p rwpm -p rwpm-steam"));
+    assert!(PACKAGE_SH.contains(r#"cp "$release_dir/$exe" "$release_dir/$steam_exe" "$bin_dir/""#));
+    assert!(PACKAGE_SH.contains(r#"cp "$steam_src" "$bin_dir/""#));
+    // The glibc floor applies to the helper too.
+    assert!(
+        PACKAGE_SH.contains(r#"check_glibc "$ROOT/target/soldier/$target/release/$steam_exe""#)
+    );
+}
+
+#[test]
+fn the_windows_installer_puts_the_helper_in_and_takes_it_out() {
+    for define in [
+        r#"!define STEAM_EXE "rwpm-steam.exe""#,
+        r#"!define STEAM_DLL "steam_api64.dll""#,
+    ] {
+        assert!(NSI.contains(define), "{define}");
+    }
+    for name in ["STEAM_EXE", "STEAM_DLL"] {
+        assert!(
+            NSI.contains(&format!(r#"!insertmacro CheckFree "$INSTDIR\${{{name}}}""#)),
+            "{name} is not checked for use"
+        );
+        assert!(
+            NSI.contains(&format!(r#"Delete "$INSTDIR\${{{name}}}""#)),
+            "{name} is not removed on uninstall"
+        );
+    }
+}
+
+#[test]
+fn the_licence_files_cover_the_helper_and_name_valves_library() {
+    assert!(THIRD_PARTY_PY.contains(r#"SHIPPED_BINARIES = ("rwpm", "rwpm-steam")"#));
+    assert!(THIRD_PARTY_PY.contains(r#""steamworks-sys": "Noxime_steamworks-rs""#));
+    for lib in ["libsteam_api.so", "libsteam_api.dylib", "steam_api64.dll"] {
+        assert!(VALVE_NOTE.contains(lib), "{lib}");
+    }
+    assert!(VALVE_NOTE.contains("Valve"));
+}
