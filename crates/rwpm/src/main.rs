@@ -11,24 +11,35 @@ mod restart;
 mod run;
 
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 
 /// Exit code for a subcommand that is not built yet.
 const EXIT_UNIMPLEMENTED: u8 = 2;
 
-/// `rwpm <file>.rimrim`: how the OS hands over a backup that was opened (V83, T75). Only
-/// an existing file counts; any other word is still an unknown command.
-fn backup_arg(args: &[OsString]) -> Option<PathBuf> {
+/// `rwpm <file>.rimrim` or `<file>.rimpack`: how the OS hands over a backup or a modpack
+/// that was opened (V83, T75, T81). Only an existing file counts; any other word is still
+/// an unknown command.
+fn file_arg(args: &[OsString]) -> Option<gui::OpenFile> {
     let path = Path::new(args.first()?);
-    let named = path
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("rimrim"));
-    (named && path.is_file()).then(|| path.to_path_buf())
+    if !path.is_file() {
+        return None;
+    }
+    let extension = |wanted: &str| {
+        path.extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case(wanted))
+    };
+    if extension("rimrim") {
+        Some(gui::OpenFile::Backup(path.to_path_buf()))
+    } else if extension("rimpack") {
+        Some(gui::OpenFile::Pack(path.to_path_buf()))
+    } else {
+        None
+    }
 }
 
-fn open_window(backup: Option<PathBuf>) -> ExitCode {
-    match gui::run_with(backup) {
+fn open_window(open: Option<gui::OpenFile>) -> ExitCode {
+    match gui::run_with(open) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("rwpm: {e}");
@@ -42,8 +53,8 @@ fn main() -> ExitCode {
     if restart::is_restart(&args) {
         std::process::exit(restart::main(&args));
     }
-    if let Some(backup) = backup_arg(&args) {
-        return open_window(Some(backup));
+    if let Some(file) = file_arg(&args) {
+        return open_window(Some(file));
     }
     match args.first().and_then(|a| a.to_str()) {
         None => open_window(None),
@@ -69,19 +80,38 @@ mod tests {
     }
 
     #[test]
-    fn only_an_existing_rimrim_file_is_a_backup_argument() {
+    fn only_an_existing_rimrim_or_rimpack_file_is_opened() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (lower, upper) = (tmp.path().join("a.rimrim"), tmp.path().join("B.RIMRIM"));
+        let (pack, shout) = (tmp.path().join("p.rimpack"), tmp.path().join("Q.RimPack"));
         let (text, folder) = (tmp.path().join("notes.txt"), tmp.path().join("dir.rimrim"));
-        for file in [&lower, &upper, &text] {
+        for file in [&lower, &upper, &pack, &shout, &text] {
             std::fs::write(file, "x").expect("write");
         }
         std::fs::create_dir(&folder).expect("dir");
-        assert_eq!(backup_arg(&arg(&lower)), Some(lower.clone()));
-        assert_eq!(backup_arg(&arg(&upper)), Some(upper.clone()));
-        for no in [&text, &folder, &tmp.path().join("missing.rimrim")] {
-            assert_eq!(backup_arg(&arg(no)), None, "{}", no.display());
+        assert_eq!(
+            file_arg(&arg(&lower)),
+            Some(gui::OpenFile::Backup(lower.clone()))
+        );
+        assert_eq!(
+            file_arg(&arg(&upper)),
+            Some(gui::OpenFile::Backup(upper.clone()))
+        );
+        assert_eq!(
+            file_arg(&arg(&pack)),
+            Some(gui::OpenFile::Pack(pack.clone()))
+        );
+        assert_eq!(
+            file_arg(&arg(&shout)),
+            Some(gui::OpenFile::Pack(shout.clone()))
+        );
+        let missing = [
+            tmp.path().join("missing.rimrim"),
+            tmp.path().join("m.rimpack"),
+        ];
+        for no in [&text, &folder, &missing[0], &missing[1]] {
+            assert_eq!(file_arg(&arg(no)), None, "{}", no.display());
         }
-        assert_eq!(backup_arg(&[]), None);
+        assert_eq!(file_arg(&[]), None);
     }
 }

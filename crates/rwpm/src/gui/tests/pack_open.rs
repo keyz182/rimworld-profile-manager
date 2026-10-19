@@ -170,6 +170,20 @@ fn a_game_version_that_differs_is_noted_and_one_that_matches_is_not() {
 }
 
 #[test]
+fn a_file_that_is_not_a_pack_is_refused_in_words_and_opens_nothing() {
+    let sb = Sandbox::new();
+    let junk = sb.path("junk.rimpack");
+    std::fs::write(&junk, "plain text").expect("write");
+    let mut app = sb.app();
+    let _task = app.open_pack(&junk);
+    assert!(app.dialog.is_none());
+    let Some(Notice::Error(words)) = &app.notice else {
+        panic!("{:?}", app.notice);
+    };
+    assert!(words.contains("not a modpack"), "{words}");
+}
+
+#[test]
 fn only_a_steam_page_built_from_the_id_is_a_button() {
     let sb = Sandbox::new();
     let mut manual = entry("y.manual", "Find Me", None);
