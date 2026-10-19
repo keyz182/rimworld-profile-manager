@@ -65,6 +65,12 @@ pub enum ProfileError {
     NotEnoughSpace { path: PathBuf, need: u64, free: u64 },
     #[error("`{}` is not a backup this version can use: {reason}", .path.display())]
     BadBackup { path: PathBuf, reason: String },
+    #[error("`{}` is not a modpack this version can use: {reason}", .path.display())]
+    BadModpack { path: PathBuf, reason: String },
+    #[error(
+        "`{0}` has no mod list yet, so there is nothing to share; start RimWorld once with this profile"
+    )]
+    NoModList(String),
     #[error("`{0}` is not an offline profile; only offline profiles can be backed up")]
     NotOffline(String),
     #[error(

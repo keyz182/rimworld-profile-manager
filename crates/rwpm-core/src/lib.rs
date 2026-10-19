@@ -11,6 +11,7 @@ pub mod error;
 pub mod flatpak;
 mod fs_copy;
 pub mod launch;
+pub mod modpack;
 pub mod mods;
 pub mod paths;
 pub mod profile;
