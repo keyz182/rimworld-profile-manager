@@ -69,11 +69,23 @@ pub struct ModIndex {
 impl ModIndex {
     /// Scans official → local → workshop (R1). A missing folder counts as empty.
     pub fn scan(official: &Path, local: &Path, workshop: Option<&Path>) -> Self {
+        Self::scan_with_extra(official, local, workshop, None)
+    }
+
+    /// Like `scan`, with one more folder of Workshop-style mods (`<dir>/<id>/About/…`), such
+    /// as the ones the steamcmd route downloads into this app's own folder (T82c).
+    pub fn scan_with_extra(
+        official: &Path,
+        local: &Path,
+        workshop: Option<&Path>,
+        extra: Option<&Path>,
+    ) -> Self {
         let mut index = Self::default();
         let sources = [
             (Origin::Official, Some(official)),
             (Origin::Local, Some(local)),
             (Origin::Workshop, workshop),
+            (Origin::Workshop, extra),
         ];
         for (origin, dir) in sources {
             for mod_dir in dir.map(sorted_subdirs).unwrap_or_default() {

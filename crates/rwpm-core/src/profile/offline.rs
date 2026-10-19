@@ -60,6 +60,19 @@ pub fn plan_offline<T: Trash>(
     game: &EffectiveGame,
     refresh: bool,
 ) -> Result<OfflinePlan, ProfileError> {
+    plan_offline_with(store, id, game, refresh, None)
+}
+
+/// `plan_offline`, also looking for mods in `extra_workshop`: a folder of `<id>/About/…`
+/// mods outside Steam's own, such as the steamcmd route's downloads (T82c). They count as
+/// Workshop mods.
+pub fn plan_offline_with<T: Trash>(
+    store: &ProfileStore<T>,
+    id: &ProfileId,
+    game: &EffectiveGame,
+    refresh: bool,
+    extra_workshop: Option<&Path>,
+) -> Result<OfflinePlan, ProfileError> {
     let dir = stored_dir(&store.get(id)?, "made OFFLINE")?;
     let file = ProfileFile::read(&dir.join(FILE_NAME))?;
     let mut plan = OfflinePlan {
@@ -85,7 +98,8 @@ pub fn plan_offline<T: Trash>(
         Vec::new()
     };
     let workshop = game.steam.as_ref().map(|s| s.workshop_dir.as_path());
-    let index = ModIndex::scan(&game.data_dir(), &game.mods_dir(), workshop);
+    let index =
+        ModIndex::scan_with_extra(&game.data_dir(), &game.mods_dir(), workshop, extra_workshop);
     let candidates = group_candidates(&index, &active, &file, &mut plan);
     for (package_id, mut options) in candidates {
         if options.len() == 1 {
