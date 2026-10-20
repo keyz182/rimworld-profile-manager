@@ -69,11 +69,23 @@ pub struct ModIndex {
 impl ModIndex {
     /// Scans official → local → workshop (R1). A missing folder counts as empty.
     pub fn scan(official: &Path, local: &Path, workshop: Option<&Path>) -> Self {
+        Self::scan_with_extra(official, local, workshop, None)
+    }
+
+    /// Like `scan`, with one more folder of Workshop-style mods (`<dir>/<id>/About/…`), such
+    /// as the ones the steamcmd route downloads into this app's own folder (T82c).
+    pub fn scan_with_extra(
+        official: &Path,
+        local: &Path,
+        workshop: Option<&Path>,
+        extra: Option<&Path>,
+    ) -> Self {
         let mut index = Self::default();
         let sources = [
             (Origin::Official, Some(official)),
             (Origin::Local, Some(local)),
             (Origin::Workshop, workshop),
+            (Origin::Workshop, extra),
         ];
         for (origin, dir) in sources {
             for mod_dir in dir.map(sorted_subdirs).unwrap_or_default() {
@@ -235,6 +247,33 @@ fn read_about(mod_dir: &Path) -> Result<(String, Option<String>), String> {
         .map(|t| t.to_lowercase())
         .ok_or_else(|| "About.xml has no packageId".to_owned())?;
     Ok((id, field("name")))
+}
+
+/// A root-level text field of `About/About.xml` (for example `url`), trimmed; `None` when the
+/// file or the field is missing.
+pub(crate) fn about_field(mod_dir: &Path, tag: &str) -> Option<String> {
+    let about =
+        child_ignore_case(mod_dir, "About").and_then(|d| child_ignore_case(&d, "About.xml"))?;
+    root_field(&about, tag)
+}
+
+/// `<version>` of `About/Manifest.xml`, for the mods that ship one.
+pub(crate) fn manifest_version(mod_dir: &Path) -> Option<String> {
+    let manifest =
+        child_ignore_case(mod_dir, "About").and_then(|d| child_ignore_case(&d, "Manifest.xml"))?;
+    root_field(&manifest, "version")
+}
+
+fn root_field(xml: &Path, tag: &str) -> Option<String> {
+    let text = read_xml_text(xml).ok()?;
+    let doc = roxmltree::Document::parse(&text).ok()?;
+    doc.root_element()
+        .children()
+        .find(|n| n.has_tag_name(tag))
+        .and_then(|n| n.text())
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_owned)
 }
 
 #[cfg(test)]

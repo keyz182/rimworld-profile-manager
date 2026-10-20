@@ -153,7 +153,7 @@ fn manifest_for(plan: &BackupPlan, inventory: &Inventory) -> Manifest {
     }
 }
 
-fn check_space(dest: &Path, need: u64) -> Result<(), ProfileError> {
+pub(crate) fn check_space(dest: &Path, need: u64) -> Result<(), ProfileError> {
     let dir = dest.parent().filter(|p| !p.as_os_str().is_empty());
     let dir = dir.unwrap_or_else(|| Path::new("."));
     match space::free_space(dir) {
@@ -166,7 +166,7 @@ fn check_space(dest: &Path, need: u64) -> Result<(), ProfileError> {
     }
 }
 
-fn temp_beside(dest: &Path) -> Result<PathBuf, ProfileError> {
+pub(crate) fn temp_beside(dest: &Path) -> Result<PathBuf, ProfileError> {
     let Some(name) = dest.file_name().and_then(OsStr::to_str) else {
         let source = io::Error::new(io::ErrorKind::InvalidInput, "no file name");
         return Err(ProfileError::io("save", dest)(source));
@@ -204,7 +204,7 @@ fn write_archive(
 
 /// A header with the owner, group and user name left blank (the file may be shared) but
 /// the real modified time kept: RimWorld lists saves by it.
-fn header_for(meta: &Metadata) -> Header {
+pub(crate) fn header_for(meta: &Metadata) -> Header {
     let mut header = Header::new_gnu();
     header.set_metadata_in_mode(meta, HeaderMode::Deterministic);
     if let Some(secs) = meta

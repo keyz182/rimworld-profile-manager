@@ -152,6 +152,12 @@ impl App {
                 t::RESTORE_MENU,
                 self.blocked().is_none().then_some(Message::RestoreBackup),
                 theme::ghost
+            ),
+            action(
+                Icon::Folder,
+                t::OPEN_PACK_MENU,
+                self.blocked().is_none().then_some(Message::OpenPack),
+                theme::ghost
             )
         ]
         .spacing(GAP)
@@ -431,6 +437,18 @@ impl App {
         if !p.is_default() && p.mode == Mode::Offline {
             items.push(item(Icon::Copy, t::BACKUP_MENU, Message::Backup, !wait));
         }
+        items.push(item(Icon::Copy, t::SHARE_MENU, Message::Share, !wait));
+        // Only where a modpack subscribed this player to something that can be undone.
+        if p.stored_dir()
+            .is_some_and(|dir| !rwpm_core::fetch::record::read(dir).is_empty())
+        {
+            items.push(item(
+                Icon::Close,
+                t::REMOVE_PACK_SUBS,
+                Message::RemovePackSubs,
+                !wait,
+            ));
+        }
         if Os::current() == Os::Windows {
             items.push(item(
                 Icon::Close,
@@ -467,17 +485,28 @@ impl App {
             } else {
                 job.done.min(job.total) as f32
             };
-            return column![
-                row![
-                    icon(Icon::Busy),
-                    text(t::progress(&job.label, job.done, job.total)),
-                    text(t::OTHERS_WAIT).style(theme::muted)
-                ]
-                .spacing(8),
-                progress_bar(0.0..=total, done).girth(6)
+            let mut head = row![
+                icon(Icon::Busy),
+                text(if job.percent {
+                    t::progress_percent(&job.label, job.done, job.total)
+                } else {
+                    t::progress(&job.label, job.done, job.total)
+                }),
+                text(t::OTHERS_WAIT).style(theme::muted)
             ]
-            .spacing(6)
-            .into();
+            .spacing(8)
+            .align_y(Alignment::Center);
+            // A job that can be stopped (T83c) says so with a button.
+            if self.cancel.is_some() {
+                head = head.push(space::horizontal()).push(
+                    button(t::CANCEL)
+                        .on_press(Message::CancelJob)
+                        .style(theme::secondary),
+                );
+            }
+            return column![head, progress_bar(0.0..=total, done).girth(6)]
+                .spacing(6)
+                .into();
         }
         match &self.notice {
             Some(Notice::Info(line)) => row![icon(Icon::Ok), text(line)].spacing(8).into(),

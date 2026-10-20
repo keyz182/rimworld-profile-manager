@@ -9,6 +9,7 @@ authors.workspace = true
 
 [dependencies]
 dirs = "7.0.0"
+flate2 = "1.1.10"
 reflink-copy = "0.1.30"
 roxmltree = "0.21.1"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -20,6 +21,8 @@ tar = { version = "0.4.46", default-features = false }
 thiserror = "2.0.21"
 toml = "1.1.8"
 trash = "5.2.9"
+ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
 zstd = "0.14.2"
 
 [dev-dependencies]

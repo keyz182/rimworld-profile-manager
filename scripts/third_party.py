@@ -1,7 +1,7 @@
 """Copies the licence files of every crate shipped inside rwpm into a bundle.
 
 Reads `cargo metadata` (with --filter-platform) on stdin. Follows only normal
-dependencies from the `rwpm` binary (build and dev dependencies are not shipped),
+dependencies from the `rwpm` and `rwpm-steam` binaries (build and dev dependencies are not shipped),
 copies each crate's LICENSE/COPYING/NOTICE files and writes THIRD-PARTY.md.
 Exits 1 if a shipped crate has no licence file, so nothing ships unlicensed.
 
@@ -16,6 +16,8 @@ import pathlib
 import shutil
 import sys
 
+# T83e: both programs in a bundle. rwpm-steam is the Steam helper.
+SHIPPED_BINARIES = ("rwpm", "rwpm-steam")
 LICENCE_PREFIXES = ("license", "licence", "copying", "notice", "unlicense")
 LICENCE_DIRS = ("licenses", "licences", "license")
 
@@ -30,6 +32,8 @@ FROM_REPO = {
     "profiling": "aclysma_profiling",
     "spirv": "gfx-rs_rspirv",
     "svg_fmt": "nical_rust_debug",
+    # Published without a licence file; the same repository as `steamworks` (T83e).
+    "steamworks-sys": "Noxime_steamworks-rs",
     "winapi-x86_64-pc-windows-gnu": "retep998_winapi-rs",
     **{
         f"iced_{n}": "iced-rs_iced"
@@ -90,10 +94,10 @@ def licence_files(src: pathlib.Path) -> list[pathlib.Path]:
 
 
 def shipped(meta: dict) -> set[str]:
-    """Package ids reachable from rwpm through normal dependencies."""
+    """Package ids reachable from rwpm or rwpm-steam through normal dependencies."""
     nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
-    root = next(p["id"] for p in meta["packages"] if p["name"] == "rwpm")
-    seen, todo = set(), [root]
+    roots = [p["id"] for p in meta["packages"] if p["name"] in SHIPPED_BINARIES]
+    seen, todo = set(), roots
     while todo:
         pid = todo.pop()
         if pid in seen:

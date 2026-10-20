@@ -27,6 +27,11 @@ pub struct AppSettings {
     /// First-run setup is finished (or was not needed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub setup_done: bool,
+    /// SHA-256 (lower-case hex) of the steamcmd archive the first time it was downloaded
+    /// (T82). Later downloads must match it. Kept here, not beside the unpacked files, so
+    /// that deleting those does not forget it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steamcmd_sha256: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -37,6 +42,7 @@ impl Default for AppSettings {
             game_dir: None,
             steam_dir: None,
             setup_done: false,
+            steamcmd_sha256: None,
         }
     }
 }
@@ -122,6 +128,7 @@ mod tests {
             game_dir: Some(PathBuf::from("/games/RimWorld")),
             steam_dir: None,
             setup_done: true,
+            steamcmd_sha256: Some("ab".repeat(32)),
         };
         s.save(tmp.path()).expect("save");
         let text = std::fs::read_to_string(tmp.path().join(FILE_NAME)).expect("read");

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 pub use config::{read_active_mods, rewrite_active_mods};
 pub use index::{InstalledMod, ModIndex, Origin, Resolution, Skipped};
+pub(crate) use index::{about_field, manifest_version};
 
 /// Workshop copies of a packageId that also exists locally get this suffix (R1).
 pub const STEAM_POSTFIX: &str = "_steam";

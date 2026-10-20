@@ -8,15 +8,18 @@ pub mod builds;
 pub mod consent;
 pub mod discovery;
 pub mod error;
+pub mod fetch;
 pub mod flatpak;
 mod fs_copy;
 pub mod launch;
+pub mod modpack;
 pub mod mods;
 pub mod paths;
 pub mod profile;
 pub mod rimsort;
 pub mod settings;
 pub mod space;
+pub mod steamcmd;
 pub mod winhttp;
 
 pub use error::ProfileError;

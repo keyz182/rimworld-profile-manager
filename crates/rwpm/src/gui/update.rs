@@ -92,6 +92,11 @@ impl App {
                     | M::RestoreBackup
                     | M::BackupPicked(..)
                     | M::RestorePicked(_)
+                    | M::Share
+                    | M::SharePicked(..)
+                    | M::OpenPack
+                    | M::OpenPackPicked(_)
+                    | M::RemovePackSubs
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
         // A running game: starting another, or changing mods and game files, waits.
@@ -114,6 +119,11 @@ impl App {
                     | M::RestoreBackup
                     | M::BackupPicked(..)
                     | M::RestorePicked(_)
+                    | M::Share
+                    | M::SharePicked(..)
+                    | M::OpenPack
+                    | M::OpenPackPicked(_)
+                    | M::RemovePackSubs
             ) || confirm_in(|d| {
                 matches!(
                     d,
@@ -128,6 +138,12 @@ impl App {
                         | Dialog::ConfirmDowngrade { .. }
                         | Dialog::Backup(_)
                         | Dialog::Restore(_)
+                        | Dialog::Share(_)
+                        | Dialog::OpenPack(_)
+                        | Dialog::ConfirmSubscribe(_)
+                        | Dialog::ConsentSteamcmd(_)
+                        | Dialog::TrustSteamcmd { .. }
+                        | Dialog::ConfirmUnsubscribe { .. }
                 )
             }))
     }
@@ -229,6 +245,22 @@ impl App {
             | Message::BackupPicked(..)
             | Message::RestoreBackup
             | Message::RestorePicked(_) => return self.backup_update(message),
+            Message::Share
+            | Message::ShareTick(..)
+            | Message::ShareSave(..)
+            | Message::ShareStart(_)
+            | Message::SharePicked(..) => return self.modpack_update(message),
+            Message::OpenPack
+            | Message::OpenPackPicked(_)
+            | Message::PackOpened(_)
+            | Message::OpenUrl(_) => return self.pack_update(message),
+            Message::PackSubscribe
+            | Message::PackSteamcmd
+            | Message::PackOffline(_)
+            | Message::CancelJob
+            | Message::RemovePackSubs => {
+                return self.pack_fetch_update(message);
+            }
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {
@@ -273,6 +305,9 @@ impl App {
         match (&mut self.dialog, field) {
             (Some(Dialog::Name { value: v, .. }), Field::Name) => *v = value,
             (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
+            (Some(Dialog::OpenPack(preview)), Field::Name) => preview.plan.name = value,
+            (Some(Dialog::Share(draft)), Field::Description) => draft.description = value,
+            (Some(Dialog::Share(draft)), Field::Link) => draft.link = value,
             (
                 Some(Dialog::Settings {
                     game, game_check, ..
@@ -299,12 +334,39 @@ impl App {
             label,
             done: 0,
             total,
+            percent: false,
         });
         jobs::spawn(work)
     }
 
-    fn finished(&mut self, result: Result<Outcome, String>) -> Task<Message> {
+    /// A job that has a Cancel button: `work` gets a flag that turns true when it is pressed.
+    pub(super) fn start_cancellable<F>(
+        &mut self,
+        label: String,
+        total: u64,
+        work: F,
+    ) -> Task<Message>
+    where
+        F: FnOnce(&mut dyn FnMut(u64), &std::sync::atomic::AtomicBool) -> Result<Outcome, String>
+            + Send
+            + 'static,
+    {
+        let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let task = self.start(label, total, {
+            let flag = std::sync::Arc::clone(&flag);
+            move |progress| work(progress, &flag)
+        });
+        // The totals of these jobs are steps (restore, then fetch), not bytes.
+        if let Some(job) = &mut self.job {
+            job.percent = true;
+        }
+        self.cancel = Some(flag);
+        task
+    }
+
+    pub(super) fn finished(&mut self, result: Result<Outcome, String>) -> Task<Message> {
         self.job = None;
+        self.cancel = None;
         match result {
             Ok(Outcome::Changed(line)) => {
                 self.reload();
@@ -333,6 +395,17 @@ impl App {
                 return self.read_builds_task();
             }
             Ok(Outcome::Restored { id, line }) => self.changed(Some(id), line),
+            Ok(Outcome::SteamcmdChanged {
+                preview,
+                first,
+                found,
+            }) => {
+                self.dialog = Some(Dialog::TrustSteamcmd {
+                    preview,
+                    first,
+                    found,
+                });
+            }
             Ok(Outcome::ReadyToPlay(id)) => {
                 self.reload();
                 self.selected = id;
@@ -393,6 +466,20 @@ impl App {
                 self.dialog = Some(Dialog::Restore(plan));
             }
             Some(Dialog::Restore(plan)) => return self.restore_job(*plan),
+            Some(Dialog::Share(draft)) if !draft.ready() => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::Share(draft));
+            }
+            Some(Dialog::Share(draft)) => return self.pick_share_save(*draft),
+            Some(Dialog::OpenPack(preview)) if !preview.ready() => {
+                // Enter must not start what the disabled button refuses.
+                self.dialog = Some(Dialog::OpenPack(preview));
+            }
+            Some(Dialog::OpenPack(preview)) => return self.pack_restore_job(*preview),
+            Some(Dialog::ConfirmSubscribe(preview)) => return self.subscribe_job(*preview),
+            Some(Dialog::ConsentSteamcmd(preview)) => self.grant_steamcmd(*preview),
+            Some(Dialog::TrustSteamcmd { preview, .. }) => return self.trust_steamcmd(*preview),
+            Some(Dialog::ConfirmUnsubscribe { id, .. }) => return self.unsubscribe_job(id),
             Some(dialog @ Dialog::Guard(_)) => self.dialog = Some(dialog),
             Some(Dialog::Help) => {}
             None => {}
