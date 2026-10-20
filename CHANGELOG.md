@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.12.1](https://github.com/keyz182/rimworld-profile-manager/compare/ca18855d102c6b7eb44da31dccb174eb9bae1dea..v1.12.1) - 2026-10-20
+#### Bug Fixes
+- (**gui**) let a long notice scroll and be dismissed - ([e8d2aa9](https://github.com/keyz182/rimworld-profile-manager/commit/e8d2aa9cfa00deb634c313dd5796c26945545b59)) - [@keyz182](https://github.com/keyz182)
+- (**launcher**) copy the Steam helper beside the synced launcher - ([ca18855](https://github.com/keyz182/rimworld-profile-manager/commit/ca18855d102c6b7eb44da31dccb174eb9bae1dea)) - [@keyz182](https://github.com/keyz182)
+- (**steam**) do not time out a mod that waits in Steam's download queue - ([6997228](https://github.com/keyz182/rimworld-profile-manager/commit/6997228be0e27b3c2c2f15b01226f34a2385d457)) - [@keyz182](https://github.com/keyz182)
+#### Miscellaneous Chores
+- merge origin/main (v1.12.0 release commit) into main - ([4c5127e](https://github.com/keyz182/rimworld-profile-manager/commit/4c5127efb523845f451fd6580f8f0c92eb9d7c43)) - [@keyz182](https://github.com/keyz182)
+- merge fix/long-notice into main - ([29d4347](https://github.com/keyz182/rimworld-profile-manager/commit/29d4347fc60d49996337aa4277625ff885a7159b)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.12.0](https://github.com/keyz182/rimworld-profile-manager/compare/b6f835a9d8062f88ae9fc017274d1970825f95f9..v1.12.0) - 2026-10-20
 #### Features
 - restore modpacks with Steam or steamcmd, and slug RimSort instance names (#29) - ([c8d8c06](https://github.com/keyz182/rimworld-profile-manager/commit/c8d8c06b6874e14f0f8329642506917e402fb0c6)) - Kieran Evans
