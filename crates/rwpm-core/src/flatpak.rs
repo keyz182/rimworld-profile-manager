@@ -40,25 +40,51 @@ pub fn in_sandbox() -> bool {
     Path::new("/.flatpak-info").exists()
 }
 
+/// The Steam helper and Valve's library. The app looks for the helper beside its own
+/// executable (`fetch::helper_beside`), so a copied launcher needs both beside it (V86).
+fn steam_files() -> [&'static str; 2] {
+    [
+        crate::fetch::HELPER,
+        if cfg!(windows) {
+            "steam_api64.dll"
+        } else if cfg!(target_os = "macos") {
+            "libsteam_api.dylib"
+        } else {
+            "libsteam_api.so"
+        },
+    ]
+}
+
 /// Copies rwpm, the payload and Doorstop from `from` (this install) to `to`, replacing
 /// only files that differ, each via a temp file + rename (a running copy keeps its file).
+/// The Steam helper and its library go too when `from` has them: a bundle without them
+/// still syncs, and the app then offers no Steam route.
 /// → `<to>/rwpm`, the program Steam's launch options name.
 pub fn sync_launcher(from: &Path, to: &Path) -> io::Result<PathBuf> {
     for rel in launcher_files() {
-        let (src, dst) = (from.join(rel), to.join(rel));
-        let new = std::fs::read(&src)?;
-        if std::fs::read(&dst).is_ok_and(|old| old == new) {
-            continue;
+        copy_if_changed(&from.join(rel), &to.join(rel))?;
+    }
+    for rel in steam_files() {
+        match copy_if_changed(&from.join(rel), &to.join(rel)) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound && !from.join(rel).exists() => {}
+            other => other?,
         }
-        if let Some(dir) = dst.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        let tmp = dst.with_extension("rwpm-tmp");
-        std::fs::write(&tmp, &new)?;
-        std::fs::set_permissions(&tmp, std::fs::metadata(&src)?.permissions())?;
-        std::fs::rename(&tmp, &dst)?;
     }
     Ok(to.join("rwpm"))
+}
+
+fn copy_if_changed(src: &Path, dst: &Path) -> io::Result<()> {
+    let new = std::fs::read(src)?;
+    if std::fs::read(dst).is_ok_and(|old| old == new) {
+        return Ok(());
+    }
+    if let Some(dir) = dst.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = dst.with_extension("rwpm-tmp");
+    std::fs::write(&tmp, &new)?;
+    std::fs::set_permissions(&tmp, std::fs::metadata(src)?.permissions())?;
+    std::fs::rename(&tmp, dst)
 }
 
 /// `flatpak run --command=<rwpm> [--env=K=V…] com.valvesoftware.Steam run <id> -- <game>`.
@@ -120,6 +146,43 @@ mod tests {
             .modified()
             .expect("mtime");
         assert_eq!(before, after, "unchanged file rewritten");
+    }
+
+    #[test]
+    fn sync_copies_the_steam_helper_so_the_copy_finds_it() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (app, copy) = (tmp.path().join("app"), tmp.path().join("copy"));
+        bundle(&app, "v1");
+        for rel in steam_files() {
+            std::fs::write(app.join(rel), format!("{rel}:v1")).expect("file");
+        }
+        let rwpm = sync_launcher(&app, &copy).expect("sync");
+        for rel in steam_files() {
+            assert_eq!(
+                std::fs::read_to_string(copy.join(rel)).expect("copied"),
+                format!("{rel}:v1")
+            );
+        }
+        assert_eq!(
+            crate::fetch::helper_beside(&rwpm),
+            Some(copy.join(crate::fetch::HELPER))
+        );
+        std::fs::write(app.join(crate::fetch::HELPER), "newer").expect("update");
+        sync_launcher(&app, &copy).expect("sync again");
+        assert_eq!(
+            std::fs::read_to_string(copy.join(crate::fetch::HELPER)).expect("helper"),
+            "newer"
+        );
+    }
+
+    #[test]
+    fn sync_still_works_for_a_bundle_without_the_steam_helper() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (app, copy) = (tmp.path().join("app"), tmp.path().join("copy"));
+        bundle(&app, "v1");
+        let rwpm = sync_launcher(&app, &copy).expect("sync");
+        assert!(rwpm.is_file());
+        assert_eq!(crate::fetch::helper_beside(&rwpm), None);
     }
 
     #[test]
