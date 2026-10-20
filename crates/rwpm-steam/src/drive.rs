@@ -9,7 +9,8 @@ use std::time::{Duration, Instant};
 use crate::args::Op;
 use crate::event::{Event, Fresh};
 
-/// No change in an item for this long fails it.
+/// No change for this long fails an item: in the item itself, or, while Steam has it queued or
+/// downloading, anywhere in the run. A subscribed item still queued then counts as subscribed.
 pub const STALL: Duration = Duration::from_secs(60);
 /// Wait this long before the first subscribe or unsubscribe call. To Steam, starting this
 /// program starts the game, and Steam then fetches the account's subscription list; a call
@@ -250,6 +251,9 @@ pub fn run(
             }),
         }
     }
+    // When anything in the run last moved. Steam downloads a few items at a time, so an item
+    // waiting its turn shows no change of its own for as long as the queue is long.
+    let mut run_changed_at = now;
     while !pending.is_empty() {
         if stop.load(Ordering::Relaxed) {
             for p in pending.drain(..) {
@@ -271,6 +275,9 @@ pub fn run(
                     failed += 1;
                     emit(Event::Fail { id: p.id, reason });
                     continue;
+                }
+                if let Stage::Download = p.stage {
+                    run_changed_at = now;
                 }
             }
             if let Stage::Download = p.stage {
@@ -296,8 +303,10 @@ pub fn run(
                     }
                     p.last = item;
                     p.changed_at = now;
+                    run_changed_at = now;
                 }
                 if finished(op, item) {
+                    run_changed_at = now;
                     emit(Event::Ok {
                         id: p.id,
                         fresh: p.fresh,
@@ -305,7 +314,23 @@ pub fn run(
                     continue;
                 }
             }
-            if now.saturating_sub(p.changed_at) >= STALL {
+            // An item Steam is downloading or has queued is stuck only when the whole run is.
+            let queued = matches!(p.stage, Stage::Download) && p.last.busy;
+            let quiet_since = if queued {
+                p.changed_at.max(run_changed_at)
+            } else {
+                p.changed_at
+            };
+            if now.saturating_sub(quiet_since) >= STALL {
+                // Subscribed is what was asked. Steam keeps downloading by itself, and the
+                // item's own state shows it, so it counts as done.
+                if matches!(op, Op::Subscribe) && p.last.subscribed && queued {
+                    emit(Event::Ok {
+                        id: p.id,
+                        fresh: p.fresh,
+                    });
+                    continue;
+                }
                 failed += 1;
                 emit(Event::Fail {
                     id: p.id,

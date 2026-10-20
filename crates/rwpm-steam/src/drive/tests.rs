@@ -252,6 +252,68 @@ fn an_item_that_makes_no_progress_fails_after_the_stall_time() {
     );
 }
 
+/// Subscribed, and Steam has it in its download queue.
+const QUEUED: Item = Item {
+    subscribed: true,
+    installed: false,
+    busy: true,
+    progress: None,
+};
+
+/// An item that waits in Steam's queue for `steps` seconds, then finishes.
+fn queued_for(steps: usize) -> Vec<Item> {
+    let mut script = vec![QUEUED; steps];
+    script.push(SUBSCRIBED);
+    script
+}
+
+#[test]
+fn a_queued_item_waits_while_the_rest_of_the_run_moves() {
+    // Steam finishes one item every 40 s. The last waits 120 s with no change of its own, but
+    // each finish before it shows Steam is working through the queue.
+    let mut f = fake(&[
+        (1, queued_for(40)),
+        (2, queued_for(80)),
+        (3, queued_for(120)),
+    ]);
+    let (failed, lines) = go(Op::Subscribe, &[1, 2, 3], &mut f);
+    assert_eq!(failed, 0, "{lines:?}");
+    for id in 1..=3 {
+        assert!(lines.contains(&format!("ok {id} already")), "{lines:?}");
+    }
+}
+
+#[test]
+fn a_subscribed_item_stuck_in_steams_queue_counts_as_subscribed() {
+    // Nothing in the run moves for 60 s: the item is subscribed, and Steam keeps downloading
+    // it by itself, so the run says so instead of failing it.
+    let mut f = fake(&[(5, vec![ABSENT, QUEUED])]);
+    f.answers.insert(5, Ok(()));
+    let (failed, lines) = go(Op::Subscribe, &[5], &mut f);
+    assert_eq!(failed, 0, "{lines:?}");
+    assert_eq!(lines.last().map(String::as_str), Some("ok 5 new"));
+}
+
+#[test]
+fn a_subscribed_item_with_nothing_happening_still_fails() {
+    // Subscribed but not installed, and Steam is not downloading it: that is a real stall.
+    let idle = item(true, false, false, None);
+    let mut f = fake(&[(5, vec![idle])]);
+    let (failed, lines) = go(Op::Subscribe, &[5], &mut f);
+    assert_eq!(failed, 1, "{lines:?}");
+    assert_eq!(
+        lines.last().map(String::as_str),
+        Some("fail 5 Steam made no progress for 60 seconds")
+    );
+}
+
+#[test]
+fn a_queued_download_still_fails_when_the_whole_run_is_stuck() {
+    let mut f = fake(&[(1, vec![QUEUED]), (2, vec![QUEUED])]);
+    let (failed, lines) = go(Op::Download, &[1, 2], &mut f);
+    assert_eq!(failed, 2, "{lines:?}");
+}
+
 #[test]
 fn one_stuck_item_does_not_hold_back_the_others() {
     let mut f = fake(&[
@@ -469,15 +531,13 @@ fn a_refused_second_call_after_the_answer_fails_with_steams_reason() {
 }
 
 /// A subscription the player already had that Steam is still downloading is Steam's own work:
-/// no call was made, so none is repeated.
+/// no call was made, so none is repeated. It is subscribed, so it counts as done once the run
+/// has been quiet for the stall time.
 #[test]
 fn what_steam_downloads_by_itself_is_never_asked_for_again() {
     let mut f = fake(&[(7, vec![item(true, false, true, None)])]);
     let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
-    assert_eq!(failed, 1);
-    assert_eq!(
-        lines,
-        ["fail 7 Steam made no progress for 60 seconds".to_owned()]
-    );
+    assert_eq!(failed, 0);
+    assert_eq!(lines, ["ok 7 already".to_owned()]);
     assert!(f.started.is_empty());
 }
