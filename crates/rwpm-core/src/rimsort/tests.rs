@@ -125,12 +125,20 @@ fn profile(name: &str, mode: Mode) -> Profile {
     }
 }
 
+/// A profile whose name is not a slug of its id, as after a rename or from a pack.
+fn named(name: &str, id: &str) -> Profile {
+    Profile {
+        name: name.into(),
+        ..profile(id, Mode::Live)
+    }
+}
+
 #[test]
 fn instance_fields_have_rimsort_types() {
     let f = Fixture::new();
     let plan = f.plan(&profile("My Run", Mode::Offline));
     f.apply(&plan).expect("apply");
-    let inst = &f.json()["instances"]["My Run"];
+    let inst = &f.json()["instances"]["My_Run"];
     let keys: Vec<&str> = inst
         .as_object()
         .expect("object")
@@ -158,7 +166,7 @@ fn instance_fields_have_rimsort_types() {
     );
     assert_eq!(inst["steam_client_integration"], true);
     assert_eq!(inst["launch_via_steam_protocol"], false);
-    let dir = f.tmp.path().join("RimSort/instances/My Run");
+    let dir = f.tmp.path().join("RimSort/instances/My_Run");
     assert_eq!(inst["steamcmd_install_path"], dir.to_str().expect("utf-8"));
     assert!(dir.is_dir(), "instance folder created");
 }
@@ -185,7 +193,7 @@ fn other_keys_values_and_order_preserved() {
         after["instances"]["Default"],
         before["instances"]["Default"]
     );
-    assert_eq!(keys(&after["instances"]), ["Default", "My Run"]);
+    assert_eq!(keys(&after["instances"]), ["Default", "My_Run"]);
     let text = std::fs::read_to_string(f.settings()).expect("text");
     assert!(
         text.contains("\n    \"theme_name\""),
@@ -286,11 +294,11 @@ fn offline_vs_live_local_folder() {
         .expect("offline");
     let json = f.json();
     assert_eq!(
-        json["instances"]["Live Run"]["local_folder"],
+        json["instances"]["Live_Run"]["local_folder"],
         "/games/RimWorld/Mods"
     );
     assert_eq!(
-        json["instances"]["Off Run"]["local_folder"],
+        json["instances"]["Off_Run"]["local_folder"],
         "/profiles/off-run/Mods"
     );
 }
@@ -311,11 +319,11 @@ fn default_profile_config_folder_and_name_clash() {
     };
     let plan = f.plan(&default);
     assert_eq!(
-        plan.instance_name, "Default (rwpm)",
+        plan.instance_name, "Default_2",
         "RimSort's own Default instance kept"
     );
     f.apply(&plan).expect("apply");
-    let inst = &f.json()["instances"]["Default (rwpm)"];
+    let inst = &f.json()["instances"]["Default_2"];
     assert_eq!(
         inst["config_folder"],
         "/home/u/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Config"
@@ -348,7 +356,7 @@ fn reexport_finds_instance_exported_before_the_rimsort_marker() {
     f.apply(&f.plan(&profile("My Run", Mode::Live)))
         .expect("first");
     let mut json = f.json();
-    json["instances"]["My Run"]["run_args"] = "'/opt/rwpm/rwpm' run my-run -- %command%".into();
+    json["instances"]["My_Run"]["run_args"] = "'/opt/rwpm/rwpm' run my-run -- %command%".into();
     std::fs::write(
         f.settings(),
         serde_json::to_vec_pretty(&json).expect("json"),
@@ -358,7 +366,7 @@ fn reexport_finds_instance_exported_before_the_rimsort_marker() {
     assert!(plan.updates_existing, "old run_args still counts as ours");
     f.apply(&plan).expect("second");
     assert_eq!(
-        f.json()["instances"]["My Run"]["run_args"],
+        f.json()["instances"]["My_Run"]["run_args"],
         "'/opt/rwpm/rwpm' run --from rimsort my-run -- %command%"
     );
 }
@@ -370,8 +378,8 @@ fn reexport_updates_own_instance_keeps_user_fields() {
         .expect("first");
     // The player tweaks RimSort-only fields, and renames the profile.
     let mut json = f.json();
-    json["instances"]["My Run"]["steamcmd_ignore"] = true.into();
-    json["instances"]["My Run"]["initial_setup"] = true.into();
+    json["instances"]["My_Run"]["steamcmd_ignore"] = true.into();
+    json["instances"]["My_Run"]["initial_setup"] = true.into();
     std::fs::write(
         f.settings(),
         serde_json::to_vec_pretty(&json).expect("json"),
@@ -381,9 +389,9 @@ fn reexport_updates_own_instance_keeps_user_fields() {
     renamed.name = "Renamed".into();
     let plan = f.plan(&renamed);
     assert!(plan.updates_existing);
-    assert_eq!(plan.instance_name, "My Run");
+    assert_eq!(plan.instance_name, "My_Run");
     f.apply(&plan).expect("second");
-    let inst = &f.json()["instances"]["My Run"];
+    let inst = &f.json()["instances"]["My_Run"];
     assert_eq!(inst["steamcmd_ignore"], true);
     assert_eq!(inst["initial_setup"], true);
     assert_eq!(inst["local_folder"], "/profiles/my-run/Mods");
@@ -395,16 +403,98 @@ fn name_clash_with_foreign_instance_gets_suffix() {
     let f = Fixture::new();
     let mut json: Value = serde_json::from_str(SETTINGS).expect("json");
     json["instances"]["Run"] = json["instances"]["Default"].clone();
-    json["instances"]["Run (rwpm)"] = json["instances"]["Default"].clone();
+    json["instances"]["Run_2"] = json["instances"]["Default"].clone();
     std::fs::write(
         f.settings(),
         serde_json::to_vec_pretty(&json).expect("json"),
     )
     .expect("w");
+    assert_eq!(f.plan(&profile("Run", Mode::Live)).instance_name, "Run_3");
+}
+
+#[test]
+fn slugify_keeps_letters_and_digits_and_joins_the_rest_with_one_underscore() {
+    assert_eq!(slugify("Vanilla Expanded"), "Vanilla_Expanded");
+    assert_eq!(slugify("  CE + VE: Hard!! "), "CE_VE_Hard");
+    assert_eq!(slugify("../../x"), "x");
+    assert_eq!(slugify(r"C:\x\..\y"), "C_x_y");
+    assert_eq!(slugify("/tmp/x"), "tmp_x");
+    assert_eq!(slugify("a\0b\tc"), "a_b_c");
+    assert_eq!(slugify("日本語"), "");
+    assert_eq!(slugify(".. ."), "");
+    let long = slugify(&"ab ".repeat(40));
+    assert_eq!(long.len(), MAX_SLUG_LEN);
+    assert!(!long.starts_with('_') && !long.ends_with('_'));
     assert_eq!(
-        f.plan(&profile("Run", Mode::Live)).instance_name,
-        "Run (rwpm) 2"
+        slugify(&format!("{} x", "a".repeat(MAX_SLUG_LEN - 1))).len(),
+        MAX_SLUG_LEN - 1
     );
+}
+
+#[test]
+fn hostile_names_stay_one_folder_under_instances() {
+    for name in [
+        "../../escape",
+        "/tmp/abs",
+        r"C:\win",
+        "..",
+        ". .",
+        "/",
+        "a\0b",
+        "日本語",
+    ] {
+        let f = Fixture::new();
+        let plan = f.plan(&named(name, "x"));
+        let inst = plan.instance_name.clone();
+        assert!(
+            !inst.is_empty() && inst.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "{name:?} gave {inst:?}"
+        );
+        f.apply(&plan).expect("apply");
+        let rimsort = f.tmp.path().join("RimSort");
+        let made: Vec<_> = std::fs::read_dir(rimsort.join("instances"))
+            .expect("instances")
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(made, [std::ffi::OsString::from(&inst)], "{name:?}");
+        let tmp_entries = std::fs::read_dir(f.tmp.path()).expect("tmp").count();
+        assert_eq!(tmp_entries, 3, "{name:?}: only RimSort, app and backups");
+    }
+}
+
+#[test]
+fn a_name_with_nothing_alphanumeric_falls_back_to_the_profile_id() {
+    let f = Fixture::new();
+    assert_eq!(f.plan(&named("..", "my-run-2")).instance_name, "my_run_2");
+}
+
+#[test]
+fn two_names_with_one_slug_get_numbered_instances() {
+    let f = Fixture::new();
+    f.apply(&f.plan(&named("Run: A", "run-a"))).expect("a");
+    let plan = f.plan(&named("Run A", "run-a-2"));
+    assert_eq!(plan.instance_name, "Run_A_2");
+    assert!(!plan.updates_existing);
+    f.apply(&plan).expect("b");
+    let json = f.json();
+    assert_eq!(json["instances"]["Run_A"]["name"], "Run_A");
+    assert_eq!(json["instances"]["Run_A_2"]["name"], "Run_A_2");
+}
+
+#[test]
+fn a_clash_ignores_case_and_counts_folders_the_player_made() {
+    let f = Fixture::new();
+    // A key that differs only by case, and a bare folder with no settings entry.
+    let mut json: Value = serde_json::from_str(SETTINGS).expect("json");
+    json["instances"]["run"] = json["instances"]["Default"].clone();
+    std::fs::write(
+        f.settings(),
+        serde_json::to_vec_pretty(&json).expect("json"),
+    )
+    .expect("w");
+    std::fs::create_dir_all(f.tmp.path().join("RimSort/instances/RUN_2")).expect("dir");
+    assert_eq!(f.plan(&profile("Run", Mode::Live)).instance_name, "Run_3");
 }
 
 #[test]
@@ -580,26 +670,26 @@ fn v55_pinned_export_points_at_the_build() {
     let field = |inst: &str, k: &str| PathBuf::from(json["instances"][inst][k].as_str().expect(k));
     let build = resolve(&pinned);
     assert_eq!(
-        field("Pinned Run", "game_folder"),
+        field("Pinned_Run", "game_folder"),
         build.rimsort_game_folder()
     );
-    assert_eq!(field("Pinned Run", "local_folder"), build.mods_dir());
-    assert!(field("Pinned Run", "local_folder").starts_with(&games.build_dir));
+    assert_eq!(field("Pinned_Run", "local_folder"), build.mods_dir());
+    assert!(field("Pinned_Run", "local_folder").starts_with(&games.build_dir));
     assert_eq!(
-        field("Plain Run", "game_folder"),
+        field("Plain_Run", "game_folder"),
         games.live.rimsort_game_folder()
     );
-    assert_eq!(field("Plain Run", "local_folder"), games.live.mods_dir());
+    assert_eq!(field("Plain_Run", "local_folder"), games.live.mods_dir());
     let workshop = &games.live.steam.as_ref().expect("steam").workshop_dir;
-    assert_eq!(&field("Pinned Run", "workshop_folder"), workshop);
+    assert_eq!(&field("Pinned_Run", "workshop_folder"), workshop);
     // OFFLINE: the build's game, the profile's own Mods.
     assert_eq!(
-        field("Pinned Off", "game_folder"),
+        field("Pinned_Off", "game_folder"),
         build.rimsort_game_folder()
     );
     assert_eq!(
-        Some(field("Pinned Off", "local_folder")),
+        Some(field("Pinned_Off", "local_folder")),
         pinned_offline.mods_dir()
     );
-    assert_eq!(&field("Pinned Off", "workshop_folder"), workshop);
+    assert_eq!(&field("Pinned_Off", "workshop_folder"), workshop);
 }
