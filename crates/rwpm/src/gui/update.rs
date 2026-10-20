@@ -261,6 +261,7 @@ impl App {
             | Message::RemovePackSubs => {
                 return self.pack_fetch_update(message);
             }
+            Message::DismissNotice => self.notice = None,
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
             Message::Browse(field) => {

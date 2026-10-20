@@ -1061,6 +1061,30 @@ pub fn pack_mismatch_reason(expected: &str, found: &str) -> String {
     }
 }
 
+/// What failed, grouped by reason so one cause is told once: `Name (why)` for a lone mod,
+/// `N mods (why): A, B, C` for several. Groups go in the order the reasons first appear.
+fn not_fetched(failed: &[(String, String)]) -> String {
+    let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+    for (name, why) in failed {
+        match groups.iter_mut().find(|(w, _)| *w == why.as_str()) {
+            Some((_, names)) => names.push(name),
+            None => groups.push((why, vec![name])),
+        }
+    }
+    let parts: Vec<String> = groups
+        .iter()
+        .map(|(why, names)| match names.as_slice() {
+            [one] => format!("{one} ({why})"),
+            many => format!(
+                "{} ({why}): {}",
+                count(many.len(), "mod", "mods"),
+                many.join(", ")
+            ),
+        })
+        .collect();
+    parts.join("; ")
+}
+
 fn not_kept(mismatched: &[(String, String)]) -> String {
     let list: Vec<String> = mismatched
         .iter()
@@ -1078,11 +1102,7 @@ pub fn pack_kept_live(
 ) -> String {
     let mut line = format!("Restored “{name}”, but it was not made OFFLINE: {why}.");
     if !failed.is_empty() {
-        let list: Vec<String> = failed
-            .iter()
-            .map(|(n, why)| format!("{n} ({why})"))
-            .collect();
-        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+        line.push_str(&format!(" Not fetched: {}.", not_fetched(failed)));
     }
     if !mismatched.is_empty() {
         line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
@@ -1123,11 +1143,7 @@ pub fn pack_subscribed(
         line.push_str(&format!(" {} already had.", count(already, "mod", "mods")));
     }
     if !failed.is_empty() {
-        let list: Vec<String> = failed
-            .iter()
-            .map(|(n, why)| format!("{n} ({why})"))
-            .collect();
-        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+        line.push_str(&format!(" Not fetched: {}.", not_fetched(failed)));
     }
     if !mismatched.is_empty() {
         line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
@@ -1251,6 +1267,27 @@ mod tests {
         assert!(
             !line.contains("Not the mod the pack named"),
             "the old wording said the wrong thing for missing files"
+        );
+    }
+
+    #[test]
+    fn mods_that_failed_for_one_reason_are_told_once() {
+        let stall = "Steam made no progress for 60 seconds";
+        let failed: Vec<(String, String)> =
+            [("A", stall), ("B", "gone"), ("C", stall), ("D", stall)]
+                .iter()
+                .map(|(n, w)| ((*n).to_owned(), (*w).to_owned()))
+                .collect();
+        assert_eq!(
+            not_fetched(&failed),
+            "3 mods (Steam made no progress for 60 seconds): A, C, D; B (gone)"
+        );
+        assert_eq!(not_fetched(&failed[1..2]), "B (gone)");
+        let line = pack_subscribed("P", 2, 0, &failed, &[], 0);
+        assert_eq!(
+            line.matches(stall).count(),
+            1,
+            "the repeated reason is said once: {line}"
         );
     }
 
