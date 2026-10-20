@@ -508,13 +508,34 @@ impl App {
                 .spacing(6)
                 .into();
         }
-        match &self.notice {
-            Some(Notice::Info(line)) => row![icon(Icon::Ok), text(line)].spacing(8).into(),
+        let body: Element<'_, Message> = match &self.notice {
+            Some(Notice::Info(line)) => row![icon(Icon::Ok), text(line).width(Length::Fill)]
+                .spacing(8)
+                .into(),
             Some(Notice::Error(line)) => problem(line.clone()),
-            None => space::vertical().height(0).into(),
-        }
+            None => return space::vertical().height(0).into(),
+        };
+        // A long notice scrolls in a box of its own, so it cannot push the lists off the
+        // window, and OK lets the player say they have read it.
+        row![
+            container(
+                scrollable(container(body).padding(iced::Padding::ZERO.right(12)))
+                    .width(Length::Fill)
+            )
+            .max_height(NOTICE_MAX_HEIGHT)
+            .width(Length::Fill),
+            button(t::OK)
+                .on_press(Message::DismissNotice)
+                .style(theme::secondary)
+        ]
+        .spacing(GAP)
+        .align_y(Alignment::Start)
+        .into()
     }
 }
+
+/// The tallest the footer notice grows before it scrolls: about six lines of text.
+const NOTICE_MAX_HEIGHT: f32 = 132.0;
 
 fn mode_icon(p: &Profile) -> Icon {
     if p.is_default() {

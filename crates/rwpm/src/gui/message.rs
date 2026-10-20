@@ -129,6 +129,8 @@ pub enum Message {
     CancelJob,
     /// More → "Remove subscriptions from the pack".
     RemovePackSubs,
+    /// The OK button beside a notice in the footer: the player has read it.
+    DismissNotice,
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).

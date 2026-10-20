@@ -1655,6 +1655,52 @@ fn help_bounds(height: f32) -> (iced::Rectangle, iced::Rectangle) {
     (ok, first)
 }
 
+/// Lays out the main window `height` tall with `notice` showing; returns the bounds of the
+/// notice's OK button and of the Default profile's row.
+fn notice_bounds(notice: Notice, height: f32) -> (iced::Rectangle, iced::Rectangle) {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.notice = Some(notice);
+    let settings = iced::Settings {
+        fonts: super::icon::fonts(),
+        default_font: super::icon::UI,
+        ..iced::Settings::default()
+    };
+    let mut ui = iced_test::Simulator::with_size(settings, (960.0, height), app.view());
+    let ok = ui.find(text::OK).expect("OK is laid out").bounds();
+    let row = ui.find("Default").expect("the list is laid out").bounds();
+    (ok, row)
+}
+
+/// A restore of a big pack can leave a notice of thousands of words. It scrolls in a box of
+/// its own, so the OK button stays in the window and the profile list keeps its room.
+#[test]
+fn a_very_long_notice_scrolls_and_leaves_the_list_its_room() {
+    let long = "Not fetched: Some Mod (Steam made no progress for 60 seconds), ".repeat(300);
+    for notice in [Notice::Info(long.clone()), Notice::Error(long.clone())] {
+        let (ok, row) = notice_bounds(notice, 600.0);
+        assert!(ok.y + ok.height <= 600.0, "OK ends at {}", ok.y + ok.height);
+        assert!(
+            row.height > 0.0 && row.y + row.height <= ok.y,
+            "the list row is at {}..{}, the notice starts at {}",
+            row.y,
+            row.y + row.height,
+            ok.y
+        );
+    }
+}
+
+#[test]
+fn ok_clears_a_notice() {
+    let sb = Sandbox::new();
+    for notice in [Notice::Info("done".into()), Notice::Error("bad".into())] {
+        let mut app = sb.app();
+        app.notice = Some(notice);
+        let _ = app.update(Message::DismissNotice);
+        assert!(app.notice.is_none());
+    }
+}
+
 /// T59 D36: the Help dialog keeps its OK button inside the smallest window the layout is
 /// designed for (V33), however many sections it has.
 #[test]
