@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.12.0](https://github.com/keyz182/rimworld-profile-manager/compare/b6f835a9d8062f88ae9fc017274d1970825f95f9..v1.12.0) - 2026-10-20
+#### Features
+- restore modpacks with Steam or steamcmd, and slug RimSort instance names (#29) - ([c8d8c06](https://github.com/keyz182/rimworld-profile-manager/commit/c8d8c06b6874e14f0f8329642506917e402fb0c6)) - Kieran Evans
+#### Tests
+- (**gui**) render the Game versions screens for the wiki (#27) - ([27361e5](https://github.com/keyz182/rimworld-profile-manager/commit/27361e5a5df4e973d526f0ccfaadcc924b20824b)) - Kieran Evans
+- (**gui**) render the backup dialogs for the wiki (#26) - ([b6f835a](https://github.com/keyz182/rimworld-profile-manager/commit/b6f835a9d8062f88ae9fc017274d1970825f95f9)) - Kieran Evans
+#### Continuous Integration
+- bump the actions group with 2 updates (#28) - ([5927012](https://github.com/keyz182/rimworld-profile-manager/commit/5927012cbe2c74edd96e9e24071b93e88a6563b7)) - dependabot[bot], dependabot[bot]
+
+- - -
+
 ## [v1.11.0](https://github.com/keyz182/rimworld-profile-manager/compare/5c07f9fbb58bc8cdfd095b11133671fbd157879c..v1.11.0) - 2026-10-16
 #### Features
 - back up and restore OFFLINE profiles as .rimrim files (#24) - ([5c07f9f](https://github.com/keyz182/rimworld-profile-manager/commit/5c07f9fbb58bc8cdfd095b11133671fbd157879c)) - Kieran Evans
