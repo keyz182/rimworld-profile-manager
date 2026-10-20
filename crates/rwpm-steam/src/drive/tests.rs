@@ -395,3 +395,89 @@ fn a_refused_second_call_fails_with_steams_reason() {
     );
     assert_eq!(f.started.len(), 2);
 }
+
+/// What the stress test on Linux showed: Steam answers the call, the state shows the change,
+/// then the subscription list fetched at start undoes it. The answer is not lost, so only the
+/// state tells; the call is made once more at once.
+#[test]
+fn a_change_undone_after_the_answer_is_asked_for_once_more() {
+    let arriving = item(true, false, true, None);
+    let mut f = fake(&[(
+        7,
+        vec![
+            ABSENT,
+            arriving,
+            ABSENT,
+            item(true, false, true, Some((1, 2))),
+            SUBSCRIBED,
+        ],
+    )]);
+    f.answers.insert(7, Ok(()));
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(
+        (failed, lines),
+        (0, vec!["progress 7 1 2".into(), "ok 7 new".into()])
+    );
+    assert_eq!(f.started, [(Op::Subscribe, 7), (Op::Subscribe, 7)]);
+    assert!(
+        f.started_at[1] < SETTLE.as_secs() + RESEND_AFTER.as_secs(),
+        "asked again at once, not after the resend time"
+    );
+}
+
+/// The same for an unsubscribe that is answered and then not seen in the state for the resend
+/// time (the state can flip back between two looks).
+#[test]
+fn a_change_that_never_shows_after_the_answer_is_asked_for_after_the_resend_time() {
+    let mut steps = vec![SUBSCRIBED; 25];
+    steps.push(INSTALLED);
+    let mut f = fake(&[(4, steps)]);
+    f.answers.insert(4, Ok(()));
+    let (failed, lines) = go(Op::Unsubscribe, &[4], &mut f);
+    assert_eq!((failed, lines), (0, vec!["ok 4 new".to_owned()]));
+    assert_eq!(f.started, [(Op::Unsubscribe, 4), (Op::Unsubscribe, 4)]);
+    let first_look = SETTLE.as_secs() + 1;
+    assert_eq!(f.started_at[1], first_look + RESEND_AFTER.as_secs());
+}
+
+#[test]
+fn the_second_call_is_the_last_even_when_it_is_undone_again() {
+    let arriving = item(true, false, true, None);
+    let mut f = fake(&[(7, vec![ABSENT, arriving, ABSENT, arriving, ABSENT])]);
+    f.answers.insert(7, Ok(()));
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(failed, 1);
+    assert_eq!(
+        lines.last().map(String::as_str),
+        Some("fail 7 Steam made no progress for 60 seconds")
+    );
+    assert_eq!(f.started.len(), 2, "no third call");
+}
+
+#[test]
+fn a_refused_second_call_after_the_answer_fails_with_steams_reason() {
+    let arriving = item(true, false, true, None);
+    let mut f = fake(&[(7, vec![ABSENT, arriving, ABSENT])]);
+    f.answers.insert(7, Ok(()));
+    f.refuse_again.insert(7);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(
+        (failed, lines),
+        (1, vec!["fail 7 Steam said no".to_owned()])
+    );
+    assert_eq!(f.started.len(), 2);
+}
+
+/// A subscription the player already had that Steam is still downloading is Steam's own work:
+/// no call was made, so none is repeated.
+#[test]
+fn what_steam_downloads_by_itself_is_never_asked_for_again() {
+    let mut f = fake(&[(7, vec![item(true, false, true, None)])]);
+    let (failed, lines) = go(Op::Subscribe, &[7], &mut f);
+    assert_eq!(failed, 1);
+    assert_eq!(
+        lines,
+        ["fail 7 Steam made no progress for 60 seconds".to_owned()]
+    );
+    assert!(f.started.is_empty());
+}

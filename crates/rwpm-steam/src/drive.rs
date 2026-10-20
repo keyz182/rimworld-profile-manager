@@ -80,7 +80,9 @@ struct Pending {
     fresh: Fresh,
     last: Item,
     changed_at: Duration,
-    /// Steam's state has shown what was asked while waiting for the answer.
+    /// A subscribe or unsubscribe call was made (not a wait for what Steam does by itself).
+    called: bool,
+    /// Steam's state has shown the change that was asked for.
     seen: bool,
     /// The call has been made a second time.
     resent: bool,
@@ -118,6 +120,21 @@ fn finished(op: Op, item: Item) -> bool {
     }
 }
 
+/// Makes the call a second time. `Err` is Steam refusing it.
+fn resend(
+    op: Op,
+    p: &mut Pending,
+    why: &str,
+    backend: &mut dyn Backend,
+    now: Duration,
+) -> Result<(), String> {
+    eprintln!("rwpm-steam: {why} for {}, asking again", p.id);
+    backend.start(op, p.id)?;
+    p.resent = true;
+    p.changed_at = now;
+    Ok(())
+}
+
 /// One step of waiting for the answer to a subscribe or unsubscribe call. `Err` fails the id.
 ///
 /// The call is made once more when it looks lost: Steam's state showed what was asked and then
@@ -142,6 +159,7 @@ fn wait_answer(
         Some(Ok(())) => {
             p.stage = Stage::Download;
             p.changed_at = now;
+            p.seen |= backend.item(p.id).subscribed == matches!(op, Op::Subscribe);
             return Ok(());
         }
         None => {}
@@ -154,10 +172,33 @@ fn wait_answer(
     } else if asked {
         p.seen = true;
     } else if p.seen || now.saturating_sub(p.changed_at) >= RESEND_AFTER {
-        eprintln!("rwpm-steam: no answer for {}, asking again", p.id);
-        backend.start(op, p.id)?;
-        p.resent = true;
-        p.changed_at = now;
+        resend(op, p, "no answer", backend, now)?;
+    }
+    Ok(())
+}
+
+/// One step of waiting for Steam's state after the call was answered. Steam can answer and then
+/// undo the change: the subscription list it fetches when this program starts can arrive after
+/// the call and put the old state back (SPEC, stall trials). The call is made once more when the
+/// state showed the change and then went back, or when nothing changed for [`RESEND_AFTER`];
+/// the id then waits for an answer again. `Err` fails the id.
+fn watch_change(
+    op: Op,
+    p: &mut Pending,
+    item: Item,
+    backend: &mut dyn Backend,
+    now: Duration,
+) -> Result<(), String> {
+    if !p.called || p.resent || matches!(op, Op::Download) {
+        return Ok(());
+    }
+    if item.subscribed == matches!(op, Op::Subscribe) {
+        p.seen = true;
+        return Ok(());
+    }
+    if p.seen || now.saturating_sub(p.changed_at) >= RESEND_AFTER {
+        resend(op, p, "change undone or missing", backend, now)?;
+        p.stage = Stage::Answer;
     }
     Ok(())
 }
@@ -203,6 +244,7 @@ pub fn run(
                 fresh,
                 last: Item::default(),
                 changed_at: now,
+                called: matches!(stage, Stage::Answer),
                 seen: false,
                 resent: false,
             }),
@@ -233,6 +275,15 @@ pub fn run(
             }
             if let Stage::Download = p.stage {
                 let item = backend.item(p.id);
+                if let Err(reason) = watch_change(op, &mut p, item, backend, now) {
+                    failed += 1;
+                    emit(Event::Fail { id: p.id, reason });
+                    continue;
+                }
+                if let Stage::Answer = p.stage {
+                    still.push(p);
+                    continue;
+                }
                 if item != p.last {
                     if let (true, Some((done, total))) =
                         (item.progress != p.last.progress, item.progress)
