@@ -1050,11 +1050,30 @@ pub fn pack_downloaded(name: &str, mods: usize, still_to_find: usize) -> String 
     line
 }
 
+/// Why a mod that arrived was not kept. `expected` and `found` are the package ids the pack
+/// named and the one the delivered folder holds; when there was no folder to read, `found` is
+/// one of the fixed texts of `rwpm_core::fetch`.
+pub fn pack_mismatch_reason(expected: &str, found: &str) -> String {
+    if found == rwpm_core::fetch::NO_ABOUT || found == rwpm_core::fetch::NOT_FOUND {
+        "its files were not found on disk".to_owned()
+    } else {
+        format!("the pack named {expected}, but what arrived is {found}")
+    }
+}
+
+fn not_kept(mismatched: &[(String, String)]) -> String {
+    let list: Vec<String> = mismatched
+        .iter()
+        .map(|(name, why)| format!("{name} ({why})"))
+        .collect();
+    list.join(", ")
+}
+
 /// The profile stays LIVE: what failed, and why it was not made OFFLINE.
 pub fn pack_kept_live(
     name: &str,
     failed: &[(String, String)],
-    mismatched: &[String],
+    mismatched: &[(String, String)],
     why: &str,
 ) -> String {
     let mut line = format!("Restored “{name}”, but it was not made OFFLINE: {why}.");
@@ -1066,10 +1085,7 @@ pub fn pack_kept_live(
         line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
     }
     if !mismatched.is_empty() {
-        line.push_str(&format!(
-            " Not the mod the pack named, so not kept: {}.",
-            mismatched.join(", ")
-        ));
+        line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
     }
     line.push_str(" The profile still works as a LIVE profile; open the pack again to retry.");
     line
@@ -1096,7 +1112,7 @@ pub fn pack_subscribed(
     subscribed: usize,
     already: usize,
     failed: &[(String, String)],
-    mismatched: &[String],
+    mismatched: &[(String, String)],
     still_to_find: usize,
 ) -> String {
     let mut line = format!(
@@ -1114,10 +1130,7 @@ pub fn pack_subscribed(
         line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
     }
     if !mismatched.is_empty() {
-        line.push_str(&format!(
-            " Not the mod the pack named, so not kept: {}.",
-            mismatched.join(", ")
-        ));
+        line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
     }
     if still_to_find > 0 {
         let mods = count(still_to_find, "mod", "mods");
@@ -1205,6 +1218,40 @@ mod tests {
         assert_eq!(size(512), "less than 1 MB");
         assert_eq!(size(1536 * 1024), "1.5 MB");
         assert_eq!(size(3 * 1024 * 1024 * 1024), "3.0 GB");
+    }
+
+    #[test]
+    fn a_mod_that_was_not_kept_says_why_in_plain_words() {
+        use rwpm_core::fetch::{NO_ABOUT, NOT_FOUND};
+        for found in [NO_ABOUT, NOT_FOUND] {
+            assert_eq!(
+                pack_mismatch_reason("a.b", found),
+                "its files were not found on disk"
+            );
+        }
+        assert_eq!(
+            pack_mismatch_reason("a.b", "c.d"),
+            "the pack named a.b, but what arrived is c.d"
+        );
+        let line = pack_subscribed(
+            "P",
+            1,
+            0,
+            &[],
+            &[
+                ("One".to_owned(), pack_mismatch_reason("a.b", NO_ABOUT)),
+                ("Two".to_owned(), pack_mismatch_reason("e.f", "g.h")),
+            ],
+            0,
+        );
+        assert_eq!(
+            line,
+            "Restored “P”. Subscribed to 1 mod. Not kept: One (its files were not found on disk), Two (the pack named e.f, but what arrived is g.h)."
+        );
+        assert!(
+            !line.contains("Not the mod the pack named"),
+            "the old wording said the wrong thing for missing files"
+        );
     }
 
     #[test]

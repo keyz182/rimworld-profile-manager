@@ -268,6 +268,11 @@ fn run_helper(
     ended
 }
 
+/// What `Status::Mismatch::found` says when the delivered folder has no readable About.xml.
+pub const NO_ABOUT: &str = "no About.xml";
+/// What `Status::Mismatch::found` says when no folder was looked at, because none is known.
+pub const NOT_FOUND: &str = "the downloaded mod was not found";
+
 /// The package id the pack names, as the mod's own About.xml would write it.
 pub(crate) fn plain_id(id: &str) -> String {
     let lower = id.to_lowercase();
@@ -283,7 +288,7 @@ pub(crate) fn check_identity(workshop_dir: &Path, id: u64, expected: &str) -> Re
     match found {
         Some(found) if found == plain_id(expected) => Ok(()),
         Some(found) => Err(found),
-        None => Err("no About.xml".to_owned()),
+        None => Err(NO_ABOUT.to_owned()),
     }
 }
 
@@ -363,7 +368,7 @@ fn verify(helper: &Path, request: &Request<'_>, outcomes: &mut [Outcome]) {
         };
         let checked = match request.workshop_dir {
             Some(dir) => check_identity(dir, *id, expected),
-            None => Err("the downloaded mod was not found".to_owned()),
+            None => Err(NOT_FOUND.to_owned()),
         };
         if let Err(found) = checked {
             if request.op == Op::Subscribe && fresh == Fresh::New {

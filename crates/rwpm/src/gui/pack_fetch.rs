@@ -138,7 +138,8 @@ struct Summary {
     subscribed: usize,
     already: usize,
     failed: Vec<(String, String)>,
-    mismatched: Vec<String>,
+    /// A mod that arrived but was not kept: its name and why, in plain words.
+    mismatched: Vec<(String, String)>,
 }
 
 /// The mods to get: (Workshop id, the package id the pack names), and their display names.
@@ -164,7 +165,9 @@ fn summarise(outcomes: &[Fetched], names: &BTreeMap<u64, String>) -> Summary {
             Status::Done(Fresh::New) => summary.subscribed += 1,
             Status::Done(Fresh::Already) => summary.already += 1,
             Status::Failed(why) => summary.failed.push((name(outcome.id), why.clone())),
-            Status::Mismatch { .. } => summary.mismatched.push(name(outcome.id)),
+            Status::Mismatch { expected, found } => summary
+                .mismatched
+                .push((name(outcome.id), t::pack_mismatch_reason(expected, found))),
         }
     }
     summary
@@ -643,7 +646,7 @@ mod tests {
         assert_eq!(s.failed, [("Two".to_owned(), "no".to_owned())]);
         assert_eq!(
             s.mismatched,
-            ["4"],
+            [("4".to_owned(), t::pack_mismatch_reason("a", "b"))],
             "an id with no name falls back to the number"
         );
     }

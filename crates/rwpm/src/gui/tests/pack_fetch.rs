@@ -156,7 +156,7 @@ fn subscribing_restores_the_profile_records_only_new_ids_and_says_what_happened(
         1,
         1,
         &[("Mod 2".to_owned(), "Steam said no".to_owned())],
-        &["Mod 3".to_owned()],
+        &[("Mod 3".to_owned(), text::pack_mismatch_reason("a.b", "c.d"))],
         0,
     );
     let _ = app.update(Message::Done(Ok(Outcome::Restored {
