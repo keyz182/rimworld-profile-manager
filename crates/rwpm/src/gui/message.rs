@@ -9,6 +9,9 @@ use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
+use super::modpack::{ShareDraft, ShareTick};
+use super::modpack_open::PackPreview;
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Select(ProfileId),
@@ -98,6 +101,34 @@ pub enum Message {
     RestoreBackup,
     /// The backup file chosen to restore; `None` when the dialog was closed.
     RestorePicked(Option<PathBuf>),
+    /// More → "Share as modpack…" (T81).
+    Share,
+    /// Share dialog: a settings box ticked or unticked.
+    ShareTick(ShareTick, bool),
+    /// Share dialog: save number `.0` (in the dialog's list) ticked or unticked.
+    ShareSave(usize, bool),
+    /// Share dialog: the save to start from, by its number; `None` = no start save.
+    ShareStart(Option<usize>),
+    /// The file chosen to save the pack in; `None` when the dialog was closed.
+    SharePicked(Box<ShareDraft>, Option<PathBuf>),
+    /// "Open modpack…": open the file dialog (T81b).
+    OpenPack,
+    /// The pack chosen to open; `None` when the dialog was closed.
+    OpenPackPicked(Option<PathBuf>),
+    /// A pack's contents, checked against what is installed.
+    PackOpened(Box<PackPreview>),
+    /// A Steam page link in the Open dialog (Steam pages only).
+    OpenUrl(String),
+    /// Open dialog: "Restore and subscribe…" (T83c).
+    PackSubscribe,
+    /// Open dialog: the box "Make it an OFFLINE profile" ticked or unticked (T83d).
+    PackOffline(bool),
+    /// Open dialog: "Restore and download…" through Valve's steamcmd (T82c).
+    PackSteamcmd,
+    /// The Cancel button on the progress bar of a job that can be stopped.
+    CancelJob,
+    /// More → "Remove subscriptions from the pack".
+    RemovePackSubs,
 }
 
 /// Views that replace the detail pane, with ‹ Back (T23 layout).
@@ -114,6 +145,10 @@ pub enum Field {
     GameDir,
     SteamDir,
     MoveTo,
+    /// Share dialog: the pack's description.
+    Description,
+    /// Share dialog: the link to a Steam collection.
+    Link,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,6 +175,12 @@ pub enum Outcome {
     Restored {
         id: ProfileId,
         line: String,
+    },
+    /// steamcmd's file changed since it was first seen: nothing was restored; ask first.
+    SteamcmdChanged {
+        preview: Box<PackPreview>,
+        first: String,
+        found: String,
     },
 }
 
@@ -206,5 +247,24 @@ pub enum Dialog {
     Backup(Box<super::backup::Draft>),
     /// A backup file's contents and the name of the profile it will become.
     Restore(Box<RestorePlan>),
+    /// What goes in a modpack (T81).
+    Share(Box<ShareDraft>),
+    /// A modpack's contents and the name of the profile it will become (T81b).
+    OpenPack(Box<PackPreview>),
+    /// What opening the pack would subscribe the player to (T83c).
+    ConfirmSubscribe(Box<PackPreview>),
+    /// First use of steamcmd: what will be downloaded and run, asked before anything is (T82c).
+    ConsentSteamcmd(Box<PackPreview>),
+    /// Valve's steamcmd file differs from the one first seen (T82 review M1).
+    TrustSteamcmd {
+        preview: Box<PackPreview>,
+        first: String,
+        found: String,
+    },
+    /// Unsubscribe from the mods that a pack subscribed this profile's player to.
+    ConfirmUnsubscribe {
+        id: ProfileId,
+        count: usize,
+    },
     Help,
 }

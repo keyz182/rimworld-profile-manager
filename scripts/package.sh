@@ -37,11 +37,17 @@ case "$os" in
 linux)
   target="x86_64-unknown-linux-gnu"
   exe="rwpm"
+  steam_exe="rwpm-steam"
+  steam_lib="libsteam_api.so"
+  steam_dir="linux64"
   loader="linux_x64/libdoorstop.so"
   ;;
 windows)
   target="x86_64-pc-windows-gnu"
   exe="rwpm.exe"
+  steam_exe="rwpm-steam.exe"
+  steam_lib="steam_api64.dll"
+  steam_dir="win64"
   loader="win_x64/winhttp.dll"
   rustup target list --installed | grep -qx "$target" || {
     echo "package.sh: no Rust target $target; see T19 notes for the Windows toolchain" >&2
@@ -53,6 +59,9 @@ macos)
   # costs a second target + lipo + an x86 CI leg for zero present Intel-Mac users.
   target="aarch64-apple-darwin"
   exe="rwpm"
+  steam_exe="rwpm-steam"
+  steam_lib="libsteam_api.dylib"
+  steam_dir="osx"
   loader="macos/libdoorstop.dylib"
   rustup target list --installed | grep -qx "$target" || {
     echo "package.sh: no Rust target $target" >&2
@@ -99,7 +108,7 @@ build_linux() {
     bash -c 'set -euo pipefail
       [[ -x "$CARGO_HOME/bin/rustup" ]] ||
         curl -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal --default-toolchain none --no-modify-path
-      "$CARGO_HOME/bin/cargo" build -q --locked --release -p rwpm --target '"$target"' --target-dir /target/soldier'
+      "$CARGO_HOME/bin/cargo" build -q --locked --release -p rwpm -p rwpm-steam --target '"$target"' --target-dir /target/soldier'
 }
 
 # Fails when the binary needs a newer glibc than the floor.
@@ -117,11 +126,26 @@ echo "[package] rwpm $version for $target" >&2
 if [[ "$os" == linux ]]; then
   build_linux
   check_glibc "$ROOT/target/soldier/$target/release/$exe"
-  cp "$ROOT/target/soldier/$target/release/$exe" "$bin_dir/"
+  check_glibc "$ROOT/target/soldier/$target/release/$steam_exe"
+  release_dir="$ROOT/target/soldier/$target/release"
 else
-  cargo build -q --release -p rwpm --target "$target" --manifest-path "$ROOT/Cargo.toml"
-  cp "$ROOT/target/$target/release/$exe" "$bin_dir/"
+  cargo build -q --release -p rwpm -p rwpm-steam --target "$target" --manifest-path "$ROOT/Cargo.toml"
+  release_dir="$ROOT/target/$target/release"
 fi
+cp "$release_dir/$exe" "$release_dir/$steam_exe" "$bin_dir/"
+
+# T83e: Valve's Steamworks library, beside rwpm-steam (the helper finds it there: $ORIGIN on
+# Linux, @loader_path on macOS, the exe folder on Windows). It is taken from the pinned
+# steamworks-sys crate, so it is the very file the helper was built against. rwpm itself
+# never loads it.
+steam_src="$(cargo metadata --format-version 1 --manifest-path "$ROOT/Cargo.toml" |
+  python3 -I -c 'import json,sys; print(next(p["manifest_path"] for p in json.load(sys.stdin)["packages"] if p["name"]=="steamworks-sys"))')"
+steam_src="$(dirname "$steam_src")/lib/steam/redistributable_bin/$steam_dir/$steam_lib"
+[[ -f "$steam_src" ]] || {
+  echo "package.sh: Valve library not found at $steam_src" >&2
+  exit 1
+}
+cp "$steam_src" "$bin_dir/"
 
 dotnet build "$ROOT/payload/Rwpm.Payload" -c Release -o "$ROOT/target/dist/payload-build" -nologo >/dev/null
 cp "$ROOT/target/dist/payload-build/Rwpm.Payload.dll" "$bin_dir/payload/"

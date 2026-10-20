@@ -6,6 +6,7 @@ use super::*;
 const GUIDE: &str = include_str!("../../../../../docs/game-versions.md");
 const README: &str = include_str!("../../../../../README.md");
 const BACKUPS: &str = include_str!("../../../../../docs/backups.md");
+const MODPACKS: &str = include_str!("../../../../../docs/modpacks.md");
 
 /// A label as the guide writes it: in straight double quotes, so the check does not pass on
 /// the same word used in other prose.
@@ -127,6 +128,60 @@ fn the_backup_docs_quote_the_shipped_labels_and_notices() {
         );
     }
     assert!(README.contains("docs/backups.md"));
+}
+
+/// T81: the modpack guide and the README quote the labels the app shows, and the guide
+/// quotes the notices word for word.
+#[test]
+fn the_modpack_docs_quote_the_shipped_labels_and_notices() {
+    for label in [
+        text::SHARE_MENU,
+        text::OPEN_PACK_MENU,
+        text::SHARE_IT,
+        text::OPEN_PACK_IT,
+        text::OPEN_STEAM_PAGE,
+        text::PACK_MISSING,
+        text::PACK_MANUAL,
+        text::PACK_PRESENT,
+        text::SHARE_MOD_SETTINGS,
+    ] {
+        assert!(
+            MODPACKS.contains(&quoted(label)),
+            "docs/modpacks.md does not quote {label:?}"
+        );
+    }
+    for notice in [
+        text::SHARE_NOTICE,
+        text::SHARE_SETTINGS_NOTICE,
+        text::PACK_HINT,
+    ] {
+        assert!(
+            MODPACKS.contains(&format!("> {notice}")),
+            "docs/modpacks.md does not quote {notice:?}"
+        );
+    }
+    for label in [text::SHARE_MENU, text::OPEN_PACK_MENU, text::SHARE_IT] {
+        assert!(
+            README.contains(&quoted(label)),
+            "README.md does not quote {label:?}"
+        );
+    }
+    assert!(README.contains("docs/modpacks.md"));
+}
+
+#[test]
+fn help_explains_modpacks_and_the_private_details_warning() {
+    let (title, words) = text::HELP_SECTIONS[8];
+    assert_eq!(title, "Modpacks");
+    for part in [
+        text::SHARE_MENU,
+        text::OPEN_PACK_MENU,
+        ".rimpack",
+        "no mods",
+        "private details",
+    ] {
+        assert!(words.contains(part), "{part:?} missing from {words}");
+    }
 }
 
 #[test]

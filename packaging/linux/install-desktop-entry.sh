@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Adds RimWorld Profile Manager to your desktop's app menu, with its icon, and makes it
-# open .rimrim backup files, for this user.
+# open .rimrim backups and .rimpack modpacks, for this user.
 # Writes only below ~/.local/share (applications/, icons/ and mime/). Run it again after
 # moving this folder; run with --remove to take the entry out again.
 set -euo pipefail
@@ -46,9 +46,9 @@ Exec="$here/rwpm" %f
 Icon=rwpm
 Terminal=false
 Categories=Game;Utility;
-MimeType=application/x-rimrim;
+MimeType=application/x-rimrim;application/x-rimpack;
 StartupWMClass=rwpm
 DESKTOP
 refresh
 echo "Added RimWorld Profile Manager to the app menu ($entry)."
-echo "Backup files (.rimrim) now open in it."
+echo "Backups (.rimrim) and modpacks (.rimpack) now open in it."

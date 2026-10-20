@@ -1,0 +1,19 @@
+[package]
+name = "rwpm-steam"
+description = "Helper for RimWorld Profile Manager: asks the running Steam client to download, subscribe to or unsubscribe from Workshop mods"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Bindings to Valve's Steamworks SDK. It loads Valve's library when the program starts, so
+# this is a separate program: `rwpm` itself never links it, and starts without it.
+steamworks = "0.13.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

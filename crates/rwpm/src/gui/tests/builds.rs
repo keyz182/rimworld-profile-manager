@@ -314,6 +314,7 @@ fn capture_and_delete_wait_for_a_job_or_a_running_game() {
         label: "Storing".into(),
         done: 0,
         total: 1,
+        percent: false,
     });
     let _ = app.update(Message::CaptureBuild);
     let _ = app.update(Message::DeleteBuild(KEY.into()));
@@ -410,6 +411,7 @@ fn confirm_on_capture_and_delete_dialogs_waits_for_a_job_or_game() {
             label: "Busy".into(),
             done: 0,
             total: 1,
+            percent: false,
         });
         let _ = app.update(Message::Confirm);
         assert!(app.dialog.is_some(), "a job is running");

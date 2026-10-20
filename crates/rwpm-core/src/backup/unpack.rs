@@ -469,7 +469,7 @@ impl Job<'_> {
     }
 }
 
-fn parts_of(rel: &Path) -> Vec<&str> {
+pub(crate) fn parts_of(rel: &Path) -> Vec<&str> {
     rel.components()
         .filter_map(|c| c.as_os_str().to_str())
         .collect()
@@ -509,7 +509,7 @@ fn write_bytes(dest: &Path, bytes: &[u8]) -> Result<(), ProfileError> {
 
 /// Folders and regular files only (V73). A file is created new, so a repeated name fails
 /// instead of overwriting an earlier entry. Modes are reduced to plain or executable.
-fn write_entry<R: Read>(
+pub(crate) fn write_entry<R: Read>(
     dest: &Path,
     kind: EntryType,
     entry: &mut tar::Entry<'_, R>,

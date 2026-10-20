@@ -100,17 +100,21 @@ pub fn plan_export(
             .and_then(Value::as_str)
             .is_some_and(|a| runs_profile(a, profile.id.as_str()))
     });
+    let rimsort_dir = settings.parent().unwrap_or(Path::new(""));
+    let instances_dir = rimsort_dir.join(INSTANCES);
     let (instance_name, existing) = match own {
         Some((name, v)) => (name.clone(), v.as_object().cloned()),
-        None => (free_name(instances, &profile.name), None),
+        None => (
+            free_slug(instances, &instances_dir, &instance_base(profile)),
+            None,
+        ),
     };
-    let rimsort_dir = settings.parent().unwrap_or(Path::new(""));
     let fields = Fields {
         name: &instance_name,
         profile,
         game,
         run_args,
-        instance_dir: rimsort_dir.join(INSTANCES).join(&instance_name),
+        instance_dir: instances_dir.join(&instance_name),
     };
     Ok(ExportPlan {
         settings: settings.to_path_buf(),
@@ -283,14 +287,50 @@ fn command_line(rwpm: &Path, args: &str, windows: bool) -> Result<String, RimSor
     Ok(format!("{quote}{path}{quote} {args}"))
 }
 
-/// `name`, else `name (rwpm)`, `name (rwpm) 2`, … not already used.
-fn free_name(instances: &Map<String, Value>, name: &str) -> String {
-    let base = format!("{name} (rwpm)");
-    std::iter::once(name.to_owned())
-        .chain(std::iter::once(base.clone()))
-        .chain((2..).map(|n| format!("{base} {n}")))
-        .find(|n| !instances.contains_key(n))
-        .unwrap_or(base)
+/// Longest slug before a `_N` suffix, as for profile ids.
+const MAX_SLUG_LEN: usize = 40;
+
+/// Each run of characters outside `[A-Za-z0-9]` becomes one `_`; no `_` at either end. The
+/// result is one plain path component, so a pack's name (V9, F7) cannot steer the folder.
+/// Empty when nothing alphanumeric is left.
+fn slugify(name: &str) -> String {
+    let mut slug = String::with_capacity(name.len());
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c);
+        } else if !slug.ends_with('_') {
+            slug.push('_');
+        }
+    }
+    slug.truncate(MAX_SLUG_LEN);
+    slug.trim_matches('_').to_owned()
+}
+
+/// Slug of the profile's name; its id (`[a-z0-9-]`, so safe) when the name leaves nothing.
+fn instance_base(profile: &Profile) -> String {
+    let slug = slugify(&profile.name);
+    if slug.is_empty() {
+        profile.id.as_str().replace('-', "_")
+    } else {
+        slug
+    }
+}
+
+/// `base`, else `base_2`, `base_3`, … matching no instance key and no folder in
+/// `instances_dir`. Names compare ignoring case, as Windows and macOS folders do.
+fn free_slug(instances: &Map<String, Value>, instances_dir: &Path, base: &str) -> String {
+    let mut used: Vec<String> = instances.keys().map(|k| k.to_ascii_lowercase()).collect();
+    if let Ok(entries) = std::fs::read_dir(instances_dir) {
+        used.extend(
+            entries
+                .flatten()
+                .map(|e| e.file_name().to_string_lossy().to_ascii_lowercase()),
+        );
+    }
+    std::iter::once(base.to_owned())
+        .chain((2..).map(|n| format!("{base}_{n}")))
+        .find(|n| !used.contains(&n.to_ascii_lowercase()))
+        .unwrap_or_else(|| base.to_owned())
 }
 
 fn instances<'a>(path: &Path, root: &'a Value) -> Result<&'a Map<String, Value>, RimSortError> {

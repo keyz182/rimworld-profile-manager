@@ -1,0 +1,291 @@
+//! Modpacks (T81): "Share as modpack…". The core gathers the mod list and writes the file
+//! (limits, the allowlist, the checks on every string); this file asks, shows progress,
+//! reports. A pack holds no mod files and no game files.
+
+use std::path::{Path, PathBuf};
+
+use iced::Task;
+use rwpm_core::ProfileError;
+use rwpm_core::modpack::file::{
+    MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_link, check_save_name,
+};
+use rwpm_core::modpack::{self, Includes, PackSpec};
+use rwpm_core::profile::copy_settings::{Group, entries};
+use rwpm_core::profile::{ProcessProbe, ProfileId};
+
+use super::message::{Dialog, Message, Outcome};
+use super::{App, Notice, text as t};
+
+/// A settings box in the Share dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShareTick {
+    ModSettings,
+    Creations,
+    GameSettings,
+}
+
+/// What a ticked group would put in: an upper bound, since files that are not plain data
+/// are left out when the pack is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Count {
+    pub files: u64,
+    pub bytes: u64,
+}
+
+/// One save file the profile has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SaveChoice {
+    pub name: String,
+    pub bytes: u64,
+    pub on: bool,
+}
+
+/// The Share dialog's state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShareDraft {
+    pub id: ProfileId,
+    pub name: String,
+    pub mod_settings: bool,
+    pub creations: bool,
+    pub game_settings: bool,
+    pub mod_settings_count: Count,
+    pub creations_count: Count,
+    pub game_settings_count: Count,
+    pub saves: Vec<SaveChoice>,
+    /// The save to start from: an index into `saves`, always a ticked one.
+    pub start: Option<usize>,
+    pub description: String,
+    pub link: String,
+}
+
+impl ShareDraft {
+    pub fn name_too_long(&self) -> bool {
+        self.name.chars().count() > MAX_NAME_CHARS
+    }
+
+    pub fn description_too_long(&self) -> bool {
+        self.description.chars().count() > MAX_DESCRIPTION_CHARS
+    }
+
+    /// Empty is fine: the link is optional.
+    pub fn link_ok(&self) -> bool {
+        let link = self.link.trim();
+        link.is_empty() || check_link(link).is_ok()
+    }
+
+    pub fn ready(&self) -> bool {
+        !self.name_too_long() && !self.description_too_long() && self.link_ok()
+    }
+
+    fn includes(&self) -> Includes {
+        Includes {
+            mod_settings: self.mod_settings,
+            creations: self.creations,
+            game_settings: self.game_settings,
+            saves: self
+                .saves
+                .iter()
+                .filter(|s| s.on)
+                .map(|s| s.name.clone())
+                .collect(),
+        }
+    }
+
+    fn start_name(&self) -> Option<String> {
+        let save = self.saves.get(self.start?)?;
+        save.on.then(|| save.name.clone())
+    }
+
+    /// What the progress bar counts to: an estimate; the core counts the real bytes.
+    fn total(&self) -> u64 {
+        let groups = [
+            (self.mod_settings, self.mod_settings_count),
+            (self.creations, self.creations_count),
+            (self.game_settings, self.game_settings_count),
+        ];
+        let settings: u64 = groups.iter().filter(|g| g.0).map(|g| g.1.bytes).sum();
+        let saves: u64 = self.saves.iter().filter(|s| s.on).map(|s| s.bytes).sum();
+        settings + saves
+    }
+}
+
+impl App {
+    /// The actions of this file; `update` hands them over together.
+    pub(super) fn modpack_update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::Share => self.ask_share(),
+            Message::ShareTick(tick, on) => self.share_tick(tick, on),
+            Message::ShareSave(index, on) => self.share_save(index, on),
+            Message::ShareStart(index) => self.share_start(index),
+            Message::SharePicked(draft, Some(path)) => return self.run_share(*draft, path),
+            _ => {}
+        }
+        Task::none()
+    }
+
+    fn ask_share(&mut self) {
+        let Some(p) = self.current() else { return };
+        let save_data = p.save_data_dir();
+        if !save_data.join("Config").join("ModsConfig.xml").is_file() {
+            let words = ProfileError::NoModList(p.name.clone()).to_string();
+            self.notice = Some(Notice::Error(words));
+            return;
+        }
+        let draft = ShareDraft {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            mod_settings: true,
+            creations: true,
+            game_settings: false,
+            mod_settings_count: count_group(&save_data, Group::ModSettings),
+            creations_count: count_group(&save_data, Group::Creations),
+            game_settings_count: count_group(&save_data, Group::GameSettings),
+            saves: list_saves(&save_data),
+            start: None,
+            description: String::new(),
+            link: String::new(),
+        };
+        self.dialog = Some(Dialog::Share(Box::new(draft)));
+    }
+
+    fn share_tick(&mut self, tick: ShareTick, on: bool) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        match tick {
+            ShareTick::ModSettings => draft.mod_settings = on,
+            ShareTick::Creations => draft.creations = on,
+            ShareTick::GameSettings => draft.game_settings = on,
+        }
+    }
+
+    fn share_save(&mut self, index: usize, on: bool) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        let Some(save) = draft.saves.get_mut(index) else {
+            return;
+        };
+        save.on = on;
+        if !on && draft.start == Some(index) {
+            draft.start = None;
+        }
+    }
+
+    fn share_start(&mut self, index: Option<usize>) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        draft.start = index.filter(|i| draft.saves.get(*i).is_some_and(|s| s.on));
+    }
+
+    /// The Share dialog's button: ask where to save the file.
+    pub(super) fn pick_share_save(&self, draft: ShareDraft) -> Task<Message> {
+        let name = format!(
+            "{}.{}",
+            ProfileId::slug_base(&draft.name),
+            t::PACK_EXTENSION
+        );
+        Task::perform(
+            pick_pack_save(t::PICK_SHARE_SAVE_TITLE, name),
+            move |path| Message::SharePicked(Box::new(draft.clone()), path),
+        )
+    }
+
+    fn run_share(&mut self, draft: ShareDraft, path: PathBuf) -> Task<Message> {
+        let Some(p) = self.profiles.iter().find(|p| p.id == draft.id).cloned() else {
+            return Task::none();
+        };
+        let game = match self.ctx.effective_game(&p, self.game.as_ref().ok()) {
+            Ok(game) => game,
+            Err(e) => {
+                self.notice = Some(Notice::Error(e.to_string()));
+                return Task::none();
+            }
+        };
+        let path = super::backup::with_extension(path, t::PACK_EXTENSION);
+        let (ctx, total) = (self.ctx.clone(), draft.total());
+        self.start(t::sharing(&p.name), total, move |progress| {
+            let fail = |e: ProfileError| e.to_string();
+            let store = ctx.store().map_err(fail)?;
+            let gathered = modpack::gather_mods(&p, &game).map_err(fail)?;
+            let link = draft.link.trim();
+            let spec = PackSpec {
+                description: draft.description.trim().to_owned(),
+                game_version: game.version.clone(),
+                dlc: gathered.dlc,
+                includes: draft.includes(),
+                start_save: draft.start_name(),
+                collection_url: (!link.is_empty()).then(|| link.to_owned()),
+                mods: gathered.mods,
+            };
+            let plan = modpack::plan_pack(&store, &p.id, spec).map_err(fail)?;
+            let report =
+                modpack::apply_pack(&plan, &path, &ProcessProbe, progress).map_err(fail)?;
+            Ok(Outcome::Changed(t::shared(
+                &plan.name,
+                &path.display().to_string(),
+                report.archive_bytes,
+                gathered.skipped.len(),
+                plan.skipped.len(),
+            )))
+        })
+    }
+}
+
+/// Files and bytes a group would put in, counted the way the core walks: links are skipped.
+fn count_group(save_data: &Path, group: Group) -> Count {
+    let mut count = Count::default();
+    for rel in entries(save_data, &[group]) {
+        walk(&save_data.join(rel), &mut count);
+    }
+    count
+}
+
+fn walk(path: &Path, count: &mut Count) {
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return;
+    };
+    if meta.is_dir() {
+        if let Ok(read) = std::fs::read_dir(path) {
+            for entry in read.filter_map(Result::ok) {
+                walk(&entry.path(), count);
+            }
+        }
+    } else if meta.is_file() {
+        count.files += 1;
+        count.bytes += meta.len();
+    }
+}
+
+/// The save files a pack may hold, by name, none ticked.
+fn list_saves(save_data: &Path) -> Vec<SaveChoice> {
+    let Ok(read) = std::fs::read_dir(save_data.join("Saves")) else {
+        return Vec::new();
+    };
+    let mut saves: Vec<SaveChoice> = read
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let meta = entry.metadata().ok().filter(|m| m.is_file())?;
+            let name = entry.file_name().into_string().ok()?;
+            check_save_name(&name).ok()?;
+            Some(SaveChoice {
+                name,
+                bytes: meta.len(),
+                on: false,
+            })
+        })
+        .collect();
+    saves.sort_by(|a, b| a.name.cmp(&b.name));
+    saves
+}
+
+async fn pick_pack_save(title: &'static str, name: String) -> Option<PathBuf> {
+    rfd::AsyncFileDialog::new()
+        .set_title(title)
+        .add_filter(t::PACK_FILTER, &[t::PACK_EXTENSION])
+        .set_file_name(name)
+        .save_file()
+        .await
+        .map(|f| f.path().to_path_buf())
+}

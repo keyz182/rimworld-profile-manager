@@ -14,10 +14,15 @@ ManifestDPIAware true
 
 !define APP "RimWorld Profile Manager"
 !define EXE "rwpm.exe"
+; T83e: the Steam helper and Valve's library sit beside rwpm.exe (modpack mod fetching).
+!define STEAM_EXE "rwpm-steam.exe"
+!define STEAM_DLL "steam_api64.dll"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\rwpm"
-; V83: `.rimrim` backups open in this app. Per user (HKCU), like the rest of the install.
+; V83: `.rimrim` backups and `.rimpack` modpacks open in this app. Per user (HKCU), like the
+; rest of the install.
 !define CLASSES "Software\Classes"
 !define BACKUP_CLASS "rwpm.backup"
+!define PACK_CLASS "rwpm.modpack"
 ; Tells Explorer that file associations changed, so icons and "open with" update at once.
 !define SHCNE_ASSOCCHANGED 0x08000000
 !define ICON "${__FILEDIR__}\..\..\crates\rwpm\assets\icon\rwpm.ico"
@@ -72,6 +77,8 @@ VIAddVersionKey "LegalCopyright" "keyz182"
     retry:
       StrCpy $R8 0
       !insertmacro CheckFree "$INSTDIR\${EXE}"
+      !insertmacro CheckFree "$INSTDIR\${STEAM_EXE}"
+      !insertmacro CheckFree "$INSTDIR\${STEAM_DLL}"
       !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.dll"
       !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.Hook.dll"
       StrCmp $R8 0 done
@@ -111,6 +118,10 @@ Section "Install"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}" "" "${APP} backup"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}\DefaultIcon" "" "$INSTDIR\${EXE},0"
   WriteRegStr HKCU "${CLASSES}\${BACKUP_CLASS}\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
+  WriteRegStr HKCU "${CLASSES}\.rimpack" "" "${PACK_CLASS}"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}" "" "${APP} modpack"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\DefaultIcon" "" "$INSTDIR\${EXE},0"
+  WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (${SHCNE_ASSOCCHANGED}, 0, 0, 0)'
 SectionEnd
 
@@ -118,6 +129,8 @@ Section "Uninstall"
   Call un.EnsureNotInUse
   ; Only what the installer put there; the folder goes only if it is then empty.
   Delete "$INSTDIR\${EXE}"
+  Delete "$INSTDIR\${STEAM_EXE}"
+  Delete "$INSTDIR\${STEAM_DLL}"
   Delete "$INSTDIR\LICENSE"
   IfFileExists "$INSTDIR\uninstall.exe" 0 +4
     RMDir /r "$INSTDIR\payload"
@@ -132,5 +145,9 @@ Section "Uninstall"
   StrCmp $0 "${BACKUP_CLASS}" 0 +2
     DeleteRegKey HKCU "${CLASSES}\.rimrim"
   DeleteRegKey HKCU "${CLASSES}\${BACKUP_CLASS}"
+  ReadRegStr $0 HKCU "${CLASSES}\.rimpack" ""
+  StrCmp $0 "${PACK_CLASS}" 0 +2
+    DeleteRegKey HKCU "${CLASSES}\.rimpack"
+  DeleteRegKey HKCU "${CLASSES}\${PACK_CLASS}"
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (${SHCNE_ASSOCCHANGED}, 0, 0, 0)'
 SectionEnd

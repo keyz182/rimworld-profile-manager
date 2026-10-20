@@ -11,7 +11,10 @@ mod icon;
 mod jobs;
 mod keys;
 mod message;
+mod modpack;
+mod modpack_open;
 mod mods;
+mod pack_fetch;
 mod picker;
 mod setup;
 mod support;
@@ -154,6 +157,8 @@ pub struct Job {
     pub label: String,
     pub done: u64,
     pub total: u64,
+    /// `done` and `total` are steps, not bytes: shown as a percentage (T82 click-through).
+    pub percent: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,6 +177,12 @@ pub struct App {
     pub selected: ProfileId,
     pub dialog: Option<Dialog>,
     pub job: Option<Job>,
+    /// Set by the Cancel button of a job that can be stopped (T83c). Cleared when it ends.
+    pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// How the Steam helper is run; tests replace it so none of them starts a process.
+    pub fetcher: pack_fetch::Fetcher,
+    /// How steamcmd is installed and run; tests replace it too (T82c).
+    pub cmd: pack_fetch::CmdRunner,
     pub notice: Option<Notice>,
     /// The OS asks for dark colours.
     pub dark: bool,
@@ -211,6 +222,9 @@ impl App {
             selected: ProfileId::default_id(),
             dialog: None,
             job: None,
+            cancel: None,
+            fetcher: pack_fetch::Fetcher::real(),
+            cmd: pack_fetch::CmdRunner::real(),
             notice: None,
             dark: false,
             search: String::new(),
@@ -380,7 +394,17 @@ impl App {
 /// Opens the window; returns when it closes. `backup` is a `.rimrim` file the OS opened:
 /// the Restore dialog starts on it (T74). First-run setup comes first and takes it over,
 /// so the player restores from "Restore backup…" once setup is done.
-pub fn run_with(backup: Option<PathBuf>) -> iced::Result {
+/// A file the OS handed over when it was opened with rwpm (V83): what the window opens at
+/// start-up.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenFile {
+    /// A `.rimrim` backup: the Restore dialog.
+    Backup(PathBuf),
+    /// A `.rimpack` modpack: the Open modpack dialog.
+    Pack(PathBuf),
+}
+
+pub fn run_with(open: Option<OpenFile>) -> iced::Result {
     let (ctx, note) = match Ctx::detect() {
         Ok(found) => found,
         Err(e) => {
@@ -394,15 +418,22 @@ pub fn run_with(backup: Option<PathBuf>) -> iced::Result {
             app.notice = Some(Notice::Info(note.clone()));
         }
         app.other_profiles = paths::ignored_profiles();
-        if let Some(path) = &backup
-            && app.setup.is_none()
-        {
-            app.open_backup(path);
+        let mut opened = iced::Task::none();
+        if app.setup.is_none() {
+            match &open {
+                Some(OpenFile::Backup(path)) => app.open_backup(path),
+                Some(OpenFile::Pack(path)) => opened = app.open_pack(path),
+                None => {}
+            }
         }
         let health = app.check_health();
         (
             app,
-            iced::Task::batch([iced::system::theme().map(message::Message::Theme), health]),
+            iced::Task::batch([
+                iced::system::theme().map(message::Message::Theme),
+                health,
+                opened,
+            ]),
         )
     };
     let mut program = iced::application(start, App::update, App::view)

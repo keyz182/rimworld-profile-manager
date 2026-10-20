@@ -109,7 +109,7 @@ pub const TIP_GO_LIVE: &str =
 
 // Help.
 pub const HELP_TITLE: &str = "How profiles work";
-pub const HELP_SECTIONS: [(&str, &str); 8] = [
+pub const HELP_SECTIONS: [(&str, &str); 9] = [
     (
         "Profiles",
         "Each profile has its own saves, settings and mod list. Playing one never touches another.",
@@ -141,6 +141,10 @@ pub const HELP_SECTIONS: [(&str, &str); 8] = [
     (
         "Backups",
         "\"Back up…\" in the More menu saves an OFFLINE profile as one .rimrim file: its mods and settings, and, if you choose, its saves, log files and game files. \"Restore backup…\" makes a new profile from a .rimrim file and never changes a profile you already have. A backup holds other people's mods. Check each mod's licence or ask its author before you share it. Game files are RimWorld's own: do not share them.",
+    ),
+    (
+        "Modpacks",
+        "\"Share as modpack…\" in the More menu saves a profile's mod list as one .rimpack file, with the mod settings, creations and saves you choose. A pack holds no mods and no game files. \"Open modpack…\" under the profile list reads a pack, shows which mods you have, which to get from Steam and which to find yourself, and makes a new profile. The app can subscribe to the missing mods in Steam, or download them into an OFFLINE profile with Valve's steamcmd when Steam cannot be reached. Otherwise, get the missing mods before you play. Mod settings can hold private details, such as account logins: only share settings you have checked.",
     ),
 ];
 pub const ICON_CREDIT: &str = "Icons: Font Awesome Free (CC BY 4.0). Text: Inter (SIL OFL 1.1).";
@@ -481,6 +485,14 @@ pub fn progress(label: &str, done: u64, total: u64) -> String {
     } else {
         format!("{label}… {} of {}", size(done), size(total))
     }
+}
+
+/// Progress counted in steps out of `total`, shown as a percentage.
+pub fn progress_percent(label: &str, done: u64, total: u64) -> String {
+    if total == 0 {
+        return format!("{label}…");
+    }
+    format!("{label}… {}%", done.min(total) * 100 / total)
 }
 
 pub fn confirm_delete(name: &str) -> String {
@@ -834,6 +846,344 @@ pub fn restoring(name: &str) -> String {
     format!("Restoring “{name}”")
 }
 
+// Modpacks (T81). A pack holds no mods, so it carries its own notice, not the licence one.
+pub const SHARE_MENU: &str = "Share as modpack…";
+pub const SHARE_TITLE: &str = "Share as a modpack";
+pub const SHARE_IT: &str = "Share";
+pub const SHARE_NOTICE: &str = "This pack holds no mods. Mods may have changed since it was made.";
+pub const SHARE_SETTINGS_NOTICE: &str = "Mod settings can hold private details, such as account logins. Only share settings you have checked.";
+pub const SHARE_MOD_SETTINGS: &str = "Mod settings";
+pub const SHARE_CREATIONS: &str = "Scenarios, ideoligions, xenotypes and exported pawns";
+pub const SHARE_GAME_SETTINGS: &str = "Game settings (screen size, key bindings)";
+pub const SHARE_SAVES: &str = "Saves to include";
+pub const SHARE_NO_SAVES: &str = "This profile has no saves.";
+pub const SHARE_START: &str = "Save to start from";
+pub const SHARE_START_NONE: &str = "No start save";
+pub const SHARE_DESCRIPTION: &str = "Description (optional)";
+pub const SHARE_LINK: &str = "Link to a Steam collection (optional)";
+pub const SHARE_LINK_BAD: &str = "That is not a web address. It must start with https://";
+pub const PICK_SHARE_SAVE_TITLE: &str = "Save the modpack";
+pub const PACK_FILTER: &str = "RimWorld Profile Manager modpack";
+pub const PACK_EXTENSION: &str = "rimpack";
+
+pub fn share_about(name: &str) -> String {
+    format!("“{name}” goes into one .rimpack file: its mod list and the settings you choose below.")
+}
+
+pub fn share_group(label: &str, files: u64, bytes: u64) -> String {
+    let files = count(
+        usize::try_from(files).unwrap_or(usize::MAX),
+        "file",
+        "files",
+    );
+    format!("{label} ({files}, {})", size(bytes))
+}
+
+pub fn share_save(name: &str, bytes: u64) -> String {
+    format!("{name} ({})", size(bytes))
+}
+
+pub fn share_name_long(max: usize) -> String {
+    format!("The profile name is longer than {max} characters. Rename the profile to share it.")
+}
+
+pub fn share_description_long(max: usize) -> String {
+    format!("The description is longer than {max} characters.")
+}
+
+// Opening a modpack (T81b).
+pub const OPEN_PACK_MENU: &str = "Open modpack…";
+pub const OPEN_PACK_TITLE: &str = "Open a modpack";
+pub const OPEN_PACK_IT: &str = "Restore";
+pub const PICK_PACK_OPEN_TITLE: &str = "Choose a modpack to open";
+pub const PACK_PRESENT: &str = "Mods you already have";
+pub const PACK_MISSING: &str = "Mods to get from Steam";
+pub const PACK_MANUAL: &str = "Mods to find yourself";
+pub const OPEN_STEAM_PAGE: &str = "Open Steam page";
+pub const PACK_NO_GAME: &str =
+    "RimWorld was not found, so the mods could not be checked against what is installed.";
+pub const PACK_HINT: &str = "Get the missing mods before you play. RimSort can fetch them if its Steam database is on: use Export to RimSort, then let RimSort download the rest.";
+
+pub fn pack_about(name: &str, mods: usize, description: &str) -> String {
+    let mods = count(mods, "mod", "mods");
+    if description.trim().is_empty() {
+        format!("“{name}” lists {mods}.")
+    } else {
+        format!("“{name}” lists {mods}.\n{}", description.trim())
+    }
+}
+
+pub fn pack_section(title: &str, shown: usize) -> String {
+    format!("{title} ({shown})")
+}
+
+pub fn and_more(more: usize) -> String {
+    format!("and {more} more")
+}
+
+pub fn pack_dlc_missing(ids: &[String]) -> String {
+    format!(
+        "The pack needs expansions you do not have: {}.",
+        ids.join(", ")
+    )
+}
+
+pub fn pack_newer(names: &[String]) -> String {
+    let mods = count(names.len(), "mod", "mods");
+    format!("{mods} you already have changed on Steam since the pack was made.")
+}
+
+pub fn pack_version_differs(pack: &str, here: &str) -> String {
+    format!("The pack was made on game version {pack}. This computer plays {here}.")
+}
+
+pub fn opening_pack(name: &str) -> String {
+    format!("Restoring “{name}”")
+}
+
+pub fn pack_restored(name: &str, still_needed: usize) -> String {
+    let mut line = format!("Restored “{name}” from the modpack.");
+    if still_needed > 0 {
+        let mods = count(still_needed, "mod", "mods");
+        line.push_str(&format!(" {mods} still to get. {PACK_HINT}"));
+    }
+    line
+}
+
+pub fn open_page_failed(reason: &str) -> String {
+    format!("Could not open the page: {reason}")
+}
+
+// Getting the missing mods through Steam (T83c).
+pub const SUBSCRIBE_MENU: &str = "Restore and subscribe…";
+pub const SUBSCRIBE_TITLE: &str = "Subscribe in Steam";
+pub const SUBSCRIBE_IT: &str = "Subscribe";
+pub const SUBSCRIBE_TRUST: &str = "These names come from the pack. Steam may show something else. Mods run code on your computer: only get mods from a pack you trust.";
+pub const SUBSCRIBE_KEEPS: &str =
+    "Steam keeps these subscriptions and updates the mods until you remove them.";
+pub const REMOVE_PACK_SUBS: &str = "Remove subscriptions from the pack";
+pub const UNSUBSCRIBE_TITLE: &str = "Remove subscriptions";
+pub const UNSUBSCRIBE_IT: &str = "Unsubscribe";
+pub const UNSUBSCRIBING: &str = "Removing subscriptions";
+pub const NO_PACK_SUBS: &str = "This profile has no subscriptions from a pack to remove.";
+pub const STEAM_HELPER_MISSING: &str = "The Steam helper is missing, so this cannot be done.";
+pub const STEAM_NO_LIBRARY: &str =
+    "Steam's Workshop folder was not found, so mods cannot be fetched from Steam.";
+
+// Downloading private copies into an OFFLINE profile (T83d).
+pub const PACK_OFFLINE_TICK: &str =
+    "Make it an OFFLINE profile: download private copies, and do not subscribe";
+pub const DOWNLOAD_MENU: &str = "Restore and download…";
+pub const DOWNLOAD_TITLE: &str = "Download from Steam";
+pub const DOWNLOAD_IT: &str = "Download";
+pub const DOWNLOAD_KEEPS: &str =
+    "Steam is only asked to download. You are not subscribed, so the mods do not update.";
+pub const OFFLINE_NOT_ALL: &str = "not every mod arrived as the pack named it";
+pub const OFFLINE_CONFLICTS: &str = "some mods are installed in more than one place";
+
+// The steamcmd route: Valve's own downloader, for a machine with no Steam client (T82c).
+pub const CMD_NOTE: &str = "Steam cannot be reached here, so Valve's steamcmd can download the mods into an OFFLINE profile instead.";
+pub const CMD_DOWNLOAD_TITLE: &str = "Download with steamcmd";
+pub const CMD_DOWNLOAD_KEEPS: &str =
+    "You are not subscribed to anything, so the mods do not update. No Steam client is needed.";
+pub const CMD_CONSENT_TITLE: &str = "Download steamcmd";
+pub const CMD_CONSENT_ABOUT: &str =
+    "steamcmd is Valve's own command-line downloader for Steam. To get the mods, this app will:";
+pub const CMD_CONSENT_POINTS: [&str; 4] = [
+    "Download steamcmd (about 2 MB) from Valve over HTTPS into this app's own folder.",
+    "Keep a fingerprint of that file, and refuse it if the file ever changes.",
+    "Run steamcmd, signed in anonymously. steamcmd then updates itself from Valve.",
+    "Download the mods from the Steam Workshop. Their authors wrote them; this app does not check them.",
+];
+/// What this system must have for steamcmd to start, told before anything is downloaded.
+/// steamcmd is an Intel program, so a Mac needs Rosetta 2 to run it.
+pub fn cmd_platform_note(macos: bool) -> Option<&'static str> {
+    macos.then_some(
+        "On a Mac, steamcmd needs Rosetta 2, Apple's way of running Intel programs. If it is not installed, run \"softwareupdate --install-rosetta\" in Terminal first.",
+    )
+}
+pub const CMD_CONSENT_GO: &str = "Download steamcmd and continue";
+pub const CMD_NO_CONSENT: &str = "steamcmd is not downloaded until you agree to it.";
+pub const CMD_CHANGED_TITLE: &str = "steamcmd file changed";
+pub const CMD_TRUST_IT: &str = "Trust the new file";
+
+pub fn cmd_download_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("This makes a new OFFLINE profile and downloads {mods} with steamcmd into it:")
+}
+
+pub fn cmd_changed_about(first: &str, found: &str) -> String {
+    format!(
+        "Valve's steamcmd file is not the one this app saw the first time.\nFirst seen: {first}\nNow: {found}\nValve may have updated it, or something changed it on the way. Trust the new file only if you expect a change."
+    )
+}
+
+/// A steamcmd problem in plain words, with the technical text on a line of its own.
+pub fn cmd_failed(plain: &str, details: Option<&str>) -> String {
+    match details {
+        Some(details) => format!("{plain}\nDetails: {details}"),
+        None => plain.to_owned(),
+    }
+}
+
+pub fn download_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!(
+        "This makes a new OFFLINE profile and downloads {mods} from Steam into it, without subscribing:"
+    )
+}
+
+pub fn offline_missing(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("{mods} the pack lists could not be found")
+}
+
+pub fn pack_downloaded(name: &str, mods: usize, still_to_find: usize) -> String {
+    let mut line = format!(
+        "Restored “{name}” as an OFFLINE profile with {} downloaded.",
+        count(mods, "mod", "mods")
+    );
+    if still_to_find > 0 {
+        let more = count(still_to_find, "mod", "mods");
+        line.push_str(&format!(" {more} to find yourself."));
+    }
+    line
+}
+
+/// Why a mod that arrived was not kept. `expected` and `found` are the package ids the pack
+/// named and the one the delivered folder holds; when there was no folder to read, `found` is
+/// one of the fixed texts of `rwpm_core::fetch`.
+pub fn pack_mismatch_reason(expected: &str, found: &str) -> String {
+    if found == rwpm_core::fetch::NO_ABOUT || found == rwpm_core::fetch::NOT_FOUND {
+        "its files were not found on disk".to_owned()
+    } else {
+        format!("the pack named {expected}, but what arrived is {found}")
+    }
+}
+
+fn not_kept(mismatched: &[(String, String)]) -> String {
+    let list: Vec<String> = mismatched
+        .iter()
+        .map(|(name, why)| format!("{name} ({why})"))
+        .collect();
+    list.join(", ")
+}
+
+/// The profile stays LIVE: what failed, and why it was not made OFFLINE.
+pub fn pack_kept_live(
+    name: &str,
+    failed: &[(String, String)],
+    mismatched: &[(String, String)],
+    why: &str,
+) -> String {
+    let mut line = format!("Restored “{name}”, but it was not made OFFLINE: {why}.");
+    if !failed.is_empty() {
+        let list: Vec<String> = failed
+            .iter()
+            .map(|(n, why)| format!("{n} ({why})"))
+            .collect();
+        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+    }
+    if !mismatched.is_empty() {
+        line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
+    }
+    line.push_str(" The profile still works as a LIVE profile; open the pack again to retry.");
+    line
+}
+
+pub fn steam_unreachable(why: &str) -> String {
+    format!("Steam cannot be used now: {why}")
+}
+
+pub fn subscribe_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!("This makes a new profile and subscribes you to {mods} in Steam:")
+}
+
+pub fn unsubscribe_about(n: usize) -> String {
+    let mods = count(n, "mod", "mods");
+    format!(
+        "This unsubscribes you from {mods} that a modpack subscribed you to. Mods you chose yourself are not touched."
+    )
+}
+
+pub fn pack_subscribed(
+    name: &str,
+    subscribed: usize,
+    already: usize,
+    failed: &[(String, String)],
+    mismatched: &[(String, String)],
+    still_to_find: usize,
+) -> String {
+    let mut line = format!(
+        "Restored “{name}”. Subscribed to {}.",
+        count(subscribed, "mod", "mods")
+    );
+    if already > 0 {
+        line.push_str(&format!(" {} already had.", count(already, "mod", "mods")));
+    }
+    if !failed.is_empty() {
+        let list: Vec<String> = failed
+            .iter()
+            .map(|(n, why)| format!("{n} ({why})"))
+            .collect();
+        line.push_str(&format!(" Not fetched: {}.", list.join(", ")));
+    }
+    if !mismatched.is_empty() {
+        line.push_str(&format!(" Not kept: {}.", not_kept(mismatched)));
+    }
+    if still_to_find > 0 {
+        let mods = count(still_to_find, "mod", "mods");
+        line.push_str(&format!(" {mods} to find yourself."));
+    }
+    line
+}
+
+/// `failed` holds one reason per mod that could not be removed; each reason is said once.
+pub fn pack_unsubscribed(done: usize, failed: &[String]) -> String {
+    let mut line = format!("Unsubscribed from {}.", count(done, "mod", "mods"));
+    if !failed.is_empty() {
+        let mut reasons: Vec<&str> = Vec::new();
+        for why in failed {
+            let why = why.trim_end_matches('.');
+            if !reasons.contains(&why) {
+                reasons.push(why);
+            }
+        }
+        line.push_str(&format!(
+            " {} could not be removed: {}.",
+            count(failed.len(), "mod", "mods"),
+            reasons.join("; ")
+        ));
+    }
+    line
+}
+
+pub fn sharing(name: &str) -> String {
+    format!("Sharing “{name}”")
+}
+
+pub fn shared(
+    name: &str,
+    path: &str,
+    bytes: u64,
+    mods_left_out: usize,
+    files_left_out: usize,
+) -> String {
+    let mut line = format!("Shared “{name}” as {path} ({}).", size(bytes));
+    if mods_left_out > 0 {
+        let mods = count(mods_left_out, "mod", "mods");
+        line.push_str(&format!(" {mods} could not be listed."));
+    }
+    if files_left_out > 0 {
+        let files = count(files_left_out, "file", "files");
+        line.push_str(&format!(
+            " {files} in the chosen settings are not plain data and were left out."
+        ));
+    }
+    line
+}
+
 /// The notes are rwpm-core's own plain words; they follow the line as they are.
 pub fn restored(name: &str, notes: &[rwpm_core::backup::RestoreNote]) -> String {
     let mut line = format!("Restored “{name}”.");
@@ -868,6 +1218,61 @@ mod tests {
         assert_eq!(size(512), "less than 1 MB");
         assert_eq!(size(1536 * 1024), "1.5 MB");
         assert_eq!(size(3 * 1024 * 1024 * 1024), "3.0 GB");
+    }
+
+    #[test]
+    fn a_mod_that_was_not_kept_says_why_in_plain_words() {
+        use rwpm_core::fetch::{NO_ABOUT, NOT_FOUND};
+        for found in [NO_ABOUT, NOT_FOUND] {
+            assert_eq!(
+                pack_mismatch_reason("a.b", found),
+                "its files were not found on disk"
+            );
+        }
+        assert_eq!(
+            pack_mismatch_reason("a.b", "c.d"),
+            "the pack named a.b, but what arrived is c.d"
+        );
+        let line = pack_subscribed(
+            "P",
+            1,
+            0,
+            &[],
+            &[
+                ("One".to_owned(), pack_mismatch_reason("a.b", NO_ABOUT)),
+                ("Two".to_owned(), pack_mismatch_reason("e.f", "g.h")),
+            ],
+            0,
+        );
+        assert_eq!(
+            line,
+            "Restored “P”. Subscribed to 1 mod. Not kept: One (its files were not found on disk), Two (the pack named e.f, but what arrived is g.h)."
+        );
+        assert!(
+            !line.contains("Not the mod the pack named"),
+            "the old wording said the wrong thing for missing files"
+        );
+    }
+
+    #[test]
+    fn the_unsubscribe_notice_says_why_each_reason_once() {
+        assert_eq!(pack_unsubscribed(2, &[]), "Unsubscribed from 2 mods.");
+        let why = |s: &str| s.to_owned();
+        assert_eq!(
+            pack_unsubscribed(0, &[why("The Steam helper stopped answering.")]),
+            "Unsubscribed from 0 mods. 1 mod could not be removed: The Steam helper stopped answering."
+        );
+        assert_eq!(
+            pack_unsubscribed(
+                1,
+                &[
+                    why("Steam is not running"),
+                    why("x"),
+                    why("Steam is not running")
+                ]
+            ),
+            "Unsubscribed from 1 mod. 3 mods could not be removed: Steam is not running; x."
+        );
     }
 
     #[test]
@@ -979,6 +1384,9 @@ mod tests {
             ("health.rs", include_str!("health.rs")),
             ("copy.rs", include_str!("copy.rs")),
             ("backup.rs", include_str!("backup.rs")),
+            ("modpack.rs", include_str!("modpack.rs")),
+            ("modpack_open.rs", include_str!("modpack_open.rs")),
+            ("pack_fetch.rs", include_str!("pack_fetch.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

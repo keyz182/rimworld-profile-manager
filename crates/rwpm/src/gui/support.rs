@@ -52,6 +52,25 @@ fn section(out: &mut String, name: &str, path: &Path) {
 
 /// Opens a file or folder with the system's default app.
 pub fn open_path(path: &Path) -> std::io::Result<()> {
+    open_with_system(path.as_os_str())
+}
+
+/// The only addresses the window opens by itself. They are Steam Workshop pages, built from
+/// a number; an address from someone else's file is shown as text and never opened (H1).
+const STEAM_PAGES: &str = "https://steamcommunity.com/";
+
+/// Opens a Steam page in the system browser. Refuses any other address.
+pub fn open_url(url: &str) -> std::io::Result<()> {
+    if !url.starts_with(STEAM_PAGES) || url.chars().any(|c| c.is_control() || c.is_whitespace()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "only Steam pages are opened",
+        ));
+    }
+    open_with_system(url.as_ref())
+}
+
+fn open_with_system(target: &std::ffi::OsStr) -> std::io::Result<()> {
     let opener = if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {
@@ -59,7 +78,7 @@ pub fn open_path(path: &Path) -> std::io::Result<()> {
     } else {
         "xdg-open"
     };
-    let mut child = std::process::Command::new(opener).arg(path).spawn()?;
+    let mut child = std::process::Command::new(opener).arg(target).spawn()?;
     std::thread::spawn(move || child.wait());
     Ok(())
 }

@@ -49,7 +49,7 @@ impl Group {
 }
 
 /// Which group a path (relative to the save-data folder) belongs to; `None` = never copied.
-fn group_of(rel: &Path, is_dir: bool) -> Option<Group> {
+pub(crate) fn group_of(rel: &Path, is_dir: bool) -> Option<Group> {
     let mut parts = rel.components().map(|c| c.as_os_str().to_string_lossy());
     let first = parts.next()?;
     let second = parts.next();

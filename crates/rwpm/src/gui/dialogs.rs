@@ -2,7 +2,8 @@
 
 use iced::Element;
 use iced::widget::{
-    Column, button, center, checkbox, column, container, row, scrollable, space, text, text_input,
+    Column, button, center, checkbox, column, container, radio, row, scrollable, space, text,
+    text_input,
 };
 use rwpm_core::backup::RestorePlan;
 use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
@@ -13,9 +14,14 @@ use rwpm_core::profile::relocate::MovePlan;
 use super::backup::{Draft, GameFiles, Tick};
 use super::icon::UI_BOLD;
 use super::message::{Ask, Dialog, Field, GuardChoice, Message, NameFor};
+use super::modpack::{ShareDraft, ShareTick};
 use super::{App, text as t, theme};
 
 const GAP: u32 = 10;
+
+/// The part of the Share dialog that scrolls. In the smallest window (600 px high, V33) the
+/// title, the padding and the buttons need about 150 px of it.
+const SHARE_FORM_HEIGHT: f32 = 400.0;
 
 pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message> {
     match dialog {
@@ -73,11 +79,21 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         }
         Dialog::Backup(draft) => backup_dialog(draft),
         Dialog::Restore(plan) => restore_dialog(plan),
+        Dialog::Share(draft) => share_dialog(draft),
+        Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview),
+        Dialog::ConfirmSubscribe(preview) => super::pack_fetch::confirm_subscribe_dialog(preview),
+        Dialog::ConsentSteamcmd(_) => super::pack_fetch::consent_steamcmd_dialog(),
+        Dialog::TrustSteamcmd { first, found, .. } => {
+            super::pack_fetch::trust_steamcmd_dialog(first, found)
+        }
+        Dialog::ConfirmUnsubscribe { count, .. } => {
+            super::pack_fetch::confirm_unsubscribe_dialog(*count)
+        }
         Dialog::Help => help_dialog(help_list_height(600.0)),
     }
 }
 
-fn heading(words: &str) -> iced::widget::Text<'_> {
+pub(super) fn heading(words: &str) -> iced::widget::Text<'_> {
     text(words).size(18).font(UI_BOLD)
 }
 
@@ -127,7 +143,7 @@ pub fn help_layer(window_height: f32) -> Element<'static, Message> {
 }
 
 /// Cancel and the main button; the main button is disabled until `ok` is set.
-fn buttons(label: &str, ok: Option<Message>, danger: bool) -> Element<'_, Message> {
+pub(super) fn buttons(label: &str, ok: Option<Message>, danger: bool) -> Element<'_, Message> {
     row![
         space::horizontal(),
         button(t::CANCEL)
@@ -417,4 +433,125 @@ fn restore_dialog(plan: &RestorePlan) -> Element<'_, Message> {
     }
     let ok = super::backup::restore_ok(plan).then_some(Message::Confirm);
     body.push(buttons(t::RESTORE_IT, ok, false)).into()
+}
+
+/// The pack holds no mods, so it has its own notice; mod settings carry a privacy warning.
+fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
+    let tick = |label: String, on: bool, which: ShareTick| {
+        checkbox(on)
+            .label(label)
+            .on_toggle(move |v| Message::ShareTick(which, v))
+    };
+    let mut body = column![
+        text(t::share_about(&draft.name)),
+        tick(
+            t::share_group(
+                t::SHARE_MOD_SETTINGS,
+                draft.mod_settings_count.files,
+                draft.mod_settings_count.bytes
+            ),
+            draft.mod_settings,
+            ShareTick::ModSettings
+        ),
+        text(t::SHARE_SETTINGS_NOTICE)
+            .size(13)
+            .style(theme::warning),
+        tick(
+            t::share_group(
+                t::SHARE_CREATIONS,
+                draft.creations_count.files,
+                draft.creations_count.bytes
+            ),
+            draft.creations,
+            ShareTick::Creations
+        ),
+        tick(
+            t::share_group(
+                t::SHARE_GAME_SETTINGS,
+                draft.game_settings_count.files,
+                draft.game_settings_count.bytes
+            ),
+            draft.game_settings,
+            ShareTick::GameSettings
+        ),
+    ]
+    .spacing(GAP);
+    body = body.push(saves_section(draft));
+    body = body
+        .push(text(t::SHARE_DESCRIPTION))
+        .push(
+            text_input("", &draft.description)
+                .padding(8)
+                .on_input(|v| Message::Input(Field::Description, v)),
+        )
+        .push(text(t::SHARE_LINK))
+        .push(
+            text_input("https://", &draft.link)
+                .padding(8)
+                .on_input(|v| Message::Input(Field::Link, v))
+                .on_submit(Message::Confirm),
+        );
+    let warnings = [
+        (!draft.link_ok(), t::SHARE_LINK_BAD.to_owned()),
+        (
+            draft.description_too_long(),
+            t::share_description_long(rwpm_core::modpack::file::MAX_DESCRIPTION_CHARS),
+        ),
+        (
+            draft.name_too_long(),
+            t::share_name_long(rwpm_core::modpack::file::MAX_NAME_CHARS),
+        ),
+    ];
+    for (shown, words) in warnings {
+        if shown {
+            body = body.push(text(words).size(13).style(theme::error));
+        }
+    }
+    // The title and the buttons stay on screen; the form scrolls (V33).
+    column![
+        heading(t::SHARE_TITLE),
+        container(scrollable(body.push(text(t::SHARE_NOTICE).size(13))))
+            .max_height(SHARE_FORM_HEIGHT),
+        buttons(
+            t::SHARE_IT,
+            draft.ready().then_some(Message::Confirm),
+            false
+        ),
+    ]
+    .spacing(GAP)
+    .into()
+}
+
+/// The saves to include, and which of them the pack starts from.
+fn saves_section(draft: &ShareDraft) -> Element<'_, Message> {
+    if draft.saves.is_empty() {
+        return text(t::SHARE_NO_SAVES).size(13).style(theme::muted).into();
+    }
+    let mut list = Column::new().spacing(6);
+    for (i, save) in draft.saves.iter().enumerate() {
+        list = list.push(
+            checkbox(save.on)
+                .label(t::share_save(&save.name, save.bytes))
+                .on_toggle(move |v| Message::ShareSave(i, v)),
+        );
+    }
+    let mut section = column![text(t::SHARE_SAVES), list].spacing(6);
+    if draft.saves.iter().any(|s| s.on) {
+        section = section.push(text(t::SHARE_START));
+        section = section.push(radio(
+            t::SHARE_START_NONE,
+            None,
+            Some(draft.start),
+            Message::ShareStart,
+        ));
+        for (i, save) in draft.saves.iter().enumerate().filter(|(_, s)| s.on) {
+            section = section.push(radio(
+                save.name.as_str(),
+                Some(i),
+                Some(draft.start),
+                Message::ShareStart,
+            ));
+        }
+    }
+    section.into()
 }

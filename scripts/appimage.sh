@@ -54,7 +54,7 @@ Exec=rwpm %f
 Icon=rwpm
 Terminal=false
 Categories=Game;Utility;
-MimeType=application/x-rimrim;
+MimeType=application/x-rimrim;application/x-rimpack;
 StartupWMClass=rwpm
 X-AppImage-Version=$version
 DESKTOP

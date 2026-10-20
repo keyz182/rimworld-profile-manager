@@ -12,14 +12,18 @@ fn version_prints_crate_version() {
     assert_eq!(stdout.trim(), format!("rwpm {}", env!("CARGO_PKG_VERSION")));
 }
 
-/// V83: a word that is not an existing `.rimrim` file is still an unknown command, so a
-/// typo never opens the window.
+/// V83: a word that is not an existing `.rimrim` or `.rimpack` file is still an unknown
+/// command, so a typo never opens the window.
 #[test]
-fn a_missing_backup_or_other_file_is_an_unknown_command() {
+fn a_missing_backup_or_pack_or_other_file_is_an_unknown_command() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let notes = tmp.path().join("notes.txt");
     std::fs::write(&notes, "words").expect("write");
-    for arg in [tmp.path().join("missing.rimrim"), notes] {
+    for arg in [
+        tmp.path().join("missing.rimrim"),
+        tmp.path().join("missing.rimpack"),
+        notes,
+    ] {
         let out = rwpm().arg(&arg).output().expect("spawn rwpm");
         assert_eq!(out.status.code(), Some(2), "{}", arg.display());
         let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");

@@ -502,3 +502,25 @@ fn real_install_offline_round_trip() {
     );
     assert_eq!(copied, plan.bytes_needed);
 }
+
+#[test]
+fn a_second_workshop_folder_supplies_mods_steam_does_not_have() {
+    let f = Fixture::new();
+    f.add_mod("ws/111", "have.steam");
+    f.add_mod("own/222", "have.own");
+    let id = f.profile(&["ludeon.rimworld", "have.steam", "have.own"]);
+    // Without the extra folder the second mod is missing, as before.
+    assert_eq!(f.plan(&id, false).missing, ["have.own"]);
+    let own = f.path("own");
+    let plan = plan_offline_with(&f.store(), &id, &f.game(), false, Some(&own)).expect("plan");
+    assert!(plan.missing.is_empty(), "{:?}", plan.missing);
+    assert!(plan.conflicts.is_empty());
+    let found = plan
+        .copies
+        .iter()
+        .find(|c| c.package_id == "have.own")
+        .expect("copy of the extra mod");
+    assert_eq!(found.folder, "222");
+    assert_eq!(found.source, ModSource::Workshop);
+    assert!(plan.copies.iter().any(|c| c.package_id == "have.steam"));
+}

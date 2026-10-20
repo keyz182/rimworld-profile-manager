@@ -141,7 +141,8 @@ impl App {
         let Some(p) = self.profiles.iter().find(|p| p.id == *id).cloned() else {
             return Task::none();
         };
-        let (path, total) = (with_extension(path), self.backup_total(&p, includes));
+        let path = with_extension(path, t::BACKUP_EXTENSION);
+        let total = self.backup_total(&p, includes);
         let (ctx, id) = (self.ctx.clone(), p.id.clone());
         self.start(t::backing_up(&p.name), total, move |progress| {
             let fail = |e: rwpm_core::ProfileError| e.to_string();
@@ -204,17 +205,17 @@ impl App {
     }
 }
 
-/// The player may type a name with no `.rimrim`; the file always gets it.
-fn with_extension(path: PathBuf) -> PathBuf {
+/// The player may type a name with no extension; the file always gets it.
+pub(super) fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
     let has = path
         .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case(t::BACKUP_EXTENSION));
+        .is_some_and(|e| e.eq_ignore_ascii_case(extension));
     if has {
         return path;
     }
     let mut name = path.into_os_string();
     name.push(".");
-    name.push(t::BACKUP_EXTENSION);
+    name.push(extension);
     PathBuf::from(name)
 }
 
