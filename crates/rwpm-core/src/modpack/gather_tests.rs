@@ -176,6 +176,7 @@ fn an_offline_copy_of_a_workshop_mod_keeps_its_workshop_id() {
         name: "Offline".into(),
         mode: Mode::Offline,
         game_build: None,
+        pack: None,
         location: Location::Stored { dir },
     };
     mod_list(&profile, &["steam.only", "live.local"]);

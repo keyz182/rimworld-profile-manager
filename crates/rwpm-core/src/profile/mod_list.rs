@@ -167,6 +167,7 @@ mod tests {
                 name: "P".into(),
                 mode,
                 game_build: None,
+                pack: None,
                 location: Location::Stored { dir },
             }
         }
@@ -224,6 +225,7 @@ mod tests {
             name: "P".into(),
             mode: Mode::Live,
             game_build: None,
+            pack: None,
             location: Location::Stored {
                 dir: w.path("nothing"),
             },

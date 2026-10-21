@@ -529,6 +529,7 @@ mod tests {
             name: "Run".into(),
             mode,
             game_build: None,
+            pack: None,
             location: Location::Stored {
                 dir: PathBuf::from("/profiles/run"),
             },
@@ -541,6 +542,7 @@ mod tests {
             name: "Default".into(),
             mode: Mode::Live,
             game_build: None,
+            pack: None,
             location: Location::Default {
                 save_dir: PathBuf::from("/home/u/.config/unity3d/x"),
             },

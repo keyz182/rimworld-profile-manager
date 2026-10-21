@@ -18,8 +18,9 @@ use super::file::Manifest;
 use super::{MAX_BYTES, MAX_ENTRIES, bad, open, read_first, read_preview};
 use crate::backup::unpack::{parts_of, write_entry};
 use crate::error::ProfileError;
-use crate::profile::file::FILE_NAME as PROFILE_FILE;
-use crate::profile::{Profile, ProfileFile, ProfileId, ProfileStore, Trash};
+use crate::profile::file::{FILE_NAME as PROFILE_FILE, PACK_FILE};
+use crate::profile::offline::now_datetime;
+use crate::profile::{PackOrigin, Profile, ProfileFile, ProfileId, ProfileStore, Trash};
 use crate::space;
 
 /// Free space wanted on top of the declared size.
@@ -52,7 +53,11 @@ pub fn plan_unpack<T: Trash>(
     if manifest.uncompressed_bytes > MAX_BYTES || manifest.entry_count > MAX_ENTRIES {
         return Err(bad(archive, "it is larger than a modpack may be"));
     }
-    let need = manifest.uncompressed_bytes + manifest.uncompressed_bytes / 100 * MARGIN_PERCENT;
+    // The pack itself is kept too (a copy, though a reflink may cost nothing).
+    let kept = std::fs::metadata(archive).map_or(0, |m| m.len());
+    let need = manifest.uncompressed_bytes
+        + manifest.uncompressed_bytes / 100 * MARGIN_PERCENT
+        + kept;
     let free = space::free_space(store.root());
     if let Some(free) = free.filter(|&f| f < need) {
         return Err(ProfileError::NotEnoughSpace {
@@ -222,6 +227,18 @@ impl Job<'_> {
         if self.saves != listed {
             return Err(self.fault("its saves are not the ones it lists"));
         }
-        ProfileFile::new(name).write_atomic(&self.dir.join(PROFILE_FILE))
+        // The pack stays with the profile, for "reset to pack". Copied here, while the
+        // archive is still where the player opened it.
+        let kept = self.dir.join(PACK_FILE);
+        reflink_copy::reflink_or_copy(self.archive(), &kept)
+            .map_err(ProfileError::io("copy", self.archive()))?;
+        let mut file = ProfileFile::new(name);
+        file.pack = Some(PackOrigin {
+            name: manifest.name.clone(),
+            description: manifest.description.clone(),
+            has_cover: self.cover,
+            imported_at: now_datetime(),
+        });
+        file.write_atomic(&self.dir.join(PROFILE_FILE))
     }
 }

@@ -119,6 +119,7 @@ fn profile(name: &str, mode: Mode) -> Profile {
         name: name.into(),
         mode,
         game_build: None,
+        pack: None,
         location: Location::Stored {
             dir: PathBuf::from("/profiles").join(name.to_lowercase().replace(' ', "-")),
         },
@@ -311,6 +312,7 @@ fn default_profile_config_folder_and_name_clash() {
         name: "Default".into(),
         mode: Mode::Live,
         game_build: None,
+        pack: None,
         location: Location::Default {
             save_dir: PathBuf::from(
                 "/home/u/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios",

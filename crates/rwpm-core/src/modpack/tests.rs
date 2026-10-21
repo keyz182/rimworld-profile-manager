@@ -660,5 +660,5 @@ fn a_file_that_is_not_a_modpack_is_refused() {
     assert!(fx.leftovers().is_empty());
 }
 
-#[cfg(test)]
 mod cover_tests;
+mod origin_tests;

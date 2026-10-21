@@ -29,6 +29,7 @@ fn stored(mode: Mode) -> Profile {
         name: "Pinned".into(),
         mode,
         game_build: Some("1.6.4871-rev598".into()),
+        pack: None,
         location: Location::Stored {
             dir: PathBuf::from("/profiles/pinned"),
         },

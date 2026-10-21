@@ -13,7 +13,7 @@ pub mod relocate;
 pub mod running;
 pub mod store;
 
-pub use file::{FrozenMod, ModSource, Mode, ProfileFile};
+pub use file::{FrozenMod, ModSource, Mode, PackOrigin, ProfileFile};
 pub use id::ProfileId;
 pub use last_run::{LastRun, RunOutcome, StartedBy};
 pub use running::{GAME_PROCESS_NAMES, ProcessProbe, RunningProbe, any_game_running};

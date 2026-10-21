@@ -201,6 +201,7 @@ mod tests {
             name: "Default".into(),
             mode: crate::profile::Mode::Live,
             game_build: None,
+            pack: None,
             location: Location::Default {
                 save_dir: "/game".into(),
             },

@@ -191,7 +191,12 @@ fn check_mod(entry: &ModEntry) -> Result<(), String> {
 /// Text the app shows: at most `max` characters, no control characters (a multi-line text
 /// may keep line breaks and tabs) and none of the characters that reorder the text around
 /// them, which could make one name read as another.
-fn check_text(text: &str, what: &str, max: usize, multiline: bool) -> Result<(), String> {
+pub(crate) fn check_text(
+    text: &str,
+    what: &str,
+    max: usize,
+    multiline: bool,
+) -> Result<(), String> {
     if text.chars().count() > max {
         return Err(format!("{what} is longer than {max} characters"));
     }

@@ -7,12 +7,16 @@ use serde::{Deserialize, Serialize};
 use crate::builds::BuildKey;
 use crate::error::ProfileError;
 
-/// Highest schema this build reads. Written only when `game_build` is set;
-/// without a pin the file stays schema 1, so an older rwpm can still read it.
-pub const SCHEMA: u32 = 2;
-/// The schema a profile with no pinned game build is written as.
+/// Highest schema this build reads. A file is written as the lowest schema that holds
+/// what it has (see `ProfileFile::to_write`), so an older rwpm can still read it.
+pub const SCHEMA: u32 = 3;
+/// Schema 2 added `game_build`.
+pub const SCHEMA_PINNED: u32 = 2;
+/// The schema a profile with no pinned game build and no pack origin is written as.
 pub const SCHEMA_UNPINNED: u32 = 1;
 pub const FILE_NAME: &str = "profile.toml";
+/// The `.rimpack` a profile was made from, kept beside `profile.toml`.
+pub const PACK_FILE: &str = "pack.rimpack";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -38,6 +42,38 @@ pub struct FrozenMod {
     pub copied_at: toml::value::Datetime,
 }
 
+/// What a profile keeps of the pack that made it. The pack file (`PACK_FILE`) and the cover
+/// thumbnail (`modpack::cover::PROFILE_COVER`) sit beside `profile.toml` under fixed names,
+/// so nothing here is a path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PackOrigin {
+    pub name: String,
+    /// Markdown source, as the pack creator wrote it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub has_cover: bool,
+    pub imported_at: toml::value::Datetime,
+}
+
+impl PackOrigin {
+    /// The same limits a manifest holds its text to; a backup can bring in a foreign file.
+    fn check(&self) -> Result<(), String> {
+        use crate::modpack::file::{MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_text};
+        if self.name.trim().is_empty() {
+            return Err("`pack.name` is empty".into());
+        }
+        check_text(&self.name, "`pack.name`", MAX_NAME_CHARS, false)?;
+        check_text(
+            &self.description,
+            "`pack.description`",
+            MAX_DESCRIPTION_CHARS,
+            true,
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProfileFile {
@@ -49,6 +85,9 @@ pub struct ProfileFile {
     pub game_build: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frozen_mods: Vec<FrozenMod>,
+    /// Set when a `.rimpack` made this profile. Needs schema 3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pack: Option<PackOrigin>,
 }
 
 impl ProfileFile {
@@ -59,6 +98,7 @@ impl ProfileFile {
             mode: Mode::Live,
             game_build: None,
             frozen_mods: Vec::new(),
+            pack: None,
         }
     }
 
@@ -95,15 +135,21 @@ impl ProfileFile {
                 parse_err(format!("`game_build` {key:?} is not a game version key"))
             })?;
         }
+        if let Some(origin) = &file.pack {
+            origin.check().map_err(parse_err)?;
+        }
         Ok(file)
     }
 
-    /// Schema 2 only while a game build is pinned. Recomputed on every write, so
-    /// unpinning takes the file back to schema 1 instead of stranding it on 2.
+    /// The lowest schema that holds what the file has: 3 with a pack origin, 2 with a
+    /// pinned game build, else 1. Recomputed on every write, so dropping the pin or the
+    /// origin takes the file back down instead of stranding it.
     fn to_write(&self) -> Self {
         let mut out = self.clone();
-        out.schema = if out.game_build.is_some() {
+        out.schema = if out.pack.is_some() {
             SCHEMA
+        } else if out.game_build.is_some() {
+            SCHEMA_PINNED
         } else {
             SCHEMA_UNPINNED
         };
@@ -144,6 +190,16 @@ mod tests {
                 source_dir: PathBuf::from("/steam/workshop/content/294100/2009463077"),
                 copied_at: "2026-10-11T17:00:00Z".parse().expect("datetime"),
             }],
+            pack: None,
+        }
+    }
+
+    fn origin() -> PackOrigin {
+        PackOrigin {
+            name: "Ironman".into(),
+            description: "# Hard mode\n\n- no saves\n- no mercy".into(),
+            has_cover: true,
+            imported_at: "2026-10-21T12:00:00Z".parse().expect("datetime"),
         }
     }
 
@@ -161,13 +217,64 @@ mod tests {
         let path = dir.path().join(FILE_NAME);
         std::fs::write(
             &path,
-            "schema = 3\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
+            "schema = 4\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
         )
         .expect("write");
         assert!(matches!(
             ProfileFile::read(&path),
-            Err(ProfileError::SchemaTooNew { found: 3, .. })
+            Err(ProfileError::SchemaTooNew { found: 4, .. })
         ));
+    }
+
+    /// 3 while a pack origin is set; without one the file stays readable by older builds.
+    #[test]
+    fn schema_follows_the_pack_origin_in_both_directions() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        let mut file = ProfileFile::new("Run");
+        file.pack = Some(origin());
+        file.write_atomic(&path).expect("write");
+        let read = ProfileFile::read(&path).expect("read");
+        assert_eq!(read.schema, 3);
+        assert_eq!(read.pack, Some(origin()));
+
+        file.game_build = Some("1.6.4871-rev598".into());
+        file.write_atomic(&path).expect("write");
+        assert_eq!(ProfileFile::read(&path).expect("read").schema, 3);
+
+        file.pack = None;
+        file.write_atomic(&path).expect("write");
+        assert_eq!(ProfileFile::read(&path).expect("read").schema, 2);
+        file.game_build = None;
+        file.write_atomic(&path).expect("write");
+        let text = std::fs::read_to_string(&path).expect("read");
+        assert!(text.contains("schema = 1") && !text.contains("pack"), "{text}");
+    }
+
+    /// An origin read from a backup is as untrusted as a pack manifest.
+    #[test]
+    fn rejects_hostile_pack_text() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        let long = "x".repeat(2_001);
+        let cases = [
+            ("name = \"\"", ""),
+            ("name = \"a\\u0007b\"", ""),
+            ("name = \"Ok\"", &format!("description = {long:?}")),
+            ("name = \"Ok\"", "description = \"a\\u202Eb\""),
+        ];
+        for (name, extra) in cases {
+            let text = format!(
+                "schema = 3\nname = \"x\"\nmode = \"live\"\n[pack]\n{name}\n{extra}\n\
+                 imported_at = 2026-10-21T12:00:00Z\n"
+            );
+            std::fs::write(&path, text).expect("write");
+            let out = ProfileFile::read(&path);
+            assert!(
+                matches!(out, Err(ProfileError::Parse { .. })),
+                "{name} {extra:.20}: {out:?}"
+            );
+        }
     }
 
     /// 2 while pinned, back to 1 when the pin goes.

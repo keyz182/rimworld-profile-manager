@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::builds::BuildKey;
 use crate::discovery::Engine;
 use crate::error::ProfileError;
-use crate::profile::file::{FILE_NAME, Mode, ProfileFile};
+use crate::profile::file::{FILE_NAME, Mode, PackOrigin, ProfileFile};
 use crate::profile::id::ProfileId;
 use crate::profile::running::RunningProbe;
 
@@ -59,6 +59,9 @@ pub struct Profile {
     /// Key of the stored game build this profile is pinned to; `None` = the Steam
     /// install. Default is never pinned.
     pub game_build: Option<String>,
+    /// The pack this profile was made from, if any. Its file and cover sit in the profile
+    /// folder; see `PackOrigin`.
+    pub pack: Option<PackOrigin>,
     pub location: Location,
 }
 
@@ -264,6 +267,8 @@ impl<T: Trash> ProfileStore<T> {
                     }
                     let mut file = ProfileFile::read(&src_dir.join(FILE_NAME))?;
                     file.name = name.to_owned();
+                    // A copy is its own profile: the pack file and cover stay with the original.
+                    file.pack = None;
                     Ok(file)
                 }
             }
@@ -383,6 +388,7 @@ impl<T: Trash> ProfileStore<T> {
             name: file.name,
             mode: file.mode,
             game_build: file.game_build,
+            pack: file.pack,
             location: Location::Stored { dir },
         }
     }
@@ -394,6 +400,7 @@ impl<T: Trash> ProfileStore<T> {
             mode: Mode::Live,
             // Default shares the game's own save folder and cannot be pinned.
             game_build: None,
+            pack: None,
             location: Location::Default {
                 save_dir: self.game_save_dir.clone(),
             },
@@ -841,6 +848,7 @@ mod tests {
             name: "P".into(),
             mode: Mode::Live,
             game_build: None,
+            pack: None,
             location: Location::Stored { dir: dir.clone() },
         };
         let default = Profile {
@@ -848,6 +856,7 @@ mod tests {
             name: "Default".into(),
             mode: Mode::Live,
             game_build: None,
+            pack: None,
             location: Location::Default {
                 save_dir: save.clone(),
             },
