@@ -29,7 +29,7 @@ const EX_USAGE: i32 = 64;
 const EX_TEMPFAIL: i32 = 75;
 const EX_FAILED: i32 = 1;
 const POLL: Duration = Duration::from_secs(1);
-const USAGE: &str = "usage: rwpm run [--from rimsort] <profile-id> -- <game command…>";
+pub(crate) const USAGE: &str = "usage: rwpm run [--from rimsort] <profile-id> -- <game command…>";
 
 pub(crate) enum RunError {
     Usage(String),

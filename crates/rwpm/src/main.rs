@@ -19,6 +19,24 @@ use std::process::ExitCode;
 /// Exit code for a subcommand that is not built yet.
 const EXIT_UNIMPLEMENTED: u8 = 2;
 
+/// What `rwpm --help` prints. The `run` line is the one `rwpm run` shows on a usage error.
+fn help_text() -> String {
+    let run = run::USAGE.trim_start_matches("usage: ");
+    format!(
+        "rwpm {}\n\
+         Separate RimWorld profiles, each with its own saves, settings and mod list.\n\
+         \n\
+         usage:\n  \
+         rwpm                  open the app\n  \
+         rwpm <file>           open a .rimrim backup or a .rimpack modpack\n  \
+         {run}\n                        start a profile (a Steam launch option)\n  \
+         rwpm mcp              run an MCP server on standard input and output\n  \
+         rwpm --version        show the version\n  \
+         rwpm --help           show this text",
+        rwpm_core::VERSION
+    )
+}
+
 /// `rwpm <file>.rimrim` or `<file>.rimpack`: how the OS hands over a backup or a modpack
 /// that was opened. Only an existing file counts; any other word is still
 /// an unknown command.
@@ -64,11 +82,15 @@ fn main() -> ExitCode {
             println!("rwpm {}", rwpm_core::VERSION);
             ExitCode::SUCCESS
         }
+        Some("--help" | "-h") => {
+            println!("{}", help_text());
+            ExitCode::SUCCESS
+        }
         // Full i32 exit code (Windows game codes do not fit ExitCode's u8).
         Some("run") => std::process::exit(run::main(&args[1..])),
         Some("mcp") => std::process::exit(mcp::main()),
         Some(other) => {
-            eprintln!("rwpm: unknown command `{other}`");
+            eprintln!("rwpm: unknown command `{other}`. Try `rwpm --help`.");
             ExitCode::from(EXIT_UNIMPLEMENTED)
         }
     }
@@ -80,6 +102,16 @@ mod tests {
 
     fn arg(path: &Path) -> Vec<OsString> {
         vec![path.as_os_str().to_owned()]
+    }
+
+    #[test]
+    fn help_names_every_command() {
+        let help = help_text();
+        for word in ["rwpm mcp", "--version", "--help", ".rimrim", ".rimpack"] {
+            assert!(help.contains(word), "help lacks {word}");
+        }
+        assert!(help.contains(run::USAGE.trim_start_matches("usage: ")));
+        assert!(help.contains(rwpm_core::VERSION));
     }
 
     #[test]
