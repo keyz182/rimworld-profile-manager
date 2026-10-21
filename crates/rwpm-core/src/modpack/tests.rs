@@ -16,6 +16,7 @@ fn includes(saves: &[&str]) -> Includes {
         creations: true,
         game_settings: false,
         saves: saves.iter().map(|s| (*s).to_owned()).collect(),
+        ..Default::default()
     }
 }
 
@@ -72,10 +73,10 @@ fn manifest_refuses_unknown_fields_and_newer_schema() {
         parse(&extra),
         Err(ProfileError::BadModpack { .. })
     ));
-    let newer = text.replacen("schema = 1", "schema = 3", 1);
+    let newer = text.replacen("schema = 1", "schema = 4", 1);
     assert!(matches!(
         parse(&newer),
-        Err(ProfileError::SchemaTooNew { found: 3, .. })
+        Err(ProfileError::SchemaTooNew { found: 4, .. })
     ));
 }
 
@@ -259,12 +260,14 @@ fn declared_files_follow_the_ticks_and_the_save_list() {
         creations: true,
         game_settings: true,
         saves: vec!["A.rws".into()],
+        ..Default::default()
     };
     let none = Includes {
         mod_settings: false,
         creations: false,
         game_settings: false,
         saves: vec![],
+        ..Default::default()
     };
     let ok = |rel: &str, inc: &Includes| check_declared(Path::new(rel), inc).is_ok();
     assert!(ok("Config/ModsConfig.xml", &none));
@@ -662,4 +665,5 @@ fn a_file_that_is_not_a_modpack_is_refused() {
 
 mod cover_tests;
 mod origin_tests;
+mod picks_tests;
 mod reset_tests;

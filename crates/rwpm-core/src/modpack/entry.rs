@@ -72,6 +72,23 @@ pub fn check_entry_kind(kind: tar::EntryType, name: &Path) -> Result<(), String>
     }
 }
 
+/// Whether a picked list leaves this file in (`rel` is below `SaveData/`). A file outside
+/// the two groups that can be narrowed, or in a group with no list, is always in.
+pub fn picked(rel: &Path, includes: &Includes) -> bool {
+    let parts = crate::backup::unpack::parts_of(rel);
+    match (group_of(rel, false), parts.as_slice()) {
+        (Some(Group::ModSettings), [_, name, ..]) => includes
+            .mod_settings_only
+            .as_ref()
+            .is_none_or(|l| l.iter().any(|n| n == name)),
+        (Some(Group::Creations), _) => includes
+            .creations_only
+            .as_ref()
+            .is_none_or(|l| l.contains(&parts.join("/"))),
+        _ => true,
+    }
+}
+
 /// Whether the pack's own manifest declares this file (`rel` is below `SaveData/`): the mod
 /// list always, then settings and creations by the ticks, then exactly the listed saves.
 pub fn check_declared(rel: &Path, includes: &Includes) -> Result<(), String> {
@@ -97,7 +114,7 @@ pub fn check_declared(rel: &Path, includes: &Includes) -> Result<(), String> {
         Some(Group::Creations) => includes.creations,
         Some(Group::ModData) | None => false,
     };
-    if !ticked {
+    if !ticked || !picked(rel, includes) {
         return Err(outside());
     }
     let extension = rel.extension().and_then(|e| e.to_str()).unwrap_or("");

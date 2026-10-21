@@ -113,6 +113,7 @@ impl ShareDraft {
                 .filter(|s| s.on)
                 .map(|s| s.name.clone())
                 .collect(),
+            ..Default::default()
         }
     }
 

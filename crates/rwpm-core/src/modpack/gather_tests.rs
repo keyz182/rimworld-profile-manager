@@ -232,6 +232,7 @@ fn a_gathered_list_goes_straight_into_a_pack() {
             creations: false,
             game_settings: false,
             saves: vec![],
+            ..Default::default()
         },
         start_save: None,
         collection_url: None,

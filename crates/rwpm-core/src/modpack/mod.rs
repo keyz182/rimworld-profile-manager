@@ -19,7 +19,10 @@ use std::path::Path;
 
 pub use file::{Includes, Manifest, ModEntry};
 pub use gather::{Gathered, gather_mods};
-pub use pack::{PackPlan, PackReport, PackSpec, apply_pack, plan_pack};
+pub use pack::{
+    Candidate, PackPlan, PackReport, PackSpec, PickCandidates, apply_pack, pick_candidates,
+    plan_pack,
+};
 pub use reset::{ResetPlan, ResetReport, apply_reset, plan_reset};
 pub use unpack::{UnpackPlan, UnpackReport, apply_unpack, plan_unpack};
 

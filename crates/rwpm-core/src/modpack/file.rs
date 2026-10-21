@@ -9,14 +9,22 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
+use crate::profile::copy_settings::{Group, group_of};
 
-/// Highest schema this build reads. Schema 2 added `cover`.
-pub const SCHEMA: u32 = 2;
-/// What a pack without a cover is written as, so builds that predate covers still open it.
+/// Highest schema this build reads. Schema 2 added `cover`, schema 3 the picked lists in
+/// `[includes]`.
+pub const SCHEMA: u32 = 3;
+/// What a pack with a cover is written as.
+pub const SCHEMA_COVER: u32 = 2;
+/// What a pack that lists single settings or creations is written as.
+pub const SCHEMA_PICKS: u32 = 3;
+/// What any other pack is written as, so builds that predate covers still open it.
 pub const SCHEMA_BASE: u32 = 1;
 pub const FILE_NAME: &str = "rimpack.toml";
 
 const MAX_MODS: usize = 5_000;
+/// Longest picked list; each name is held to `MAX_TEXT`.
+const MAX_PICKS: usize = 5_000;
 const MAX_TEXT: usize = 512;
 const MAX_ID: usize = 128;
 /// Text a person reads is shown in the app, so it is short (counted in characters).
@@ -25,12 +33,20 @@ pub const MAX_DESCRIPTION_CHARS: usize = 2_000;
 const MAX_VERSION_CHARS: usize = 128;
 
 /// What the pack creator chose to put in. `ModsConfig.xml` is always in.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Includes {
     pub mod_settings: bool,
     pub creations: bool,
     pub game_settings: bool,
+    /// Narrows `mod_settings` to these entries directly in `Config/`, for example
+    /// `Mod_1234_Thing.xml`. `None` is all of them. Needs schema 3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mod_settings_only: Option<Vec<String>>,
+    /// Narrows `creations` to these files, as paths below the save-data folder, for example
+    /// `Scenarios/Hard.rsc`. `None` is all of them. Needs schema 3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creations_only: Option<Vec<String>>,
     /// File names below `Saves/`, for example `Colony.rws`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub saves: Vec<String>,
@@ -149,10 +165,11 @@ impl Manifest {
             if cover != super::cover::COVER_ENTRY {
                 return Err(format!("`{}` is not a cover name", cover.escape_debug()));
             }
-            if self.schema < SCHEMA {
+            if self.schema < SCHEMA_COVER {
                 return Err("it has a cover but is not schema 2".into());
             }
         }
+        self.check_picks()?;
         let mut seen = std::collections::BTreeSet::new();
         for save in &self.includes.saves {
             check_save_name(save)?;
@@ -166,6 +183,77 @@ impl Manifest {
             return Err(format!("the start save `{start}` is not one of its saves"));
         }
         Ok(())
+    }
+
+    /// A picked list narrows a group that is ticked, names things that group holds, and is
+    /// the only way to say it: an empty list is an unticked box, a full one is no list.
+    fn check_picks(&self) -> Result<(), String> {
+        let includes = &self.includes;
+        let lists = [
+            (
+                &includes.mod_settings_only,
+                includes.mod_settings,
+                "mod settings",
+                Group::ModSettings,
+            ),
+            (
+                &includes.creations_only,
+                includes.creations,
+                "creations",
+                Group::Creations,
+            ),
+        ];
+        for (list, ticked, what, group) in lists {
+            let Some(list) = list else { continue };
+            if self.schema < SCHEMA_PICKS {
+                return Err(format!("it picks {what} but is not schema 3"));
+            }
+            if !ticked {
+                return Err(format!("it picks {what} but does not include them"));
+            }
+            if list.is_empty() || list.len() > MAX_PICKS {
+                return Err(format!("its list of {what} is empty or too long"));
+            }
+            let mut seen = std::collections::BTreeSet::new();
+            for name in list {
+                check_pick(name, group, what)?;
+                if !seen.insert(name) {
+                    return Err(format!(
+                        "the {what} item `{}` is listed twice",
+                        name.escape_debug()
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// One picked name: plain text, short, and inside the group it is listed under.
+fn check_pick(name: &str, group: Group, what: &str) -> Result<(), String> {
+    let refused = || format!("`{}` is not one of the {what}", name.escape_debug());
+    if name.len() > MAX_TEXT || check_text(name, what, MAX_TEXT, false).is_err() {
+        return Err(refused());
+    }
+    let rel = match super::entry::classify(&Path::new(super::entry::SAVE_DATA).join(name)) {
+        Ok(super::entry::Place::SaveData(rel)) => rel,
+        _ => return Err(refused()),
+    };
+    let depth = rel.components().count();
+    let shaped = match group {
+        // A `Config/` entry: one name, never a path.
+        Group::ModSettings => depth == 1 && !name.contains('/'),
+        _ => depth >= 2,
+    };
+    let rel = if group == Group::ModSettings {
+        Path::new("Config").join(&rel)
+    } else {
+        rel
+    };
+    if shaped && group_of(&rel, false) == Some(group) {
+        Ok(())
+    } else {
+        Err(refused())
     }
 }
 

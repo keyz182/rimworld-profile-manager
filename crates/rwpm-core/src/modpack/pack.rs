@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use tar::Header;
 
 use super::cover;
-use super::entry::{MOD_LIST, SAVE_DATA, check_declared};
+use super::entry::{MOD_LIST, SAVE_DATA, check_declared, picked};
 use super::file::{self, Includes, Manifest, ModEntry, check_save_name};
 use super::{MAX_BYTES, MAX_ENTRIES, bad};
 use crate::backup::pack::{check_space, header_for, temp_beside};
@@ -67,7 +67,8 @@ pub fn plan_pack<T: Trash>(
 ) -> Result<PackPlan, ProfileError> {
     let profile = store.get(id)?;
     let save_data = profile.save_data_dir();
-    let inventory = Inventory::of(&save_data, &spec.includes, &profile.name)?;
+    let includes = normalise(&save_data, spec.includes)?;
+    let inventory = Inventory::of(&save_data, &includes, &profile.name)?;
     if let Some(cover) = &spec.cover {
         cover::thumbnail(cover).map_err(|r| bad(Path::new(cover::COVER_ENTRY), r))?;
     }
@@ -84,7 +85,7 @@ pub fn plan_pack<T: Trash>(
         cover: None,
         uncompressed_bytes: 0,
         entry_count: 0,
-        includes: spec.includes,
+        includes,
         mods: spec.mods,
     };
     set_totals(&mut manifest, &inventory, spec.cover.as_deref());
@@ -101,16 +102,96 @@ pub fn plan_pack<T: Trash>(
     })
 }
 
-/// The totals restore holds a pack to count the cover too, and a cover makes the pack
-/// schema 2; without one the pack stays readable by builds that predate covers.
+/// The totals restore holds a pack to count the cover too. A picked list makes the pack
+/// schema 3 and a cover schema 2; any other pack stays readable by builds that predate both.
 fn set_totals(manifest: &mut Manifest, inventory: &Inventory, cover: Option<&[u8]>) {
     let cover_bytes = cover.map_or(0, |c| c.len() as u64);
     manifest.uncompressed_bytes = inventory.bytes + cover_bytes;
     manifest.entry_count = inventory.items.len() as u64 + u64::from(cover.is_some());
-    (manifest.schema, manifest.cover) = match cover {
-        Some(_) => (file::SCHEMA, Some(cover::COVER_ENTRY.to_owned())),
-        None => (file::SCHEMA_BASE, None),
+    manifest.cover = cover.map(|_| cover::COVER_ENTRY.to_owned());
+    let includes = &manifest.includes;
+    manifest.schema = if includes.mod_settings_only.is_some() || includes.creations_only.is_some() {
+        file::SCHEMA_PICKS
+    } else if cover.is_some() {
+        file::SCHEMA_COVER
+    } else {
+        file::SCHEMA_BASE
     };
+}
+
+/// One thing the Share dialog may offer to pick, and the bytes it holds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    /// A `Config/` entry name for a mod setting, a path below the save-data folder for a
+    /// creation: the form `Includes` lists them in.
+    pub name: String,
+    pub bytes: u64,
+}
+
+/// What a pack could hold of the two narrowable groups. It is found by the walk the packer
+/// uses, so nothing is offered that the packer would leave out.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PickCandidates {
+    pub mod_settings: Vec<Candidate>,
+    pub creations: Vec<Candidate>,
+}
+
+pub fn pick_candidates(save_data: &Path) -> Result<PickCandidates, ProfileError> {
+    let all = Includes {
+        mod_settings: true,
+        creations: true,
+        ..Includes::default()
+    };
+    let mut inventory = Inventory::default();
+    for rel in entries(save_data, &[Group::ModSettings, Group::Creations]) {
+        inventory.walk(save_data, &rel, &all)?;
+    }
+    let mut found = PickCandidates::default();
+    let mut settings: std::collections::BTreeMap<String, u64> = Default::default();
+    for item in &inventory.items {
+        let rel = item
+            .name
+            .strip_prefix(&format!("{SAVE_DATA}/"))
+            .unwrap_or(&item.name);
+        match crate::profile::copy_settings::group_of(Path::new(rel), false) {
+            Some(Group::ModSettings) => {
+                let entry = rel.split('/').nth(1).unwrap_or(rel).to_owned();
+                *settings.entry(entry).or_default() += item.bytes;
+            }
+            Some(Group::Creations) => found.creations.push(Candidate {
+                name: rel.to_owned(),
+                bytes: item.bytes,
+            }),
+            _ => {}
+        }
+    }
+    found.mod_settings = settings
+        .into_iter()
+        .map(|(name, bytes)| Candidate { name, bytes })
+        .collect();
+    found.creations.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(found)
+}
+
+/// A list that picks everything the group holds is the same as no list, so it is written as
+/// none and the pack stays readable by older builds.
+fn normalise(save_data: &Path, mut includes: Includes) -> Result<Includes, ProfileError> {
+    if includes.mod_settings_only.is_none() && includes.creations_only.is_none() {
+        return Ok(includes);
+    }
+    let found = pick_candidates(save_data)?;
+    let drop_if_full = |list: &mut Option<Vec<String>>, all: &[Candidate]| {
+        let names: std::collections::BTreeSet<&str> = all.iter().map(|c| c.name.as_str()).collect();
+        let picked = list
+            .as_ref()
+            .map(|l| l.iter().map(String::as_str).collect());
+        if picked.as_ref() == Some(&names) {
+            *list = None;
+        }
+    };
+    drop_if_full(&mut includes.mod_settings_only, &found.mod_settings);
+    drop_if_full(&mut includes.creations_only, &found.creations);
+    Ok(includes)
 }
 
 fn check_manifest(manifest: &Manifest) -> Result<(), ProfileError> {
@@ -231,6 +312,7 @@ fn append_file<W: io::Write>(tarball: &mut tar::Builder<W>, item: &Item) -> io::
 struct Item {
     name: String,
     source: PathBuf,
+    bytes: u64,
 }
 
 #[derive(Default)]
@@ -278,7 +360,32 @@ impl Inventory {
             };
             inventory.push(&rel, source, meta.len());
         }
+        inventory.require_picks(includes)?;
         Ok(inventory)
+    }
+
+    /// Every listed setting and creation must have produced a file: one that is gone, or that
+    /// a pack may not hold, would leave a pack that names what it lacks.
+    fn require_picks(&self, includes: &Includes) -> Result<(), ProfileError> {
+        let held = |name: &str| {
+            let folder = format!("{name}/");
+            self.items
+                .iter()
+                .any(|i| i.name == name || i.name.starts_with(&folder))
+        };
+        let settings = includes.mod_settings_only.iter().flatten();
+        let creations = includes.creations_only.iter().flatten();
+        let wanted = settings
+            .map(|n| (n, format!("{SAVE_DATA}/Config/{n}"), "mod setting"))
+            .chain(creations.map(|n| (n, format!("{SAVE_DATA}/{n}"), "creation")));
+        for (name, entry, what) in wanted {
+            if !held(&entry) {
+                let reason =
+                    format!("the {what} `{name}` is not in this profile or cannot be packed");
+                return Err(bad(Path::new(file::FILE_NAME), reason));
+            }
+        }
+        Ok(())
     }
 
     fn walk(&mut self, root: &Path, rel: &Path, includes: &Includes) -> Result<(), ProfileError> {
@@ -291,6 +398,8 @@ impl Inventory {
             for name in names {
                 self.walk(root, &rel.join(name), includes)?;
             }
+        } else if meta.is_file() && !picked(rel, includes) {
+            // Left out on purpose, so not reported as a file a pack cannot hold.
         } else if meta.is_file() && check_declared(rel, includes).is_ok() {
             self.push(rel, path, meta.len());
         } else {
@@ -306,7 +415,11 @@ impl Inventory {
         match name.filter(|n| super::entry::classify(Path::new(n)).is_ok()) {
             Some(name) => {
                 self.bytes += len;
-                self.items.push(Item { name, source });
+                self.items.push(Item {
+                    name,
+                    source,
+                    bytes: len,
+                });
             }
             None => self.skipped.push(rel.to_path_buf()),
         }

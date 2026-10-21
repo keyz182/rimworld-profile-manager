@@ -18,6 +18,7 @@ use super::file::Manifest;
 use super::{MAX_BYTES, MAX_ENTRIES, bad, open, read_first, read_preview};
 use crate::backup::unpack::{parts_of, write_entry};
 use crate::error::ProfileError;
+use crate::profile::copy_settings::{Group, group_of};
 use crate::profile::file::{FILE_NAME as PROFILE_FILE, PACK_FILE};
 use crate::profile::offline::now_datetime;
 use crate::profile::{PackOrigin, Profile, ProfileFile, ProfileId, ProfileStore, Trash};
@@ -96,6 +97,7 @@ pub fn apply_unpack<T: Trash>(
         cover: false,
         write_saves: true,
         saves: BTreeSet::new(),
+        picks: Picks::default(),
     };
     let done = job
         .run()
@@ -123,6 +125,14 @@ struct Job<'a> {
     write_saves: bool,
     /// Save file names seen, to hold the manifest to what it lists.
     saves: BTreeSet<String>,
+    picks: Picks,
+}
+
+/// The settings entries and creation files seen, to hold a picked list to what it names.
+#[derive(Default)]
+struct Picks {
+    mod_settings: BTreeSet<String>,
+    creations: BTreeSet<String>,
 }
 
 impl Job<'_> {
@@ -214,7 +224,15 @@ impl Job<'_> {
                 self.saves.insert((*save).to_owned());
                 return true;
             }
-            _ => {}
+            parts => match group_of(rel, false) {
+                Some(Group::ModSettings) => {
+                    self.picks.mod_settings.insert(parts[1].to_owned());
+                }
+                Some(Group::Creations) => {
+                    self.picks.creations.insert(parts.join("/"));
+                }
+                _ => {}
+            },
         }
         false
     }
@@ -234,6 +252,21 @@ impl Job<'_> {
         let listed: BTreeSet<String> = manifest.includes.saves.iter().cloned().collect();
         if self.saves != listed {
             return Err(self.fault("its saves are not the ones it lists"));
+        }
+        let includes = &manifest.includes;
+        for (list, seen, what) in [
+            (
+                &includes.mod_settings_only,
+                &self.picks.mod_settings,
+                "mod settings",
+            ),
+            (&includes.creations_only, &self.picks.creations, "creations"),
+        ] {
+            let listed: Option<BTreeSet<String>> =
+                list.as_ref().map(|l| l.iter().cloned().collect());
+            if listed.is_some_and(|l| l != *seen) {
+                return Err(self.fault(format!("its {what} are not the ones it lists")));
+            }
         }
         Ok(())
     }
@@ -277,6 +310,7 @@ pub(crate) fn extract(
         cover: false,
         write_saves: saves,
         saves: BTreeSet::new(),
+        picks: Picks::default(),
     };
     job.run()?;
     job.verify()

@@ -27,7 +27,7 @@ fn with_cover_spec(saves: &[&str]) -> PackSpec {
 /// A manifest for `archive()` that lists a cover and one entry, the mod list.
 fn declares_cover() -> Manifest {
     let mut m = sample();
-    m.schema = file::SCHEMA;
+    m.schema = file::SCHEMA_COVER;
     m.cover = Some(COVER_ENTRY.into());
     m.start_save = None;
     m.includes = Includes {
@@ -35,6 +35,7 @@ fn declares_cover() -> Manifest {
         creations: false,
         game_settings: false,
         saves: vec![],
+        ..Default::default()
     };
     m.entry_count = 2;
     m.uncompressed_bytes = (MOD_LIST.len() + "not a picture".len()) as u64;
@@ -51,7 +52,7 @@ fn a_cover_round_trips_into_the_new_profile() {
     );
     let dest = fx.tmp.path().join("cover.rimpack");
     let report = apply_pack(&plan, &dest, &Probe(false), &mut |_| {}).expect("pack");
-    assert_eq!(report.manifest.schema, file::SCHEMA);
+    assert_eq!(report.manifest.schema, file::SCHEMA_COVER);
     assert_eq!(report.manifest.cover.as_deref(), Some(COVER_ENTRY));
 
     let (manifest, thumb) = read_preview(&dest, true).expect("preview");

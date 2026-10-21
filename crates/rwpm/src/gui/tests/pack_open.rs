@@ -52,6 +52,7 @@ pub(super) fn make_pack(
             creations: false,
             game_settings: false,
             saves: vec![],
+            ..Default::default()
         },
         start_save: None,
         collection_url: None,
