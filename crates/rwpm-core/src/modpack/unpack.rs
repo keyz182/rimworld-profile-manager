@@ -95,6 +95,7 @@ pub fn apply_unpack<T: Trash>(
         entries: 0,
         mod_list: false,
         cover: false,
+        write_saves: true,
         saves: BTreeSet::new(),
     };
     let done = job
@@ -118,6 +119,9 @@ struct Job<'a> {
     entries: u64,
     mod_list: bool,
     cover: bool,
+    /// Off for a reset that leaves the player's saves alone: saves are still counted and
+    /// checked, but not written.
+    write_saves: bool,
     /// Save file names seen, to hold the manifest to what it lists.
     saves: BTreeSet<String>,
 }
@@ -173,7 +177,9 @@ impl Job<'_> {
             Place::SaveData(rel) => rel,
         };
         check_declared(&rel, &self.plan.manifest.includes).map_err(|r| self.fault(r))?;
-        self.note(&rel);
+        if self.note(&rel) && !self.write_saves {
+            return Ok(());
+        }
         let dest = self.dir.join(SAVE_DATA).join(&rel);
         // Files are created new, so a repeated name fails instead of overwriting.
         write_entry(&dest, EntryType::Regular, &mut entry).map_err(|e| match &e {
@@ -201,18 +207,21 @@ impl Job<'_> {
         std::fs::write(&dest, thumb).map_err(ProfileError::io("write", &dest))
     }
 
-    fn note(&mut self, rel: &Path) {
+    /// Records what `rel` is; true when it is a save file.
+    fn note(&mut self, rel: &Path) -> bool {
         match parts_of(rel).as_slice() {
             ["Config", "ModsConfig.xml"] => self.mod_list = true,
             ["Saves", save] => {
                 self.saves.insert((*save).to_owned());
+                return true;
             }
             _ => {}
         }
+        false
     }
 
-    /// After the stream: the totals and the listed saves must match, then `profile.toml`.
-    fn finish(&mut self, name: &str) -> Result<(), ProfileError> {
+    /// After the stream: the totals and the listed saves must match.
+    fn verify(&self) -> Result<(), ProfileError> {
         let manifest = &self.plan.manifest;
         if (self.entries, self.bytes) != (manifest.entry_count, manifest.uncompressed_bytes) {
             return Err(self.fault("it holds less than it says"));
@@ -227,6 +236,13 @@ impl Job<'_> {
         if self.saves != listed {
             return Err(self.fault("its saves are not the ones it lists"));
         }
+        Ok(())
+    }
+
+    /// `verify`, then the pack is kept and `profile.toml` is written.
+    fn finish(&mut self, name: &str) -> Result<(), ProfileError> {
+        self.verify()?;
+        let manifest = &self.plan.manifest;
         // The pack stays with the profile, for "reset to pack". Copied here, while the
         // archive is still where the player opened it.
         let kept = self.dir.join(PACK_FILE);
@@ -241,4 +257,27 @@ impl Job<'_> {
         });
         file.write_atomic(&self.dir.join(PROFILE_FILE))
     }
+}
+
+/// Reads `plan.archive` into `dir` (`SaveData/...`, and `cover.png` when it has one) without
+/// making a profile of it. Saves are written only when `saves` is set.
+pub(crate) fn extract(
+    plan: &UnpackPlan,
+    dir: &Path,
+    saves: bool,
+    progress: &mut dyn FnMut(u64),
+) -> Result<(), ProfileError> {
+    let mut job = Job {
+        plan,
+        dir,
+        progress,
+        bytes: 0,
+        entries: 0,
+        mod_list: false,
+        cover: false,
+        write_saves: saves,
+        saves: BTreeSet::new(),
+    };
+    job.run()?;
+    job.verify()
 }

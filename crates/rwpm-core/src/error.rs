@@ -67,6 +67,12 @@ pub enum ProfileError {
     BadBackup { path: PathBuf, reason: String },
     #[error("`{}` is not a modpack this version can use: {reason}", .path.display())]
     BadModpack { path: PathBuf, reason: String },
+    #[error("`{0}` was not made from a pack, so there is nothing to reset it to")]
+    NoPackOrigin(String),
+    #[error("the pack file of this profile is missing: `{}`", .0.display())]
+    PackFileMissing(PathBuf),
+    #[error("this offline profile has no copy of: {}; fetch them first", .0.join(", "))]
+    ResetNeedsMods(Vec<String>),
     #[error(
         "`{0}` has no mod list yet, so there is nothing to share; start RimWorld once with this profile"
     )]

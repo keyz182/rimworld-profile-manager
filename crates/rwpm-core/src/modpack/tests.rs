@@ -662,3 +662,4 @@ fn a_file_that_is_not_a_modpack_is_refused() {
 
 mod cover_tests;
 mod origin_tests;
+mod reset_tests;
