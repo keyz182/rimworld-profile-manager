@@ -9,7 +9,7 @@ use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
-use super::modpack::{ShareCover, ShareDraft, ShareTick};
+use super::modpack::{PickGroup, ShareCover, ShareDraft, ShareTick};
 use super::modpack_open::PackPreview;
 
 #[derive(Debug, Clone)]
@@ -107,6 +107,10 @@ pub enum Message {
     ShareTick(ShareTick, bool),
     /// Share dialog: save number `.0` (in the dialog's list) ticked or unticked.
     ShareSave(usize, bool),
+    /// Share dialog: show or hide the list of single items of a group.
+    SharePickOpen(PickGroup, bool),
+    /// Share dialog: item number `.1` of a group ticked or unticked.
+    SharePick(PickGroup, usize, bool),
     /// Share dialog: the save to start from, by its number; `None` = no start save.
     ShareStart(Option<usize>),
     /// The file chosen to save the pack in; `None` when the dialog was closed.

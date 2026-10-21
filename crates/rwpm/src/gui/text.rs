@@ -856,6 +856,7 @@ pub const SHARE_MOD_SETTINGS: &str = "Mod settings";
 pub const SHARE_CREATIONS: &str = "Scenarios, ideoligions, xenotypes and exported pawns";
 pub const SHARE_GAME_SETTINGS: &str = "Game settings (screen size, key bindings)";
 pub const SHARE_SAVES: &str = "Saves to include";
+pub const SHARE_PICK: &str = "Choose which";
 pub const SHARE_NO_SAVES: &str = "This profile has no saves.";
 pub const SHARE_START: &str = "Save to start from";
 pub const SHARE_START_NONE: &str = "No start save";
@@ -885,6 +886,20 @@ pub fn share_group(label: &str, files: u64, bytes: u64) -> String {
         "files",
     );
     format!("{label} ({files}, {})", size(bytes))
+}
+
+/// The group label while only some of its items are in, for example "3 of 12".
+pub fn share_group_some(label: &str, on: u64, all: usize, bytes: u64) -> String {
+    format!("{label} ({on} of {all}, {})", size(bytes))
+}
+
+/// A creations folder as a heading.
+pub fn share_folder(folder: &str) -> &str {
+    match folder {
+        "Ideos" => "Ideoligions",
+        "ExportedPawns" => "Exported pawns",
+        other => other,
+    }
 }
 
 pub fn share_save(name: &str, bytes: u64) -> String {

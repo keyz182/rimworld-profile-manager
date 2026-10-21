@@ -10,7 +10,7 @@ use rwpm_core::ProfileError;
 use rwpm_core::modpack::file::{
     MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_link, check_save_name,
 };
-use rwpm_core::modpack::{self, Includes, PackSpec, cover};
+use rwpm_core::modpack::{self, Includes, ModEntry, PackSpec, cover};
 use rwpm_core::profile::copy_settings::{Group, entries};
 use rwpm_core::profile::{ProcessProbe, ProfileId};
 
@@ -31,6 +31,60 @@ pub enum ShareTick {
 pub struct Count {
     pub files: u64,
     pub bytes: u64,
+}
+
+/// The two groups whose items can be picked one by one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickGroup {
+    ModSettings,
+    Creations,
+}
+
+/// One setting entry or creation file a pack could hold.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickItem {
+    /// The name the pack lists it by.
+    pub name: String,
+    /// What the player reads.
+    pub label: String,
+    pub bytes: u64,
+    pub on: bool,
+}
+
+/// The items of one group, and whether their list is shown.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Picks {
+    pub items: Vec<PickItem>,
+    pub open: bool,
+}
+
+impl Picks {
+    pub fn count(&self) -> Count {
+        let on = self.items.iter().filter(|i| i.on);
+        Count {
+            files: on.clone().count() as u64,
+            bytes: on.map(|i| i.bytes).sum(),
+        }
+    }
+
+    /// `None` when everything is in, which is how a pack that picks nothing narrower is
+    /// written; else the names that are.
+    fn only(&self) -> Option<Vec<String>> {
+        if self.items.iter().all(|i| i.on) {
+            return None;
+        }
+        Some(
+            self.items
+                .iter()
+                .filter(|i| i.on)
+                .map(|i| i.name.clone())
+                .collect(),
+        )
+    }
+
+    fn set_all(&mut self, on: bool) {
+        self.items.iter_mut().for_each(|i| i.on = on);
+    }
 }
 
 /// One save file the profile has.
@@ -68,8 +122,8 @@ pub struct ShareDraft {
     pub mod_settings: bool,
     pub creations: bool,
     pub game_settings: bool,
-    pub mod_settings_count: Count,
-    pub creations_count: Count,
+    pub settings_picks: Picks,
+    pub creations_picks: Picks,
     pub game_settings_count: Count,
     pub saves: Vec<SaveChoice>,
     /// The save to start from: an index into `saves`, always a ticked one.
@@ -102,18 +156,32 @@ impl ShareDraft {
         !self.name_too_long() && !self.description_too_long() && self.link_ok()
     }
 
-    fn includes(&self) -> Includes {
+    pub(super) fn includes(&self) -> Includes {
         Includes {
             mod_settings: self.mod_settings,
             creations: self.creations,
             game_settings: self.game_settings,
+            mod_settings_only: self
+                .mod_settings
+                .then(|| self.settings_picks.only())
+                .flatten(),
+            creations_only: self
+                .creations
+                .then(|| self.creations_picks.only())
+                .flatten(),
             saves: self
                 .saves
                 .iter()
                 .filter(|s| s.on)
                 .map(|s| s.name.clone())
                 .collect(),
-            ..Default::default()
+        }
+    }
+
+    fn picks_mut(&mut self, group: PickGroup) -> &mut Picks {
+        match group {
+            PickGroup::ModSettings => &mut self.settings_picks,
+            PickGroup::Creations => &mut self.creations_picks,
         }
     }
 
@@ -125,8 +193,8 @@ impl ShareDraft {
     /// What the progress bar counts to: an estimate; the core counts the real bytes.
     fn total(&self) -> u64 {
         let groups = [
-            (self.mod_settings, self.mod_settings_count),
-            (self.creations, self.creations_count),
+            (self.mod_settings, self.settings_picks.count()),
+            (self.creations, self.creations_picks.count()),
             (self.game_settings, self.game_settings_count),
         ];
         let settings: u64 = groups.iter().filter(|g| g.0).map(|g| g.1.bytes).sum();
@@ -142,6 +210,8 @@ impl App {
             Message::Share => self.ask_share(),
             Message::ShareTick(tick, on) => self.share_tick(tick, on),
             Message::ShareSave(index, on) => self.share_save(index, on),
+            Message::SharePickOpen(group, on) => self.share_pick_open(group, on),
+            Message::SharePick(group, index, on) => self.share_pick(group, index, on),
             Message::ShareStart(index) => self.share_start(index),
             Message::SharePicked(draft, Some(path)) => return self.run_share(*draft, path),
             Message::ShareEdit(action) => self.share_edit(action),
@@ -164,14 +234,22 @@ impl App {
             self.notice = Some(Notice::Error(words));
             return;
         }
+        let mods = self.known_mods(p);
+        let found = match modpack::pick_candidates(&save_data) {
+            Ok(found) => found,
+            Err(e) => {
+                self.notice = Some(Notice::Error(e.to_string()));
+                return;
+            }
+        };
         let draft = ShareDraft {
             id: p.id.clone(),
             name: p.name.clone(),
             mod_settings: true,
             creations: true,
             game_settings: false,
-            mod_settings_count: count_group(&save_data, Group::ModSettings),
-            creations_count: count_group(&save_data, Group::Creations),
+            settings_picks: picks_of(&found.mod_settings, |n| setting_label(n, &mods)),
+            creations_picks: picks_of(&found.creations, creation_label),
             game_settings_count: count_group(&save_data, Group::GameSettings),
             saves: list_saves(&save_data),
             start: None,
@@ -184,14 +262,60 @@ impl App {
         self.dialog = Some(Dialog::Share(Box::new(draft)));
     }
 
+    /// The mods the profile has on, for naming settings files. Best effort: with no game or
+    /// no mod list the files are shown by their own names.
+    fn known_mods(&self, p: &rwpm_core::profile::Profile) -> Vec<ModEntry> {
+        let Ok(game) = self.ctx.effective_game(p, self.game.as_ref().ok()) else {
+            return Vec::new();
+        };
+        modpack::gather_mods(p, &game).map_or_else(|_| Vec::new(), |g| g.mods)
+    }
+
     fn share_tick(&mut self, tick: ShareTick, on: bool) {
         let Some(Dialog::Share(draft)) = &mut self.dialog else {
             return;
         };
         match tick {
-            ShareTick::ModSettings => draft.mod_settings = on,
-            ShareTick::Creations => draft.creations = on,
+            // Ticking a group takes everything in it again.
+            ShareTick::ModSettings => {
+                draft.mod_settings = on;
+                if on {
+                    draft.settings_picks.set_all(true);
+                }
+            }
+            ShareTick::Creations => {
+                draft.creations = on;
+                if on {
+                    draft.creations_picks.set_all(true);
+                }
+            }
             ShareTick::GameSettings => draft.game_settings = on,
+        }
+    }
+
+    fn share_pick_open(&mut self, group: PickGroup, on: bool) {
+        if let Some(Dialog::Share(draft)) = &mut self.dialog {
+            draft.picks_mut(group).open = on;
+        }
+    }
+
+    /// Unticking the last item unticks the group: a group with nothing in it is no group.
+    fn share_pick(&mut self, group: PickGroup, index: usize, on: bool) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        let picks = draft.picks_mut(group);
+        let Some(item) = picks.items.get_mut(index) else {
+            return;
+        };
+        item.on = on;
+        let empty = picks.items.iter().all(|i| !i.on);
+        if empty {
+            picks.open = false;
+            match group {
+                PickGroup::ModSettings => draft.mod_settings = false,
+                PickGroup::Creations => draft.creations = false,
+            }
         }
     }
 
@@ -296,6 +420,44 @@ impl App {
             )))
         })
     }
+}
+
+fn picks_of(found: &[modpack::Candidate], label: impl Fn(&str) -> String) -> Picks {
+    let items = found
+        .iter()
+        .map(|c| PickItem {
+            name: c.name.clone(),
+            label: label(&c.name),
+            bytes: c.bytes,
+            on: true,
+        })
+        .collect();
+    Picks { items, open: false }
+}
+
+/// A settings file as the player reads it. The game names a mod's file `Mod_<Workshop
+/// id>_<class>.xml`, so the id gives the mod's name; any other file keeps its own name.
+pub(crate) fn setting_label(name: &str, mods: &[ModEntry]) -> String {
+    let id = name
+        .strip_prefix("Mod_")
+        .and_then(|rest| rest.split('_').next())
+        .and_then(|digits| digits.parse::<u64>().ok());
+    match mods.iter().find(|m| id.is_some() && m.workshop_id == id) {
+        Some(m) => format!("{} ({name})", m.name),
+        None => name.to_owned(),
+    }
+}
+
+/// A creation by its file name; the folder it is in is shown above it.
+fn creation_label(name: &str) -> String {
+    name.split_once('/')
+        .map_or(name, |(_, file)| file)
+        .to_owned()
+}
+
+/// The folder a creation is in, such as `Scenarios`.
+pub(crate) fn creation_folder(name: &str) -> &str {
+    name.split_once('/').map_or("", |(folder, _)| folder)
 }
 
 /// Files and bytes a group would put in, counted the way the core walks: links are skipped.

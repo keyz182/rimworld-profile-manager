@@ -9,7 +9,7 @@ use super::backups::{selected, wait_for};
 use super::builds::{clicked, found};
 use super::*;
 use crate::gui::Job;
-use crate::gui::modpack::ShareTick;
+use crate::gui::modpack::{PickGroup, ShareTick};
 
 /// A LIVE profile listing `active` mods.
 pub(super) fn live_profile(sb: &Sandbox, name: &str, active: &[&str]) -> ProfileId {
@@ -201,10 +201,13 @@ fn the_share_dialog_starts_with_settings_and_creations_and_warns_about_private_d
     let d = draft(&app);
     assert!(d.mod_settings && d.creations && !d.game_settings);
     assert_eq!(
-        (d.mod_settings_count.files, d.mod_settings_count.bytes),
+        (
+            d.settings_picks.count().files,
+            d.settings_picks.count().bytes
+        ),
         (2, 9)
     );
-    assert_eq!(d.creations_count.files, 1);
+    assert_eq!(d.creations_picks.count().files, 1);
     assert_eq!(d.game_settings_count.files, 1);
     let names: Vec<_> = d.saves.iter().map(|s| (s.name.as_str(), s.on)).collect();
     assert_eq!(names, [("a.rws", false), ("b.rws", false)]);
@@ -434,4 +437,107 @@ fn a_chosen_cover_is_written_into_the_pack() {
     let (manifest, cover) = modpack::read_preview(&pack, true).expect("preview");
     assert_eq!(manifest.cover.as_deref(), Some("cover.png"));
     assert!(cover.is_some());
+}
+
+fn picking_world() -> (Sandbox, ProfileId) {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "Ironman", &["ludeon.rimworld"]);
+    put(&sb, &id, "Config/Mod_1_A.xml", "<a/>");
+    put(&sb, &id, "Config/Mod_2_B.xml", "<b/>");
+    put(&sb, &id, "Config/notes.bin", "not data");
+    put(&sb, &id, "Scenarios/s.rsc", "<scenario/>");
+    put(&sb, &id, "Scenarios/t.rsc", "<scenario/>");
+    put(&sb, &id, "Xenotypes/x.xtp", "<x/>");
+    (sb, id)
+}
+
+#[test]
+fn the_share_dialog_offers_only_what_a_pack_can_hold_and_keeps_the_list_shut() {
+    let (sb, id) = picking_world();
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let d = draft(&app);
+    let names = |p: &crate::gui::modpack::Picks| -> Vec<String> {
+        p.items.iter().map(|i| i.name.clone()).collect()
+    };
+    assert_eq!(names(&d.settings_picks), ["Mod_1_A.xml", "Mod_2_B.xml"]);
+    assert_eq!(
+        names(&d.creations_picks),
+        ["Scenarios/s.rsc", "Scenarios/t.rsc", "Xenotypes/x.xtp"]
+    );
+    assert!(found(&app, text::SHARE_PICK));
+    let item = text::share_save("Mod_1_A.xml", 4);
+    assert!(!found(&app, &item), "the list is shut until asked for");
+    let _ = app.update(Message::SharePickOpen(PickGroup::ModSettings, true));
+    assert!(found(&app, &item));
+    let _ = app.update(Message::SharePickOpen(PickGroup::Creations, true));
+    assert!(found(&app, "Xenotypes"), "creations sit under their folder");
+}
+
+#[test]
+fn everything_ticked_sends_no_list_and_one_item_off_sends_the_rest() {
+    let (sb, id) = picking_world();
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let all = draft(&app).includes();
+    assert_eq!((all.mod_settings_only, all.creations_only), (None, None));
+
+    let _ = app.update(Message::SharePick(PickGroup::ModSettings, 0, false));
+    let _ = app.update(Message::SharePick(PickGroup::Creations, 1, false));
+    let some = draft(&app).includes();
+    assert_eq!(some.mod_settings_only, Some(vec!["Mod_2_B.xml".to_owned()]));
+    assert_eq!(
+        some.creations_only,
+        Some(vec![
+            "Scenarios/s.rsc".to_owned(),
+            "Xenotypes/x.xtp".to_owned()
+        ])
+    );
+    let _ = app.update(Message::SharePick(PickGroup::ModSettings, 0, true));
+    assert_eq!(draft(&app).includes().mod_settings_only, None);
+}
+
+#[test]
+fn unticking_every_item_unticks_the_group_and_ticking_it_takes_all_back() {
+    let (sb, id) = picking_world();
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(Message::SharePick(PickGroup::ModSettings, 0, false));
+    assert!(draft(&app).mod_settings);
+    let _ = app.update(Message::SharePick(PickGroup::ModSettings, 1, false));
+    let d = draft(&app);
+    assert!(!d.mod_settings, "nothing left in it");
+    assert_eq!(d.includes().mod_settings_only, None);
+    assert!(d.creations, "the other group is not touched");
+
+    let _ = app.update(Message::ShareTick(ShareTick::ModSettings, true));
+    let d = draft(&app);
+    assert!(d.mod_settings && d.settings_picks.items.iter().all(|i| i.on));
+}
+
+#[test]
+fn a_settings_file_is_named_after_its_mod_when_the_id_matches() {
+    let mod_with = |id: Option<u64>| modpack::ModEntry {
+        package_id: "a.b".into(),
+        name: "HugsLib".into(),
+        workshop_id: id,
+        url: None,
+        time_updated: None,
+        version: None,
+    };
+    let label = crate::gui::modpack::setting_label;
+    let mods = [mod_with(Some(2009463077)), mod_with(None)];
+    assert_eq!(
+        label("Mod_2009463077_HugsController.xml", &mods),
+        "HugsLib (Mod_2009463077_HugsController.xml)"
+    );
+    for plain in [
+        "Mod_5_Other.xml",
+        "ModSettingsFrameworkMod_Settings.xml",
+        "Mod__x.xml",
+        "Mod_x_y.xml",
+        "RimHUD",
+    ] {
+        assert_eq!(label(plain, &mods), plain, "no mod, so its own name");
+    }
 }

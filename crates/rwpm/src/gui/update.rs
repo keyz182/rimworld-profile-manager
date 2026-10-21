@@ -250,6 +250,8 @@ impl App {
             Message::Share
             | Message::ShareTick(..)
             | Message::ShareSave(..)
+            | Message::SharePickOpen(..)
+            | Message::SharePick(..)
             | Message::ShareStart(_)
             | Message::ShareEdit(_)
             | Message::SharePreview(_)

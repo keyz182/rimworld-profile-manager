@@ -14,7 +14,7 @@ use rwpm_core::profile::relocate::MovePlan;
 use super::backup::{Draft, GameFiles, Tick};
 use super::icon::UI_BOLD;
 use super::message::{Ask, Dialog, Field, GuardChoice, Message, NameFor};
-use super::modpack::{ShareDraft, ShareTick};
+use super::modpack::{PickGroup, Picks, ShareDraft, ShareTick, creation_folder};
 use super::{App, text as t, theme};
 
 const GAP: u32 = 10;
@@ -449,26 +449,22 @@ fn share_dialog(draft: &ShareDraft, dark: bool) -> Element<'_, Message> {
     };
     let mut body = column![
         text(t::share_about(&draft.name)),
-        tick(
-            t::share_group(
-                t::SHARE_MOD_SETTINGS,
-                draft.mod_settings_count.files,
-                draft.mod_settings_count.bytes
-            ),
+        group_picks(
+            t::SHARE_MOD_SETTINGS,
+            &draft.settings_picks,
             draft.mod_settings,
-            ShareTick::ModSettings
+            ShareTick::ModSettings,
+            PickGroup::ModSettings,
         ),
         text(t::SHARE_SETTINGS_NOTICE)
             .size(13)
             .style(theme::warning),
-        tick(
-            t::share_group(
-                t::SHARE_CREATIONS,
-                draft.creations_count.files,
-                draft.creations_count.bytes
-            ),
+        group_picks(
+            t::SHARE_CREATIONS,
+            &draft.creations_picks,
             draft.creations,
-            ShareTick::Creations
+            ShareTick::Creations,
+            PickGroup::Creations,
         ),
         tick(
             t::share_group(
@@ -585,6 +581,54 @@ fn cover_section(draft: &ShareDraft) -> Element<'_, Message> {
         }
     }
     body.into()
+}
+
+/// A group's box, and under it, when it holds more than one item, a way to leave single
+/// items out. Everything in is the default, and the list stays shut until asked for.
+fn group_picks<'a>(
+    label: &str,
+    picks: &'a Picks,
+    on: bool,
+    tick: ShareTick,
+    group: PickGroup,
+) -> Element<'a, Message> {
+    let count = picks.count();
+    let words = if count.files as usize == picks.items.len() {
+        t::share_group(label, count.files, count.bytes)
+    } else {
+        t::share_group_some(label, count.files, picks.items.len(), count.bytes)
+    };
+    let mut section = Column::new().spacing(6).push(
+        checkbox(on)
+            .label(words)
+            .on_toggle(move |v| Message::ShareTick(tick, v)),
+    );
+    if !on || picks.items.len() < 2 {
+        return section.into();
+    }
+    section = section.push(
+        checkbox(picks.open)
+            .label(t::SHARE_PICK)
+            .on_toggle(move |v| Message::SharePickOpen(group, v)),
+    );
+    if !picks.open {
+        return section.into();
+    }
+    let mut list = Column::new().spacing(6).padding([0, 20]);
+    let mut folder = None;
+    for (i, item) in picks.items.iter().enumerate() {
+        if group == PickGroup::Creations && folder != Some(creation_folder(&item.name)) {
+            folder = Some(creation_folder(&item.name));
+            let heading = t::share_folder(creation_folder(&item.name));
+            list = list.push(text(heading).size(13).style(theme::muted));
+        }
+        list = list.push(
+            checkbox(item.on)
+                .label(t::share_save(&item.label, item.bytes))
+                .on_toggle(move |v| Message::SharePick(group, i, v)),
+        );
+    }
+    section.push(list).into()
 }
 
 fn saves_section(draft: &ShareDraft) -> Element<'_, Message> {
