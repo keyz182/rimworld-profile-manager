@@ -105,8 +105,9 @@ jobs:
         run: rustup show active-toolchain || rustup toolchain install
       # Caches are keyed on the committed Cargo.lock, so they come before the version is set.
       # Only runs on main write the caches these jobs read; pull request caches stay separate.
+      # A hand-run publish builds an old tag, so it neither reads nor writes these caches.
       - name: Cache the soldier toolchain, crates and build
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && github.event_name == 'push'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -115,12 +116,12 @@ jobs:
           key: soldier-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'scripts/package.sh') }}
           restore-keys: soldier-
       - name: Cache the Windows build
-        if: matrix.os == 'windows'
+        if: matrix.os == 'windows' && github.event_name == 'push'
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: release-windows
       - name: Cache the macOS build
-        if: matrix.os == 'macos'
+        if: matrix.os == 'macos' && github.event_name == 'push'
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: release-macos
