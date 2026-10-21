@@ -205,3 +205,36 @@ jobs:
         run: |
           cog changelog --at "v$VERSION" > notes.md 2>/dev/null || echo "Release v$VERSION" > notes.md
           gh release create "v$VERSION" dist/* --title "v$VERSION" --notes-file notes.md --verify-tag
+
+  # Moves the two AUR packages (rwpm-bin, rwpm) to the new version. It does nothing until the
+  # AUR_SSH_KEY secret exists, and a failure here never touches the release itself.
+  aur:
+    name: Update the AUR packages
+    needs: [plan, publish]
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ needs.plan.outputs.version }}
+          persist-credentials: false
+      - name: Update the packages
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          if [[ -z "$AUR_SSH_KEY" ]]; then
+            echo "::notice::No AUR_SSH_KEY secret, so the AUR packages were not updated."
+            exit 0
+          fi
+          umask 077
+          key="$RUNNER_TEMP/aur_key"
+          known="$RUNNER_TEMP/aur_known_hosts"
+          printf '%s\n' "$AUR_SSH_KEY" >"$key"
+          ssh-keyscan -t ed25519,ecdsa,rsa aur.archlinux.org >"$known" 2>/dev/null
+          ssh-keygen -lf "$known"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known -o StrictHostKeyChecking=yes"
+          scripts/aur.sh "$VERSION" --push
