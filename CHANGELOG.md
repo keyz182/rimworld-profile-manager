@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.15.0](https://github.com/keyz182/rimworld-profile-manager/compare/f3cb901aee548f0bc8597fe8b6eefcae4ca62023..v1.15.0) - 2026-10-21
+#### Features
+- add `rwpm mcp`, an MCP server on stdio - ([92e1a35](https://github.com/keyz182/rimworld-profile-manager/commit/92e1a35a70663ff044ea149aee465e5758150b20)) - [@keyz182](https://github.com/keyz182)
+- check for new releases on a schedule, and show the version - ([f3cb901](https://github.com/keyz182/rimworld-profile-manager/commit/f3cb901aee548f0bc8597fe8b6eefcae4ca62023)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.14.0](https://github.com/keyz182/rimworld-profile-manager/compare/beb2d97e40cb5b613b9ff376bfe6520861cb3c9b..v1.14.0) - 2026-10-21
 #### Features
 - choose single mod settings and creations when sharing a pack - ([133346d](https://github.com/keyz182/rimworld-profile-manager/commit/133346da188f4848c125b3400c456c4feacdeb9e)) - [@keyz182](https://github.com/keyz182)
