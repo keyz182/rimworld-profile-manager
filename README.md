@@ -28,6 +28,11 @@ Get the newest version from [Releases](https://github.com/keyz182/rimworld-profi
 |---|---|
 | Windows | `…-windows-x86_64-setup.exe` (installer) or `…-windows-x86_64.zip` |
 | Linux | `…-x86_64.AppImage` or `…-linux-x86_64.tar.gz` |
+| Debian, Ubuntu | `rwpm_…_amd64.deb`. Install it with `sudo apt install ./<file>`. |
+| Fedora | `rwpm-….x86_64.rpm`. Install it with `sudo dnf install ./<file>`. |
+| Arch Linux | `rwpm-bin` (the release) or `rwpm` (built from source), from the AUR. |
+
+The deb and rpm packages are not signed. They put the app in `/opt/rwpm` and add a menu entry. Install and removal were tested on Debian 12, Ubuntu 24.04 and Fedora.
 
 The [wiki](https://github.com/keyz182/rimworld-profile-manager/wiki) tells you how to install the app, set up Steam and RimSort, and fix problems. It has screenshots of each step.
 

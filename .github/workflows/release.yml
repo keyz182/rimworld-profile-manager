@@ -143,6 +143,11 @@ jobs:
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: scripts/appimage.sh "target/dist/rwpm-$VERSION-linux-x86_64"
+      - name: Linux deb and rpm
+        if: matrix.os == 'linux'
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: scripts/deb-rpm.sh "target/dist/rwpm-$VERSION-linux-x86_64"
       - name: Windows installer
         if: matrix.os == 'windows'
         env:
@@ -154,6 +159,8 @@ jobs:
           path: |
             target/dist/rwpm-${{ needs.plan.outputs.version }}-linux-x86_64.tar.gz
             target/dist/rwpm-${{ needs.plan.outputs.version }}-x86_64.AppImage
+            target/dist/rwpm_${{ needs.plan.outputs.version }}-1_amd64.deb
+            target/dist/rwpm-${{ needs.plan.outputs.version }}-1.x86_64.rpm
             target/dist/rwpm-${{ needs.plan.outputs.version }}-windows-x86_64.zip
             target/dist/rwpm-${{ needs.plan.outputs.version }}-windows-x86_64-setup.exe
             target/dist/rwpm-${{ needs.plan.outputs.version }}-macos-arm64.zip

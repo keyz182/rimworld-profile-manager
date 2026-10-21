@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=RimWorld Profile Manager
+Comment=Separate RimWorld profiles with their own saves, settings and mods
+Exec=rwpm %f
+Icon=rwpm
+Terminal=false
+Categories=Game;Utility;
+MimeType=application/x-rimrim;application/x-rimpack;
+StartupWMClass=rwpm
