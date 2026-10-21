@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.16.0](https://github.com/keyz182/rimworld-profile-manager/compare/d57fd49912fcfe4be5937f7815af5b17572140d9..v1.16.0) - 2026-10-21
+#### Features
+- add deb and rpm packages to the release - ([1c87994](https://github.com/keyz182/rimworld-profile-manager/commit/1c8799405e5257fd7d07c5e86cfc4bd4079b9cf4)) - [@keyz182](https://github.com/keyz182)
+- add AUR packages and a release job that updates them - ([d57fd49](https://github.com/keyz182/rimworld-profile-manager/commit/d57fd49912fcfe4be5937f7815af5b17572140d9)) - [@keyz182](https://github.com/keyz182)
+#### Bug Fixes
+- keep scrollbars off dialog text and let dialogs grow with the window - ([6a8b9e6](https://github.com/keyz182/rimworld-profile-manager/commit/6a8b9e6a294d453bb5c80710440258909c99429f)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.15.0](https://github.com/keyz182/rimworld-profile-manager/compare/f3cb901aee548f0bc8597fe8b6eefcae4ca62023..v1.15.0) - 2026-10-21
 #### Features
 - add `rwpm mcp`, an MCP server on stdio - ([92e1a35](https://github.com/keyz182/rimworld-profile-manager/commit/92e1a35a70663ff044ea149aee465e5758150b20)) - [@keyz182](https://github.com/keyz182)
