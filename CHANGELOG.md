@@ -2,6 +2,25 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.13.0](https://github.com/keyz182/rimworld-profile-manager/compare/b6dc8dd0b6591c19d52fe141617cd7004a059f73..v1.13.0) - 2026-10-21
+#### Features
+- offer to take a pack profile offline once Steam has its mods - ([62eea2c](https://github.com/keyz182/rimworld-profile-manager/commit/62eea2cee7b07c31b52e9efa0da8595dcad6fc07)) - [@keyz182](https://github.com/keyz182)
+- tell when Steam has fetched a pack's mods, and remember "Not now" - ([c877232](https://github.com/keyz182/rimworld-profile-manager/commit/c8772325a4e4d8f518c8c617eb743a75533a2df1)) - [@keyz182](https://github.com/keyz182)
+- show a pack profile's pack and reset it to the pack - ([74ac2f5](https://github.com/keyz182/rimworld-profile-manager/commit/74ac2f5a53d32c1d60cef668f6e2bbd6cff324cd)) - [@keyz182](https://github.com/keyz182)
+- choose a cover and write a markdown description when sharing a pack - ([eebfb9a](https://github.com/keyz182/rimworld-profile-manager/commit/eebfb9a7b6a2a6274408b42ff12a0fc14b943c2c)) - [@keyz182](https://github.com/keyz182)
+- show a pack's cover and markdown description when opening it - ([e109148](https://github.com/keyz182/rimworld-profile-manager/commit/e109148c5ee898037d8923af072bd67c68f0e285)) - [@keyz182](https://github.com/keyz182)
+- reset a pack profile to its pack - ([0e82203](https://github.com/keyz182/rimworld-profile-manager/commit/0e822039c2c72adc302d6cfa12bd742fdacf0ced)) - [@keyz182](https://github.com/keyz182)
+- profiles keep the pack they were made from (schema 3) - ([925aa25](https://github.com/keyz182/rimworld-profile-manager/commit/925aa25915007e6290a32f1e832dae83224208b2)) - [@keyz182](https://github.com/keyz182)
+- optional cover image in .rimpack (schema 2) - ([1bd1f62](https://github.com/keyz182/rimworld-profile-manager/commit/1bd1f623e14f6dcf1087e53bd0fd21802e262350)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- describe pack covers, markdown descriptions, reset and the offline prompt - ([1cf37c8](https://github.com/keyz182/rimworld-profile-manager/commit/1cf37c83b734953379f5741b2dcda00bf9776040)) - [@keyz182](https://github.com/keyz182)
+#### Miscellaneous Chores
+- remove SPEC.md and the references to it - ([b6dc8dd](https://github.com/keyz182/rimworld-profile-manager/commit/b6dc8dd0b6591c19d52fe141617cd7004a059f73)) - [@keyz182](https://github.com/keyz182)
+#### Style
+- format with rustfmt - ([b4249be](https://github.com/keyz182/rimworld-profile-manager/commit/b4249be1a53b5eaf1bbec10f9b2fa265e7f854f8)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.12.1](https://github.com/keyz182/rimworld-profile-manager/compare/ca18855d102c6b7eb44da31dccb174eb9bae1dea..v1.12.1) - 2026-10-20
 #### Bug Fixes
 - (**gui**) let a long notice scroll and be dismissed - ([e8d2aa9](https://github.com/keyz182/rimworld-profile-manager/commit/e8d2aa9cfa00deb634c313dd5796c26945545b59)) - [@keyz182](https://github.com/keyz182)
