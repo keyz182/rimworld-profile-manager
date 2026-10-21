@@ -44,6 +44,12 @@ pub(super) fn put(sb: &Sandbox, id: &ProfileId, rel: &str, body: &str) {
     std::fs::write(path, body).expect("write");
 }
 
+/// What typing `words` into the description box sends.
+fn type_description(words: String) -> Message {
+    use iced::widget::text_editor::{Action, Edit};
+    Message::ShareEdit(Action::Edit(Edit::Paste(std::sync::Arc::new(words))))
+}
+
 fn draft(app: &App) -> Box<crate::gui::modpack::ShareDraft> {
     let Some(Dialog::Share(draft)) = app.dialog.clone() else {
         panic!("{:?}", app.dialog);
@@ -118,7 +124,7 @@ fn the_share_dialog_keeps_its_title_and_button_on_screen_at_the_smallest_window(
     let _ = app.update(Message::ShareStart(Some(3)));
     let _ = app.update(Message::Input(Field::Link, "nope".into()));
     let long = "x".repeat(modpack::file::MAX_DESCRIPTION_CHARS + 1);
-    let _ = app.update(Message::Input(Field::Description, long));
+    let _ = app.update(type_description(long));
     // The title and the button are pinned on screen. The parts of the form are all laid out
     // with their full height (the long ones scroll); none is squeezed away.
     assert_on_screen(&app, text::SHARE_TITLE);
@@ -271,7 +277,7 @@ fn the_form_will_not_share_what_the_core_would_refuse() {
     assert!(draft(&app).ready());
 
     let long = "x".repeat(modpack::file::MAX_DESCRIPTION_CHARS + 1);
-    let _ = app.update(Message::Input(Field::Description, long));
+    let _ = app.update(type_description(long));
     assert!(found(
         &app,
         &text::share_description_long(modpack::file::MAX_DESCRIPTION_CHARS)
@@ -311,7 +317,7 @@ fn a_pack_shared_in_the_app_holds_the_list_and_the_choices() {
     let _ = app.update(Message::Share);
     let _ = app.update(Message::ShareSave(0, true));
     let _ = app.update(Message::ShareStart(Some(0)));
-    let _ = app.update(Message::Input(Field::Description, "  Hard mode  ".into()));
+    let _ = app.update(type_description("  Hard mode  ".into()));
     let chosen = draft(&app);
     // The player typed no extension: the file still becomes `.rimpack`.
     let _ = app.update(Message::SharePicked(chosen, Some(sb.path("out/mine"))));
@@ -339,4 +345,93 @@ fn a_pack_shared_in_the_app_holds_the_list_and_the_choices() {
     );
     assert_eq!(manifest.mods[0].workshop_id, Some(2009463077));
     assert_eq!(manifest.mods[1].workshop_id, None);
+}
+
+/// A 1 x 1 PNG.
+const TINY_PNG: [u8; 70] = [
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0xF0,
+    0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99, 0x3D, 0x1D, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+fn picked_cover(sb: &Sandbox) -> crate::gui::modpack::ShareCover {
+    let file = sb.path("cover.png");
+    std::fs::write(&file, TINY_PNG).expect("write");
+    crate::gui::modpack::load_cover(&file).expect("a PNG is a cover")
+}
+
+#[test]
+fn a_cover_is_chosen_cleared_and_refused_when_it_is_not_a_picture() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(&sb, "Shared", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+
+    let cover = picked_cover(&sb);
+    assert_eq!(cover.file_name, "cover.png");
+    let _ = app.update(Message::ShareCoverPicked(Some(Ok(Box::new(cover)))));
+    assert!(draft(&app).cover.is_some());
+    let _ = app.update(Message::ShareCoverClear);
+    assert!(draft(&app).cover.is_none());
+
+    let notes = sb.path("notes.png");
+    std::fs::write(&notes, "not a picture").expect("write");
+    let refused = crate::gui::modpack::load_cover(&notes).expect_err("refused");
+    let _ = app.update(Message::ShareCoverPicked(Some(Err(refused))));
+    assert!(matches!(app.notice, Some(Notice::Error(_))));
+    assert!(draft(&app).cover.is_none());
+}
+
+#[test]
+fn the_preview_parses_the_description_and_editing_goes_back() {
+    use iced::widget::markdown::Item;
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(&sb, "Shared", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(type_description("# Hard\n\nplay *well*".into()));
+    assert!(draft(&app).preview.is_none());
+    let _ = app.update(Message::SharePreview(true));
+    let items = draft(&app).preview.expect("preview on");
+    assert!(matches!(items[0], Item::Heading(..)), "{items:?}");
+    let _ = app.update(Message::SharePreview(false));
+    assert!(draft(&app).preview.is_none());
+}
+
+#[test]
+fn a_cover_and_the_preview_keep_the_title_and_button_on_screen() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(&sb, "Shared", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let _ = app.update(type_description("A line.\n\n".repeat(80)));
+    let _ = app.update(Message::SharePreview(true));
+    let cover = picked_cover(&sb);
+    let _ = app.update(Message::ShareCoverPicked(Some(Ok(Box::new(cover)))));
+    assert_on_screen(&app, text::SHARE_TITLE);
+    assert_on_screen(&app, text::SHARE_IT);
+}
+
+#[test]
+fn a_chosen_cover_is_written_into_the_pack() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(&sb, "Shared", &["ludeon.rimworld", "brrainz.harmony"]);
+    std::fs::create_dir_all(sb.path("out")).expect("out");
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    let cover = picked_cover(&sb);
+    let _ = app.update(Message::ShareCoverPicked(Some(Ok(Box::new(cover)))));
+    let chosen = draft(&app);
+    let _ = app.update(Message::SharePicked(chosen, Some(sb.path("out/covered"))));
+    let pack = sb.path("out/covered.rimpack");
+    wait_for("the modpack file", || pack.is_file());
+    let (manifest, cover) = modpack::read_preview(&pack, true).expect("preview");
+    assert_eq!(manifest.cover.as_deref(), Some("cover.png"));
+    assert!(cover.is_some());
 }

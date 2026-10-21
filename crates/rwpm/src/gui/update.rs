@@ -249,6 +249,11 @@ impl App {
             | Message::ShareTick(..)
             | Message::ShareSave(..)
             | Message::ShareStart(_)
+            | Message::ShareEdit(_)
+            | Message::SharePreview(_)
+            | Message::ShareCover
+            | Message::ShareCoverPicked(_)
+            | Message::ShareCoverClear
             | Message::SharePicked(..) => return self.modpack_update(message),
             Message::OpenPack
             | Message::OpenPackPicked(_)
@@ -307,7 +312,6 @@ impl App {
             (Some(Dialog::Name { value: v, .. }), Field::Name) => *v = value,
             (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
             (Some(Dialog::OpenPack(preview)), Field::Name) => preview.plan.name = value,
-            (Some(Dialog::Share(draft)), Field::Description) => draft.description = value,
             (Some(Dialog::Share(draft)), Field::Link) => draft.link = value,
             (
                 Some(Dialog::Settings {

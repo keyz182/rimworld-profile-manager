@@ -9,7 +9,7 @@ use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
 
-use super::modpack::{ShareDraft, ShareTick};
+use super::modpack::{ShareCover, ShareDraft, ShareTick};
 use super::modpack_open::PackPreview;
 
 #[derive(Debug, Clone)]
@@ -111,6 +111,16 @@ pub enum Message {
     ShareStart(Option<usize>),
     /// The file chosen to save the pack in; `None` when the dialog was closed.
     SharePicked(Box<ShareDraft>, Option<PathBuf>),
+    /// Share dialog: an edit in the description box.
+    ShareEdit(iced::widget::text_editor::Action),
+    /// Share dialog: show the description as it will be drawn, or edit it.
+    SharePreview(bool),
+    /// Share dialog: open the file dialog for a cover picture.
+    ShareCover,
+    /// The picture chosen (or why it was refused); `None` when the dialog was closed.
+    ShareCoverPicked(Option<Result<Box<ShareCover>, String>>),
+    /// Share dialog: drop the cover picture.
+    ShareCoverClear,
     /// "Open modpack…": open the file dialog.
     OpenPack,
     /// The pack chosen to open; `None` when the dialog was closed.
@@ -147,8 +157,6 @@ pub enum Field {
     GameDir,
     SteamDir,
     MoveTo,
-    /// Share dialog: the pack's description.
-    Description,
     /// Share dialog: the link to a Steam collection.
     Link,
 }

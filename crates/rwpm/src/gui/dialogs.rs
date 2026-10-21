@@ -1,10 +1,10 @@
 //! The dialogs shown on top of the main window, one at a time.
 
-use iced::Element;
 use iced::widget::{
-    Column, button, center, checkbox, column, container, radio, row, scrollable, space, text,
-    text_input,
+    Column, button, center, checkbox, column, container, image, markdown, radio, row, scrollable,
+    space, text, text_editor, text_input,
 };
+use iced::{Alignment, Element, Length};
 use rwpm_core::backup::RestorePlan;
 use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
@@ -22,6 +22,10 @@ const GAP: u32 = 10;
 /// The part of the Share dialog that scrolls. In the smallest window (600 px high) the
 /// title, the padding and the buttons need about 150 px of it.
 const SHARE_FORM_HEIGHT: f32 = 400.0;
+/// The description box, as an editor or as a preview.
+const DESCRIPTION_HEIGHT: f32 = 110.0;
+/// Width of the chosen cover in the Share dialog.
+const COVER_PREVIEW_WIDTH: f32 = 160.0;
 
 pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message> {
     match dialog {
@@ -79,7 +83,7 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         }
         Dialog::Backup(draft) => backup_dialog(draft),
         Dialog::Restore(plan) => restore_dialog(plan),
-        Dialog::Share(draft) => share_dialog(draft),
+        Dialog::Share(draft) => share_dialog(draft, app.dark),
         Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview, app.dark),
         Dialog::ConfirmSubscribe(preview) => super::pack_fetch::confirm_subscribe_dialog(preview),
         Dialog::ConsentSteamcmd(_) => super::pack_fetch::consent_steamcmd_dialog(),
@@ -436,7 +440,7 @@ fn restore_dialog(plan: &RestorePlan) -> Element<'_, Message> {
 }
 
 /// The pack holds no mods, so it has its own notice; mod settings carry a privacy warning.
-fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
+fn share_dialog(draft: &ShareDraft, dark: bool) -> Element<'_, Message> {
     let tick = |label: String, on: bool, which: ShareTick| {
         checkbox(on)
             .label(label)
@@ -479,11 +483,8 @@ fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
     body = body.push(saves_section(draft));
     body = body
         .push(text(t::SHARE_DESCRIPTION))
-        .push(
-            text_input("", &draft.description)
-                .padding(8)
-                .on_input(|v| Message::Input(Field::Description, v)),
-        )
+        .push(description_box(draft, dark))
+        .push(cover_section(draft))
         .push(text(t::SHARE_LINK))
         .push(
             text_input("https://", &draft.link)
@@ -523,6 +524,68 @@ fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
 }
 
 /// The saves to include, and which of them the pack starts from.
+/// The description: a box to type Markdown in, or the same words as they will be drawn.
+fn description_box(draft: &ShareDraft, dark: bool) -> Element<'_, Message> {
+    let shown: Element<'_, Message> = match &draft.preview {
+        Some(items) => container(
+            markdown::view(items, theme::markdown_settings(dark))
+                .map(|url| Message::OpenUrl(url.to_string())),
+        )
+        .padding(8)
+        .width(Length::Fill)
+        .height(Length::Fixed(DESCRIPTION_HEIGHT))
+        .into(),
+        None => text_editor(&draft.editor.0)
+            .on_action(Message::ShareEdit)
+            .height(Length::Fixed(DESCRIPTION_HEIGHT))
+            .into(),
+    };
+    column![
+        shown,
+        row![
+            text(t::SHARE_MARKDOWN_HINT).size(13),
+            space::horizontal(),
+            checkbox(draft.preview.is_some())
+                .label(t::SHARE_PREVIEW)
+                .on_toggle(Message::SharePreview),
+        ]
+        .align_y(Alignment::Center),
+    ]
+    .spacing(4)
+    .into()
+}
+
+/// A picture for the pack: chosen from a file, shown small, removable.
+fn cover_section(draft: &ShareDraft) -> Element<'_, Message> {
+    let mut body = column![text(t::SHARE_COVER)].spacing(4);
+    match &draft.cover {
+        Some(cover) => {
+            body = body
+                .push(image(cover.handle.clone()).width(Length::Fixed(COVER_PREVIEW_WIDTH)))
+                .push(
+                    row![
+                        text(&cover.file_name).size(13),
+                        space::horizontal(),
+                        button(t::SHARE_COVER_CLEAR)
+                            .on_press(Message::ShareCoverClear)
+                            .style(theme::secondary),
+                    ]
+                    .align_y(Alignment::Center),
+                );
+        }
+        None => {
+            body = body
+                .push(
+                    button(t::SHARE_COVER_CHOOSE)
+                        .on_press(Message::ShareCover)
+                        .style(theme::secondary),
+                )
+                .push(text(t::SHARE_COVER_HINT).size(13));
+        }
+    }
+    body.into()
+}
+
 fn saves_section(draft: &ShareDraft) -> Element<'_, Message> {
     if draft.saves.is_empty() {
         return text(t::SHARE_NO_SAVES).size(13).style(theme::muted).into();

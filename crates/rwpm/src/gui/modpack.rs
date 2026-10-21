@@ -5,11 +5,12 @@
 use std::path::{Path, PathBuf};
 
 use iced::Task;
+use iced::widget::{image, markdown, text_editor};
 use rwpm_core::ProfileError;
 use rwpm_core::modpack::file::{
     MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_link, check_save_name,
 };
-use rwpm_core::modpack::{self, Includes, PackSpec};
+use rwpm_core::modpack::{self, Includes, PackSpec, cover};
 use rwpm_core::profile::copy_settings::{Group, entries};
 use rwpm_core::profile::{ProcessProbe, ProfileId};
 
@@ -40,8 +41,27 @@ pub struct SaveChoice {
     pub on: bool,
 }
 
+/// The description box. `Content` cannot be cloned, so a clone is a new box with the same
+/// words; only the cursor is lost.
+#[derive(Debug, Default)]
+pub struct Editor(pub text_editor::Content);
+
+impl Clone for Editor {
+    fn clone(&self) -> Self {
+        Self(text_editor::Content::with_text(&self.0.text()))
+    }
+}
+
+/// A cover picture chosen for the pack, already checked and shrunk by the core.
+#[derive(Debug, Clone)]
+pub struct ShareCover {
+    pub png: Vec<u8>,
+    pub handle: image::Handle,
+    pub file_name: String,
+}
+
 /// The Share dialog's state.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ShareDraft {
     pub id: ProfileId,
     pub name: String,
@@ -54,7 +74,12 @@ pub struct ShareDraft {
     pub saves: Vec<SaveChoice>,
     /// The save to start from: an index into `saves`, always a ticked one.
     pub start: Option<usize>,
+    /// The words in `editor`, kept in step with it.
     pub description: String,
+    pub editor: Editor,
+    /// `Some` while the description is shown as it will be drawn; parsed when switched on.
+    pub preview: Option<Vec<markdown::Item>>,
+    pub cover: Option<ShareCover>,
     pub link: String,
 }
 
@@ -118,6 +143,13 @@ impl App {
             Message::ShareSave(index, on) => self.share_save(index, on),
             Message::ShareStart(index) => self.share_start(index),
             Message::SharePicked(draft, Some(path)) => return self.run_share(*draft, path),
+            Message::ShareEdit(action) => self.share_edit(action),
+            Message::SharePreview(on) => self.share_preview(on),
+            Message::ShareCover => {
+                return Task::perform(pick_cover(), Message::ShareCoverPicked);
+            }
+            Message::ShareCoverPicked(Some(picked)) => self.share_cover(picked),
+            Message::ShareCoverClear => self.set_cover(None),
             _ => {}
         }
         Task::none()
@@ -143,6 +175,9 @@ impl App {
             saves: list_saves(&save_data),
             start: None,
             description: String::new(),
+            editor: Editor::default(),
+            preview: None,
+            cover: None,
             link: String::new(),
         };
         self.dialog = Some(Dialog::Share(Box::new(draft)));
@@ -169,6 +204,34 @@ impl App {
         save.on = on;
         if !on && draft.start == Some(index) {
             draft.start = None;
+        }
+    }
+
+    fn share_edit(&mut self, action: text_editor::Action) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        draft.editor.0.perform(action);
+        draft.description = draft.editor.0.text().trim_end_matches('\n').to_owned();
+    }
+
+    fn share_preview(&mut self, on: bool) {
+        let Some(Dialog::Share(draft)) = &mut self.dialog else {
+            return;
+        };
+        draft.preview = on.then(|| markdown::parse(&draft.description).collect());
+    }
+
+    fn share_cover(&mut self, picked: Result<Box<ShareCover>, String>) {
+        match picked {
+            Ok(cover) => self.set_cover(Some(*cover)),
+            Err(words) => self.notice = Some(Notice::Error(words)),
+        }
+    }
+
+    fn set_cover(&mut self, cover: Option<ShareCover>) {
+        if let Some(Dialog::Share(draft)) = &mut self.dialog {
+            draft.cover = cover;
         }
     }
 
@@ -217,7 +280,7 @@ impl App {
                 includes: draft.includes(),
                 start_save: draft.start_name(),
                 collection_url: (!link.is_empty()).then(|| link.to_owned()),
-                cover: None,
+                cover: draft.cover.as_ref().map(|c| c.png.clone()),
                 mods: gathered.mods,
             };
             let plan = modpack::plan_pack(&store, &p.id, spec).map_err(fail)?;
@@ -279,6 +342,30 @@ fn list_saves(save_data: &Path) -> Vec<SaveChoice> {
         .collect();
     saves.sort_by(|a, b| a.name.cmp(&b.name));
     saves
+}
+
+/// Asks for a picture, then has the core check and shrink it. The core refuses anything that
+/// is not a PNG or JPEG, or is too big to decode safely.
+async fn pick_cover() -> Option<Result<Box<ShareCover>, String>> {
+    let file = rfd::AsyncFileDialog::new()
+        .set_title(t::PICK_COVER_TITLE)
+        .add_filter(t::COVER_FILTER, &["png", "jpg", "jpeg"])
+        .pick_file()
+        .await?;
+    Some(load_cover(file.path()).map(Box::new))
+}
+
+pub(crate) fn load_cover(path: &Path) -> Result<ShareCover, String> {
+    let source = cover::load_source(path).map_err(|e| e.to_string())?;
+    let png = cover::prepare(&source)?;
+    Ok(ShareCover {
+        handle: image::Handle::from_bytes(png.clone()),
+        file_name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        png,
+    })
 }
 
 async fn pick_pack_save(title: &'static str, name: String) -> Option<PathBuf> {
