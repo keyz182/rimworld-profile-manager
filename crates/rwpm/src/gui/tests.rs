@@ -21,8 +21,8 @@ mod modpacks;
 mod pack_fetch;
 mod pack_open;
 mod pack_reset;
-mod pack_sync;
 mod pack_steamcmd;
+mod pack_sync;
 mod picker;
 
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings

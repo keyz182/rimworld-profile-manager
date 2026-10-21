@@ -45,7 +45,10 @@ fn declares_cover() -> Manifest {
 fn a_cover_round_trips_into_the_new_profile() {
     let fx = fixture();
     let plan = plan_pack(&fx.source, &fx.id, with_cover_spec(&["A.rws"])).expect("plan");
-    assert_eq!(plan.entries, 5, "list, setting, creation, save and the cover");
+    assert_eq!(
+        plan.entries, 5,
+        "list, setting, creation, save and the cover"
+    );
     let dest = fx.tmp.path().join("cover.rimpack");
     let report = apply_pack(&plan, &dest, &Probe(false), &mut |_| {}).expect("pack");
     assert_eq!(report.manifest.schema, file::SCHEMA);
@@ -60,7 +63,8 @@ fn a_cover_round_trips_into_the_new_profile() {
     assert!(plan.cover.is_some(), "the Open dialog gets the cover");
     let restored = apply_unpack(&plan, &fx.target, &mut |_| {}).expect("unpack");
     let dir = restored.profile.save_data_dir();
-    let kept = std::fs::read(dir.parent().expect("profile dir").join(PROFILE_COVER)).expect("cover");
+    let kept =
+        std::fs::read(dir.parent().expect("profile dir").join(PROFILE_COVER)).expect("cover");
     assert!(size_of(&kept).0 <= THUMB_EDGE);
 }
 
@@ -104,7 +108,12 @@ fn a_cover_read_from_a_pack_has_hard_limits() {
 #[test]
 fn only_a_root_png_named_cover_is_a_cover_entry() {
     assert_eq!(classify(Path::new("cover.png")), Ok(Place::Cover));
-    for name in ["cover.jpg", "sub/cover.png", "Cover.png", "SaveData/cover.png/x"] {
+    for name in [
+        "cover.jpg",
+        "sub/cover.png",
+        "Cover.png",
+        "SaveData/cover.png/x",
+    ] {
         assert_ne!(classify(Path::new(name)), Ok(Place::Cover), "{name}");
     }
 }
@@ -128,7 +137,11 @@ fn a_cover_that_is_not_a_picture_is_refused_before_anything_is_restored() {
         &declares_cover(),
         &[
             (COVER_ENTRY, EntryType::Regular, "not a picture"),
-            ("SaveData/Config/ModsConfig.xml", EntryType::Regular, MOD_LIST),
+            (
+                "SaveData/Config/ModsConfig.xml",
+                EntryType::Regular,
+                MOD_LIST,
+            ),
         ],
     );
     assert!(matches!(
@@ -145,7 +158,11 @@ fn a_declared_cover_that_is_not_the_second_entry_is_refused() {
         fx.tmp.path(),
         &declares_cover(),
         &[
-            ("SaveData/Config/ModsConfig.xml", EntryType::Regular, MOD_LIST),
+            (
+                "SaveData/Config/ModsConfig.xml",
+                EntryType::Regular,
+                MOD_LIST,
+            ),
             (COVER_ENTRY, EntryType::Regular, "not a picture"),
         ],
     );
@@ -166,10 +183,17 @@ fn a_cover_the_manifest_does_not_declare_is_refused_on_restore() {
         &manifest,
         &[
             (COVER_ENTRY, EntryType::Regular, "not a picture"),
-            ("SaveData/Config/ModsConfig.xml", EntryType::Regular, MOD_LIST),
+            (
+                "SaveData/Config/ModsConfig.xml",
+                EntryType::Regular,
+                MOD_LIST,
+            ),
         ],
     );
     let plan = plan_unpack(&path, &fx.target).expect("the manifest alone is fine");
     assert!(apply_unpack(&plan, &fx.target, &mut |_| {}).is_err());
-    assert!(fx.leftovers().is_empty(), "the half-made profile is removed");
+    assert!(
+        fx.leftovers().is_empty(),
+        "the half-made profile is removed"
+    );
 }

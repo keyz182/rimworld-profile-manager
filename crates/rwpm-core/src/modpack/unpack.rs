@@ -55,9 +55,8 @@ pub fn plan_unpack<T: Trash>(
     }
     // The pack itself is kept too (a copy, though a reflink may cost nothing).
     let kept = std::fs::metadata(archive).map_or(0, |m| m.len());
-    let need = manifest.uncompressed_bytes
-        + manifest.uncompressed_bytes / 100 * MARGIN_PERCENT
-        + kept;
+    let need =
+        manifest.uncompressed_bytes + manifest.uncompressed_bytes / 100 * MARGIN_PERCENT + kept;
     let free = space::free_space(store.root());
     if let Some(free) = free.filter(|&f| f < need) {
         return Err(ProfileError::NotEnoughSpace {

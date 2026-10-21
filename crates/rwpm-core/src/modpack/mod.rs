@@ -108,8 +108,8 @@ pub fn read_preview(
         .take(cover::MAX_COVER_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(decode)?;
-    let thumb = cover::thumbnail(&bytes)
-        .map_err(|r| bad(path, format!("its cover is refused ({r})")))?;
+    let thumb =
+        cover::thumbnail(&bytes).map_err(|r| bad(path, format!("its cover is refused ({r})")))?;
     Ok((manifest, Some(thumb)))
 }
 

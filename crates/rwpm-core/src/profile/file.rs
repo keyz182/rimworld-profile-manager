@@ -252,7 +252,10 @@ mod tests {
         file.game_build = None;
         file.write_atomic(&path).expect("write");
         let text = std::fs::read_to_string(&path).expect("read");
-        assert!(text.contains("schema = 1") && !text.contains("pack"), "{text}");
+        assert!(
+            text.contains("schema = 1") && !text.contains("pack"),
+            "{text}"
+        );
     }
 
     /// An origin read from a backup is as untrusted as a pack manifest.

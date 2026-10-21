@@ -33,10 +33,7 @@ fn decode(bytes: &[u8], edge: u32, alloc: u64) -> Result<DynamicImage, String> {
     let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .map_err(|e| e.to_string())?;
-    if !matches!(
-        reader.format(),
-        Some(ImageFormat::Png | ImageFormat::Jpeg)
-    ) {
+    if !matches!(reader.format(), Some(ImageFormat::Png | ImageFormat::Jpeg)) {
         return Err("it is not a PNG or JPEG picture".into());
     }
     let mut limits = Limits::default();

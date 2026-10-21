@@ -179,7 +179,9 @@ fn parse_workshop_synced(text: &str) -> BTreeSet<u64> {
     let mut manifest: BTreeMap<u64, String> = BTreeMap::new();
     let mut latest: BTreeMap<u64, String> = BTreeMap::new();
     for (group, item, key, value) in workshop_lines(text) {
-        let Ok(id) = item.parse::<u64>() else { continue };
+        let Ok(id) = item.parse::<u64>() else {
+            continue;
+        };
         match (group.as_str(), key.as_str()) {
             ("workshopitemsinstalled", "timeupdated" | "manifest") => {
                 installed.insert(id);
