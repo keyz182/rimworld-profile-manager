@@ -91,7 +91,7 @@ impl App {
                 Column::with_children(shown)
                     .spacing(2)
                     .width(Length::Fill)
-                    .padding(iced::Padding::ZERO.right(16)),
+                    .padding(super::dialogs::gutter()),
             )
             .height(Length::Fill)
             .into()

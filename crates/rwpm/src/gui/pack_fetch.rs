@@ -23,7 +23,7 @@ use rwpm_core::profile::offline;
 use rwpm_core::profile::{ProcessProbe, Profile, ProfileId, RunningProbe};
 use rwpm_core::steamcmd::{self, run::Layout};
 
-use super::dialogs::{buttons, heading};
+use super::dialogs::{Room, buttons, gutter, heading};
 use super::icon::UI_BOLD;
 use super::message::{Dialog, Message, Outcome};
 use super::modpack_open::PackPreview;
@@ -517,7 +517,7 @@ impl App {
 }
 
 /// What the player agrees to: the names (which come from the pack), the warning, the count.
-pub fn confirm_subscribe_dialog(preview: &PackPreview) -> Element<'_, Message> {
+pub fn confirm_subscribe_dialog(preview: &PackPreview, room: Room) -> Element<'_, Message> {
     let mut names = Column::new().spacing(4);
     for m in preview.missing.iter().take(MAX_NAMES) {
         names = names.push(text(&m.name));
@@ -553,7 +553,7 @@ pub fn confirm_subscribe_dialog(preview: &PackPreview) -> Element<'_, Message> {
     column![
         heading(title),
         text(about),
-        container(scrollable(names)).max_height(NAMES_HEIGHT),
+        container(scrollable(names.padding(gutter()))).max_height(NAMES_HEIGHT + room.grow),
         text(t::SUBSCRIBE_TRUST)
             .size(13)
             .font(UI_BOLD)

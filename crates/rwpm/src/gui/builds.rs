@@ -193,7 +193,7 @@ impl App {
                 Column::with_children(view.rows.iter().map(|r| self.build_row(r)))
                     .spacing(12)
                     .width(Length::Fill)
-                    .padding(iced::Padding::ZERO.right(16)),
+                    .padding(super::dialogs::gutter()),
             )
             .height(Length::Fill)
             .into(),

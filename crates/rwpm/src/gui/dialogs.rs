@@ -29,7 +29,42 @@ const DESCRIPTION_HEIGHT: f32 = 110.0;
 /// Width of the chosen cover in the Share dialog.
 const COVER_PREVIEW_WIDTH: f32 = 160.0;
 
-pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message> {
+/// Room a scrolling area needs beside the scrollbar, so the bar never covers text.
+const SCROLLBAR_GUTTER: f32 = 16.0;
+
+/// Padding for the content of a scrollable: leaves the right edge to the scrollbar.
+pub(super) fn gutter() -> iced::Padding {
+    iced::Padding::ZERO.right(SCROLLBAR_GUTTER)
+}
+
+/// The smallest window (see `min_size` in `mod.rs`); dialog sizes are set for it.
+const MIN_WINDOW: iced::Size = iced::Size::new(960.0, 600.0);
+const DIALOG_MIN_WIDTH: f32 = 560.0;
+const DIALOG_MAX_WIDTH: f32 = 900.0;
+
+/// How a dialog uses the window: it is never smaller than at the smallest window, and
+/// grows with the window above that.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Room {
+    /// Widest the dialog may be.
+    pub width: f32,
+    /// Height a scrolling area gains over its size in the smallest window.
+    pub grow: f32,
+}
+
+impl Room {
+    pub fn of(window: iced::Size) -> Self {
+        let widest = (window.width - 2.0 * 48.0).max(DIALOG_MIN_WIDTH);
+        Self {
+            width: (window.width * 0.6)
+                .clamp(DIALOG_MIN_WIDTH, DIALOG_MAX_WIDTH)
+                .min(widest),
+            grow: (window.height - MIN_WINDOW.height).max(0.0),
+        }
+    }
+}
+
+pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog, room: Room) -> Element<'a, Message> {
     match dialog {
         Dialog::Name {
             purpose,
@@ -94,10 +129,12 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         }
         Dialog::Backup(draft) => backup_dialog(draft),
         Dialog::Restore(plan) => restore_dialog(plan),
-        Dialog::Share(draft) => share_dialog(draft, app.dark),
-        Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview, app.dark),
+        Dialog::Share(draft) => share_dialog(draft, app.dark, room),
+        Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview, app.dark, room),
         Dialog::ResetPack(plan) => super::pack_reset::reset_dialog(plan),
-        Dialog::ConfirmSubscribe(preview) => super::pack_fetch::confirm_subscribe_dialog(preview),
+        Dialog::ConfirmSubscribe(preview) => {
+            super::pack_fetch::confirm_subscribe_dialog(preview, room)
+        }
         Dialog::ConsentSteamcmd(_) => super::pack_fetch::consent_steamcmd_dialog(),
         Dialog::TrustSteamcmd { first, found, .. } => {
             super::pack_fetch::trust_steamcmd_dialog(first, found)
@@ -124,9 +161,7 @@ fn help_list_height(window_height: f32) -> f32 {
 /// the smallest window. The list takes only as much height as its text needs, up to
 /// what the window leaves. The sections once filled 600 px on their own.
 fn help_dialog(list_height: f32) -> Element<'static, Message> {
-    let mut sections = Column::new()
-        .spacing(12)
-        .padding(iced::Padding::ZERO.right(16));
+    let mut sections = Column::new().spacing(12).padding(gutter());
     for (title, words) in t::HELP_SECTIONS {
         sections =
             sections.push(column![text(title).font(UI_BOLD), text(words).size(14)].spacing(2));
@@ -147,11 +182,12 @@ fn help_dialog(list_height: f32) -> Element<'static, Message> {
 }
 
 /// The Help dialog on its backdrop, sized to the window it is shown in.
-pub fn help_layer(window_height: f32) -> Element<'static, Message> {
+pub fn help_layer(window: iced::Size) -> Element<'static, Message> {
+    let room = Room::of(window);
     center(
-        container(help_dialog(help_list_height(window_height)))
+        container(help_dialog(help_list_height(window.height)))
             .padding(24)
-            .max_width(560)
+            .max_width(room.width)
             .style(theme::raised),
     )
     .style(theme::scrim)
@@ -481,7 +517,7 @@ fn restore_dialog(plan: &RestorePlan) -> Element<'_, Message> {
 }
 
 /// The pack holds no mods, so it has its own notice; mod settings carry a privacy warning.
-fn share_dialog(draft: &ShareDraft, dark: bool) -> Element<'_, Message> {
+fn share_dialog(draft: &ShareDraft, dark: bool, room: Room) -> Element<'_, Message> {
     let tick = |label: String, on: bool, which: ShareTick| {
         checkbox(on)
             .label(label)
@@ -548,8 +584,10 @@ fn share_dialog(draft: &ShareDraft, dark: bool) -> Element<'_, Message> {
     // The title and the buttons stay on screen; the form scrolls.
     column![
         heading(t::SHARE_TITLE),
-        container(scrollable(body.push(text(t::SHARE_NOTICE).size(13))))
-            .max_height(SHARE_FORM_HEIGHT),
+        container(scrollable(
+            body.push(text(t::SHARE_NOTICE).size(13)).padding(gutter())
+        ))
+        .max_height(SHARE_FORM_HEIGHT + room.grow),
         buttons(
             t::SHARE_IT,
             draft.ready().then_some(Message::Confirm),
@@ -702,4 +740,30 @@ fn saves_section(draft: &ShareDraft) -> Element<'_, Message> {
         }
     }
     section.into()
+}
+
+#[cfg(test)]
+mod room_tests {
+    use super::*;
+
+    #[test]
+    fn smallest_window_keeps_the_old_sizes() {
+        let r = Room::of(iced::Size::new(960.0, 600.0));
+        assert_eq!(r.grow, 0.0);
+        assert!((DIALOG_MIN_WIDTH..=DIALOG_MAX_WIDTH).contains(&r.width));
+    }
+
+    #[test]
+    fn grows_with_the_window_and_stops_at_the_cap() {
+        let r = Room::of(iced::Size::new(1600.0, 1000.0));
+        assert_eq!(r.grow, 400.0);
+        assert_eq!(r.width, 900.0);
+    }
+
+    #[test]
+    fn never_below_the_minimum() {
+        let r = Room::of(iced::Size::new(300.0, 200.0));
+        assert_eq!(r.grow, 0.0);
+        assert_eq!(r.width, DIALOG_MIN_WIDTH);
+    }
 }

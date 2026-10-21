@@ -40,22 +40,20 @@ impl App {
         .height(Length::Fill);
         match &self.dialog {
             // Help sizes its list to the window, so its OK button stays on screen.
-            Some(Dialog::Help) => stack![
-                main,
-                opaque(responsive(|size| dialogs::help_layer(size.height)))
-            ]
-            .into(),
+            Some(Dialog::Help) => stack![main, opaque(responsive(dialogs::help_layer))].into(),
             Some(dialog) => stack![
                 main,
-                opaque(
+                opaque(responsive(move |size| {
+                    let room = dialogs::Room::of(size);
                     center(
-                        container(dialogs::dialog_view(self, dialog))
+                        container(dialogs::dialog_view(self, dialog, room))
                             .padding(24)
-                            .max_width(560)
-                            .style(theme::raised)
+                            .max_width(room.width)
+                            .style(theme::raised),
                     )
                     .style(theme::scrim)
-                )
+                    .into()
+                }))
             ]
             .into(),
             None => main.into(),
@@ -284,7 +282,7 @@ impl App {
                 .push(self.start_section())
                 .spacing(24)
                 .width(Length::Fill)
-                .padding(iced::Padding::ZERO.right(16)),
+                .padding(super::dialogs::gutter()),
         )
         .height(Length::Fill);
         let pane = container(

@@ -58,7 +58,7 @@ impl App {
             self.steam_check(p)
         ]
         .spacing(18)
-        .padding(iced::Padding::ZERO.right(16));
+        .padding(super::dialogs::gutter());
         scrollable(body).height(Length::Fill).into()
     }
 

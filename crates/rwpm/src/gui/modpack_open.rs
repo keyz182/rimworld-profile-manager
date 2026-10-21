@@ -16,7 +16,7 @@ use rwpm_core::discovery::GameInstall;
 use rwpm_core::modpack::{self, ModEntry, UnpackPlan};
 use rwpm_core::mods::ModIndex;
 
-use super::dialogs::{buttons, heading};
+use super::dialogs::{Room, buttons, gutter, heading};
 use super::icon::UI_BOLD;
 use super::message::{Dialog, Field, Message, Outcome};
 use super::pack_fetch::{SteamRoute, steam_route};
@@ -244,7 +244,7 @@ enum Row {
 }
 
 /// The pack, its notes and its lists, before the player agrees.
-pub fn pack_dialog(preview: &PackPreview, dark: bool) -> Element<'_, Message> {
+pub fn pack_dialog(preview: &PackPreview, dark: bool, room: Room) -> Element<'_, Message> {
     let m = &preview.plan.manifest;
     let mut details = Column::new().spacing(10);
     if let Some(cover) = &preview.cover {
@@ -288,7 +288,7 @@ pub fn pack_dialog(preview: &PackPreview, dark: bool) -> Element<'_, Message> {
             .padding(8)
             .on_input(|v| Message::Input(Field::Name, v))
             .on_submit(Message::Confirm),
-        container(scrollable(details)).max_height(DETAILS_HEIGHT),
+        container(scrollable(details.padding(gutter()))).max_height(DETAILS_HEIGHT + room.grow),
         text(t::SHARE_NOTICE).size(13),
         offline_choice(preview),
         pack_buttons(preview, ok),
