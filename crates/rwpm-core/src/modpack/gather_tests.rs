@@ -234,6 +234,7 @@ fn a_gathered_list_goes_straight_into_a_pack() {
         },
         start_save: None,
         collection_url: None,
+        cover: None,
         mods: got.mods.clone(),
     };
     let plan = plan_pack(&w.store, &profile.id, spec).expect("plan");

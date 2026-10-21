@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use tar::Header;
 
+use super::cover;
 use super::entry::{MOD_LIST, SAVE_DATA, check_declared};
 use super::file::{self, Includes, Manifest, ModEntry, check_save_name};
 use super::{MAX_BYTES, MAX_ENTRIES, bad};
@@ -33,6 +34,8 @@ pub struct PackSpec {
     pub includes: Includes,
     pub start_save: Option<String>,
     pub collection_url: Option<String>,
+    /// The bytes of `cover.png`, made by `cover::prepare`.
+    pub cover: Option<Vec<u8>>,
     pub mods: Vec<ModEntry>,
 }
 
@@ -48,6 +51,7 @@ pub struct PackPlan {
     pub skipped: Vec<PathBuf>,
     save_data: PathBuf,
     manifest: Manifest,
+    cover: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
@@ -64,8 +68,11 @@ pub fn plan_pack<T: Trash>(
     let profile = store.get(id)?;
     let save_data = profile.save_data_dir();
     let inventory = Inventory::of(&save_data, &spec.includes, &profile.name)?;
-    let manifest = Manifest {
-        schema: file::SCHEMA,
+    if let Some(cover) = &spec.cover {
+        cover::thumbnail(cover).map_err(|r| bad(Path::new(cover::COVER_ENTRY), r))?;
+    }
+    let mut manifest = Manifest {
+        schema: file::SCHEMA_BASE,
         created_at: now_datetime(),
         rwpm_version: crate::VERSION.to_owned(),
         name: profile.name.clone(),
@@ -74,21 +81,36 @@ pub fn plan_pack<T: Trash>(
         dlc: spec.dlc,
         start_save: spec.start_save,
         collection_url: spec.collection_url,
-        uncompressed_bytes: inventory.bytes,
-        entry_count: inventory.items.len() as u64,
+        cover: None,
+        uncompressed_bytes: 0,
+        entry_count: 0,
         includes: spec.includes,
         mods: spec.mods,
     };
+    set_totals(&mut manifest, &inventory, spec.cover.as_deref());
     check_manifest(&manifest)?;
     Ok(PackPlan {
         id: profile.id,
         name: profile.name,
-        bytes: inventory.bytes,
+        bytes: manifest.uncompressed_bytes,
         entries: manifest.entry_count,
         skipped: inventory.skipped,
         save_data,
         manifest,
+        cover: spec.cover,
     })
+}
+
+/// The totals restore holds a pack to count the cover too, and a cover makes the pack
+/// schema 2; without one the pack stays readable by builds that predate covers.
+fn set_totals(manifest: &mut Manifest, inventory: &Inventory, cover: Option<&[u8]>) {
+    let cover_bytes = cover.map_or(0, |c| c.len() as u64);
+    manifest.uncompressed_bytes = inventory.bytes + cover_bytes;
+    manifest.entry_count = inventory.items.len() as u64 + u64::from(cover.is_some());
+    (manifest.schema, manifest.cover) = match cover {
+        Some(_) => (file::SCHEMA, Some(cover::COVER_ENTRY.to_owned())),
+        None => (file::SCHEMA_BASE, None),
+    };
 }
 
 fn check_manifest(manifest: &Manifest) -> Result<(), ProfileError> {
@@ -115,11 +137,10 @@ pub fn apply_pack(
     check_space(dest, inventory.bytes)?;
     let mut manifest = plan.manifest.clone();
     manifest.created_at = now_datetime();
-    manifest.uncompressed_bytes = inventory.bytes;
-    manifest.entry_count = inventory.items.len() as u64;
+    set_totals(&mut manifest, &inventory, plan.cover.as_deref());
     check_manifest(&manifest)?;
     let tmp = temp_beside(dest)?;
-    let written = write_archive(&tmp, &manifest, &inventory, progress)
+    let written = write_archive(&tmp, &manifest, plan.cover.as_deref(), &inventory, progress)
         .and_then(|()| std::fs::rename(&tmp, dest).map_err(ProfileError::io("save", dest)));
     if let Err(e) = written {
         let _ = std::fs::remove_file(&tmp);
@@ -134,6 +155,7 @@ pub fn apply_pack(
 fn write_archive(
     tmp: &Path,
     manifest: &Manifest,
+    cover: Option<&[u8]>,
     inventory: &Inventory,
     progress: &mut dyn FnMut(u64),
 ) -> Result<(), ProfileError> {
@@ -147,6 +169,14 @@ fn write_archive(
     tarball
         .append_data(&mut header, file::FILE_NAME, text.as_bytes())
         .map_err(ProfileError::io("write", tmp))?;
+    if let Some(cover) = cover {
+        let mut header = Header::new_gnu();
+        header.set_size(cover.len() as u64);
+        header.set_mode(0o644);
+        tarball
+            .append_data(&mut header, cover::COVER_ENTRY, cover)
+            .map_err(ProfileError::io("write", tmp))?;
+    }
     let mut done = 0;
     for item in &inventory.items {
         done += append_file(&mut tarball, item).map_err(ProfileError::io("pack", &item.source))?;

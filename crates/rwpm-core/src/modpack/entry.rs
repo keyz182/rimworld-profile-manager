@@ -1,9 +1,10 @@
-//! Rules for archive entry names. A pack is a short allowlist: `rimpack.toml`, then
-//! plain files below `SaveData/`. Restore never joins an unchecked name onto a path, and
+//! Rules for archive entry names. A pack is a short allowlist: `rimpack.toml`, an optional
+//! `cover.png`, then plain files below `SaveData/`. Restore never joins an unchecked name onto a path, and
 //! the same rules decide what a pack may hold when it is made.
 
 use std::path::{Component, Path, PathBuf};
 
+use super::cover::COVER_ENTRY;
 use super::file::{FILE_NAME, Includes};
 use crate::profile::copy_settings::{Group, group_of};
 
@@ -19,6 +20,8 @@ const EXTENSIONS: [&str; 7] = ["xml", "rsc", "rid", "xtp", "json", "txt", "ini"]
 pub enum Place {
     /// `rimpack.toml`.
     Manifest,
+    /// `cover.png`, the cover picture.
+    Cover,
     /// `SaveData/<rel>`; `rel` is never empty.
     SaveData(PathBuf),
 }
@@ -45,6 +48,7 @@ pub fn classify(name: &Path) -> Result<Place, String> {
     match parts.as_slice() {
         [] => Err("an entry has an empty name".into()),
         [first] if *first == FILE_NAME => Ok(Place::Manifest),
+        [first] if *first == COVER_ENTRY => Ok(Place::Cover),
         [first, rest @ ..] if *first == SAVE_DATA && !rest.is_empty() => {
             Ok(Place::SaveData(rest.iter().collect()))
         }

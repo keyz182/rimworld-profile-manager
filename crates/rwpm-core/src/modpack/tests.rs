@@ -32,7 +32,7 @@ fn entry(id: &str) -> ModEntry {
 
 fn sample() -> Manifest {
     Manifest {
-        schema: file::SCHEMA,
+        schema: file::SCHEMA_BASE,
         created_at: "2026-10-19T13:00:00Z".parse().expect("datetime"),
         rwpm_version: "1.11.0".into(),
         name: "Ironman".into(),
@@ -41,6 +41,7 @@ fn sample() -> Manifest {
         dlc: vec!["ludeon.rimworld.royalty".into()],
         start_save: Some("Start.rws".into()),
         collection_url: Some("https://steamcommunity.com/workshop/filedetails/?id=1".into()),
+        cover: None,
         uncompressed_bytes: 4096,
         entry_count: 3,
         includes: includes(&["Start.rws"]),
@@ -71,10 +72,10 @@ fn manifest_refuses_unknown_fields_and_newer_schema() {
         parse(&extra),
         Err(ProfileError::BadModpack { .. })
     ));
-    let newer = text.replacen("schema = 1", "schema = 2", 1);
+    let newer = text.replacen("schema = 1", "schema = 3", 1);
     assert!(matches!(
         parse(&newer),
-        Err(ProfileError::SchemaTooNew { found: 2, .. })
+        Err(ProfileError::SchemaTooNew { found: 3, .. })
     ));
 }
 
@@ -333,6 +334,7 @@ fn spec(saves: &[&str]) -> PackSpec {
         includes: includes(saves),
         start_save: saves.first().map(|s| (*s).to_owned()),
         collection_url: None,
+        cover: None,
         mods: vec![entry("brrainz.harmony")],
     }
 }
@@ -657,3 +659,6 @@ fn a_file_that_is_not_a_modpack_is_refused() {
     assert!(plan_unpack(&path, &fx.target).is_err());
     assert!(fx.leftovers().is_empty());
 }
+
+#[cfg(test)]
+mod cover_tests;

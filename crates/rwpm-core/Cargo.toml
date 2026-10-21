@@ -10,6 +10,7 @@ authors.workspace = true
 [dependencies]
 dirs = "7.0.0"
 flate2 = "1.1.10"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
 reflink-copy = "0.1.30"
 roxmltree = "0.21.1"
 serde = { version = "1.0.229", features = ["derive"] }

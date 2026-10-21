@@ -12,9 +12,10 @@ use std::path::{Path, PathBuf};
 
 use tar::EntryType;
 
+use super::cover;
 use super::entry::{Place, SAVE_DATA, check_declared, check_entry_kind, classify};
 use super::file::Manifest;
-use super::{MAX_BYTES, MAX_ENTRIES, bad, open, read_first, read_manifest};
+use super::{MAX_BYTES, MAX_ENTRIES, bad, open, read_first, read_preview};
 use crate::backup::unpack::{parts_of, write_entry};
 use crate::error::ProfileError;
 use crate::profile::file::FILE_NAME as PROFILE_FILE;
@@ -29,6 +30,8 @@ const MARGIN_PERCENT: u64 = 10;
 pub struct UnpackPlan {
     pub archive: PathBuf,
     pub manifest: Manifest,
+    /// The cover as a thumbnail PNG, when the pack has one.
+    pub cover: Option<Vec<u8>>,
     /// Display name of the new profile; the player may change it before `apply_unpack`.
     pub name: String,
     /// Disk the restore needs, margin included.
@@ -45,7 +48,7 @@ pub fn plan_unpack<T: Trash>(
     archive: &Path,
     store: &ProfileStore<T>,
 ) -> Result<UnpackPlan, ProfileError> {
-    let manifest = read_manifest(archive)?;
+    let (manifest, cover) = read_preview(archive, true)?;
     if manifest.uncompressed_bytes > MAX_BYTES || manifest.entry_count > MAX_ENTRIES {
         return Err(bad(archive, "it is larger than a modpack may be"));
     }
@@ -62,6 +65,7 @@ pub fn plan_unpack<T: Trash>(
         archive: archive.to_path_buf(),
         name: manifest.name.clone(),
         manifest,
+        cover,
         bytes_needed: need,
         free_bytes: free,
     })
@@ -85,6 +89,7 @@ pub fn apply_unpack<T: Trash>(
         bytes: 0,
         entries: 0,
         mod_list: false,
+        cover: false,
         saves: BTreeSet::new(),
     };
     let done = job
@@ -107,6 +112,7 @@ struct Job<'a> {
     bytes: u64,
     entries: u64,
     mod_list: bool,
+    cover: bool,
     /// Save file names seen, to hold the manifest to what it lists.
     saves: BTreeSet<String>,
 }
@@ -158,6 +164,7 @@ impl Job<'_> {
         }
         let rel = match place {
             Place::Manifest => return Err(self.fault("it has a second `rimpack.toml`")),
+            Place::Cover => return self.cover(&mut entry),
             Place::SaveData(rel) => rel,
         };
         check_declared(&rel, &self.plan.manifest.includes).map_err(|r| self.fault(r))?;
@@ -170,6 +177,23 @@ impl Job<'_> {
             }
             _ => e,
         })
+    }
+
+    /// The cover is decoded under the cover limits and only its thumbnail is kept.
+    fn cover<R: Read>(&mut self, entry: &mut tar::Entry<'_, R>) -> Result<(), ProfileError> {
+        if self.plan.manifest.cover.is_none() || self.cover {
+            return Err(self.fault("it holds a cover it does not declare"));
+        }
+        self.cover = true;
+        let mut bytes = Vec::new();
+        entry
+            .take(cover::MAX_COVER_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(ProfileError::io("read", self.archive()))?;
+        let thumb = cover::thumbnail(&bytes)
+            .map_err(|r| self.fault(format!("its cover is refused ({r})")))?;
+        let dest = self.dir.join(cover::PROFILE_COVER);
+        std::fs::write(&dest, thumb).map_err(ProfileError::io("write", &dest))
     }
 
     fn note(&mut self, rel: &Path) {
@@ -190,6 +214,9 @@ impl Job<'_> {
         }
         if !self.mod_list {
             return Err(self.fault("it has no mod list"));
+        }
+        if manifest.cover.is_some() && !self.cover {
+            return Err(self.fault("its cover is missing"));
         }
         let listed: BTreeSet<String> = manifest.includes.saves.iter().cloned().collect();
         if self.saves != listed {

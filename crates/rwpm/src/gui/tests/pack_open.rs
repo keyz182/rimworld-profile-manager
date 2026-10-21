@@ -55,6 +55,7 @@ pub(super) fn make_pack(
         },
         start_save: None,
         collection_url: None,
+        cover: None,
         mods,
     };
     let plan = modpack::plan_pack(&store, &id, spec).expect("plan");

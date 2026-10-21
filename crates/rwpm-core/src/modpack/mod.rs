@@ -5,6 +5,7 @@
 //! This module holds the format and the two steps that use it. `pack` writes a pack from a
 //! profile; `unpack` makes a NEW profile from one. Fetching the listed mods is separate.
 
+pub mod cover;
 pub mod entry;
 pub mod file;
 pub mod gather;
@@ -70,6 +71,15 @@ pub(crate) fn read_first<R: Read>(
 
 /// Reads only the first entry, so a preview never unpacks anything.
 pub fn read_manifest(path: &Path) -> Result<Manifest, ProfileError> {
+    read_preview(path, false).map(|(manifest, _)| manifest)
+}
+
+/// The manifest and, when it names a cover and `with_cover` is set, the cover as a
+/// thumbnail PNG. Reads the first two entries only; a cover must be the second.
+pub fn read_preview(
+    path: &Path,
+    with_cover: bool,
+) -> Result<(Manifest, Option<Vec<u8>>), ProfileError> {
     let decode = |e: std::io::Error| bad(path, format!("it cannot be read as a modpack ({e})"));
     let mut archive = open(path)?;
     let mut entries = archive.entries().map_err(decode)?;
@@ -78,7 +88,27 @@ pub fn read_manifest(path: &Path) -> Result<Manifest, ProfileError> {
         .ok_or_else(|| bad(path, "it is empty"))?
         .map_err(decode)?;
     let text = read_first(&mut first, path)?;
-    Manifest::parse(&text, path)
+    let manifest = Manifest::parse(&text, path)?;
+    if !with_cover || manifest.cover.is_none() {
+        return Ok((manifest, None));
+    }
+    let mut second = entries
+        .next()
+        .ok_or_else(|| bad(path, "its cover is missing"))?
+        .map_err(decode)?;
+    let name = second.path().map_err(decode)?.into_owned();
+    if entry::classify(&name) != Ok(entry::Place::Cover) {
+        return Err(bad(path, "its second entry is not the cover"));
+    }
+    entry::check_entry_kind(second.header().entry_type(), &name).map_err(|r| bad(path, r))?;
+    let mut bytes = Vec::new();
+    (&mut second)
+        .take(cover::MAX_COVER_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(decode)?;
+    let thumb = cover::thumbnail(&bytes)
+        .map_err(|r| bad(path, format!("its cover is refused ({r})")))?;
+    Ok((manifest, Some(thumb)))
 }
 
 #[cfg(test)]

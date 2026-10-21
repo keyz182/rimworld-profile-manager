@@ -217,6 +217,7 @@ impl App {
                 includes: draft.includes(),
                 start_save: draft.start_name(),
                 collection_url: (!link.is_empty()).then(|| link.to_owned()),
+                cover: None,
                 mods: gathered.mods,
             };
             let plan = modpack::plan_pack(&store, &p.id, spec).map_err(fail)?;

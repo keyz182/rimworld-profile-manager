@@ -10,8 +10,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ProfileError;
 
-/// Highest schema this build reads and the one it writes.
-pub const SCHEMA: u32 = 1;
+/// Highest schema this build reads. Schema 2 added `cover`.
+pub const SCHEMA: u32 = 2;
+/// What a pack without a cover is written as, so builds that predate covers still open it.
+pub const SCHEMA_BASE: u32 = 1;
 pub const FILE_NAME: &str = "rimpack.toml";
 
 const MAX_MODS: usize = 5_000;
@@ -70,6 +72,9 @@ pub struct Manifest {
     pub start_save: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collection_url: Option<String>,
+    /// The entry that holds the cover picture; always `cover.png`. Needs schema 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
     /// Total bytes of every file after `rimpack.toml`, and how many there are: the limits
     /// restore enforces while it streams.
     pub uncompressed_bytes: u64,
@@ -139,6 +144,14 @@ impl Manifest {
         }
         for url in self.collection_url.iter() {
             check_link(url)?;
+        }
+        if let Some(cover) = &self.cover {
+            if cover != super::cover::COVER_ENTRY {
+                return Err(format!("`{}` is not a cover name", cover.escape_debug()));
+            }
+            if self.schema < SCHEMA {
+                return Err("it has a cover but is not schema 2".into());
+            }
         }
         let mut seen = std::collections::BTreeSet::new();
         for save in &self.includes.saves {
