@@ -350,3 +350,51 @@ fn a_pack_opened_in_the_app_restores_into_a_new_live_profile() {
     assert_eq!(app.selected, profile.id);
     assert_eq!(app.notice, Some(Notice::Info(line)));
 }
+
+/// The preview of `pack` with `description` and, when set, a cover, as the core would read
+/// them from the file.
+fn described(sb: &Sandbox, pack: &Path, description: &str, cover: Option<Vec<u8>>) -> PackPreview {
+    let store = sb.ctx().store().expect("store");
+    let mut plan = modpack::plan_unpack(pack, &store).expect("plan");
+    plan.manifest.description = description.into();
+    plan.cover = cover;
+    build_preview(plan, None)
+}
+
+/// Rich text is not a plain text widget, so these look at what was parsed, and that the
+/// dialog still draws it.
+#[test]
+fn the_description_is_parsed_once_into_markdown_items() {
+    use iced::widget::markdown::Item;
+    let sb = Sandbox::new();
+    let pack = make_pack(&sb, vec![], None, &[]);
+    let p = described(&sb, &pack, "# Hard mode\n\nPlay **well**.", None);
+    assert!(matches!(p.about[0], Item::Heading(..)), "{:?}", p.about);
+    assert!(matches!(p.about[1], Item::Paragraph(..)));
+    let _ = shown(&sb, p);
+}
+
+/// The viewer draws an image's alt text and nothing else: the address is never loaded.
+#[test]
+fn a_description_image_stays_an_item_the_viewer_draws_as_text() {
+    use iced::widget::markdown::Item;
+    let sb = Sandbox::new();
+    let pack = make_pack(&sb, vec![], None, &[]);
+    let p = described(&sb, &pack, "![tracker](http://evil.example/p.png)", None);
+    assert!(p.about.iter().any(|i| matches!(i, Item::Image { .. })));
+    let app = shown(&sb, p);
+    assert!(!found(&app, "http://evil.example/p.png"));
+}
+
+#[test]
+fn a_cover_reaches_the_preview_and_a_long_description_keeps_the_buttons_on_screen() {
+    use super::modpacks::assert_on_screen;
+    let sb = Sandbox::new();
+    let pack = make_pack(&sb, vec![], None, &[]);
+    let long = "A line of text about the pack.\n\n".repeat(60);
+    let p = described(&sb, &pack, &long, Some(vec![1, 2, 3]));
+    assert!(p.cover.is_some());
+    let app = shown(&sb, p);
+    assert_on_screen(&app, text::OPEN_PACK_TITLE);
+    assert_on_screen(&app, text::OPEN_PACK_IT);
+}

@@ -94,6 +94,11 @@ pub fn theme(dark: bool) -> Theme {
     theme.clone()
 }
 
+/// How markdown (a pack's description) is drawn in the app theme.
+pub fn markdown_settings(dark: bool) -> iced::widget::markdown::Settings {
+    (&theme(dark)).into()
+}
+
 /// The tokens behind a theme made by [`theme`].
 pub fn tokens(theme: &Theme) -> &'static Tokens {
     if theme.extended_palette().is_dark {

@@ -904,13 +904,8 @@ pub const PACK_NO_GAME: &str =
     "RimWorld was not found, so the mods could not be checked against what is installed.";
 pub const PACK_HINT: &str = "Get the missing mods before you play. RimSort can fetch them if its Steam database is on: use Export to RimSort, then let RimSort download the rest.";
 
-pub fn pack_about(name: &str, mods: usize, description: &str) -> String {
-    let mods = count(mods, "mod", "mods");
-    if description.trim().is_empty() {
-        format!("“{name}” lists {mods}.")
-    } else {
-        format!("“{name}” lists {mods}.\n{}", description.trim())
-    }
+pub fn pack_about(name: &str, mods: usize) -> String {
+    format!("“{name}” lists {}.", count(mods, "mod", "mods"))
 }
 
 pub fn pack_section(title: &str, shown: usize) -> String {

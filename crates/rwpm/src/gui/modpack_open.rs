@@ -6,7 +6,8 @@
 use std::path::{Path, PathBuf};
 
 use iced::widget::{
-    Column, button, checkbox, column, container, row, scrollable, space, text, text_input,
+    Column, button, checkbox, column, container, image, markdown, row, scrollable, space, text,
+    text_input,
 };
 use iced::{Alignment, Element, Length, Task};
 use rwpm_core::ProfileError;
@@ -49,11 +50,17 @@ impl From<&ModEntry> for PackMod {
     }
 }
 
+/// Width the cover is drawn at in the dialog.
+const COVER_WIDTH: f32 = 240.0;
+
 /// A pack's contents set against what is installed here.
 #[derive(Debug, Clone)]
 pub struct PackPreview {
     /// The core's plan; `plan.name` is the new profile's name, which the player may change.
     pub plan: UnpackPlan,
+    /// The description, parsed once here, not on every frame.
+    pub about: Vec<markdown::Item>,
+    pub cover: Option<image::Handle>,
     pub present: Vec<PackMod>,
     /// Not installed, with a Workshop id: a Steam page can be opened for each.
     pub missing: Vec<PackMod>,
@@ -128,6 +135,8 @@ pub fn build_preview(plan: UnpackPlan, game: Option<&GameInstall>) -> PackPrevie
     let game_note = version_note(manifest.game_version.as_deref(), here);
     PackPreview {
         checked: index.is_some(),
+        about: markdown::parse(&manifest.description).collect(),
+        cover: plan.cover.clone().map(image::Handle::from_bytes),
         plan,
         present,
         missing,
@@ -235,9 +244,18 @@ enum Row {
 }
 
 /// The pack, its notes and its lists, before the player agrees.
-pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
+pub fn pack_dialog(preview: &PackPreview, dark: bool) -> Element<'_, Message> {
     let m = &preview.plan.manifest;
     let mut details = Column::new().spacing(10);
+    if let Some(cover) = &preview.cover {
+        details = details.push(image(cover.clone()).width(Length::Fixed(COVER_WIDTH)));
+    }
+    if !preview.about.is_empty() {
+        details = details.push(
+            markdown::view(&preview.about, theme::markdown_settings(dark))
+                .map(|url| Message::OpenUrl(url.to_string())),
+        );
+    }
     let mut notes = Vec::new();
     if !preview.checked {
         notes.push(t::PACK_NO_GAME.to_owned());
@@ -264,7 +282,7 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
     // The title, the name and the buttons stay on screen; the notes and lists scroll.
     column![
         heading(t::OPEN_PACK_TITLE),
-        text(t::pack_about(&m.name, m.mods.len(), &m.description)),
+        text(t::pack_about(&m.name, m.mods.len())),
         text(t::RESTORE_NAME),
         text_input(t::NAME_HINT, &preview.plan.name)
             .padding(8)

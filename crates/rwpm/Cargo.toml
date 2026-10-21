@@ -8,7 +8,8 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
-iced = "0.14.0"
+# `markdown`: pack descriptions. `image-without-codecs`: pack covers (PNG decoding comes from rwpm-core). Neither fetches anything from the net.
+iced = { version = "0.14.0", features = ["markdown", "image-without-codecs"] }
 # System folder dialog for finding RimWorld (C: folder picker).
 rfd = "0.17.2"
 rwpm-core = { path = "../rwpm-core" }
