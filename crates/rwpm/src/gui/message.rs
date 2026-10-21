@@ -121,6 +121,10 @@ pub enum Message {
     ShareCoverPicked(Option<Result<Box<ShareCover>, String>>),
     /// Share dialog: drop the cover picture.
     ShareCoverClear,
+    /// A pack profile's "Reset to pack…".
+    ResetPack,
+    /// Reset dialog: the box for the pack's saves.
+    ResetSaves(bool),
     /// "Open modpack…": open the file dialog.
     OpenPack,
     /// The pack chosen to open; `None` when the dialog was closed.
@@ -276,5 +280,7 @@ pub enum Dialog {
         id: ProfileId,
         count: usize,
     },
+    /// What a reset to the pack would change.
+    ResetPack(Box<rwpm_core::modpack::ResetPlan>),
     Help,
 }

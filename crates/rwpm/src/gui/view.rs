@@ -244,6 +244,7 @@ impl App {
         }
         let sections = scrollable(
             Column::new()
+                .push(self.pack_section(p))
                 .push(self.game_version_section(p))
                 .push(self.health_section(p))
                 .push(self.mods_section(p))

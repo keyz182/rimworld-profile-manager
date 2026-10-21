@@ -916,6 +916,44 @@ pub fn pack_about(name: &str, mods: usize) -> String {
     format!("“{name}” lists {}.", count(mods, "mod", "mods"))
 }
 
+pub const PACK_SECTION: &str = "From a modpack";
+pub const PACK_RESET: &str = "Reset to pack…";
+pub const RESET_TITLE: &str = "Reset to the pack";
+pub const RESET_KEEPS: &str = "Files the pack does not hold stay as they are.";
+pub const RESET_SAVES: &str = "Also restore the pack's saves";
+pub const RESET_SAVES_NOTE: &str =
+    "A save with the same name is replaced. The old one goes to the recycle bin.";
+pub const RESET_IT: &str = "Reset";
+
+pub fn pack_origin(name: &str) -> String {
+    format!("Made from the modpack “{name}”.")
+}
+
+pub fn reset_about(name: &str) -> String {
+    format!(
+        "This puts “{name}” back as its modpack had it: the mod list, the mod settings and your creations. A file that differs goes to the recycle bin first, so you can get it back."
+    )
+}
+
+pub fn reset_missing(names: &[&str]) -> String {
+    format!(
+        "This offline profile has no copy of: {}. Get them first, then reset.",
+        names.join(", ")
+    )
+}
+
+pub fn resetting(name: &str) -> String {
+    format!("Resetting “{name}” to its pack")
+}
+
+pub fn reset_done(name: &str, replaced: usize, added: usize) -> String {
+    format!(
+        "“{name}” is back as its pack had it: {} replaced, {} added.",
+        count(replaced, "file", "files"),
+        count(added, "file", "files")
+    )
+}
+
 pub fn pack_section(title: &str, shown: usize) -> String {
     format!("{title} ({shown})")
 }

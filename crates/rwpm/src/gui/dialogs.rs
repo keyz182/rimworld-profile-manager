@@ -85,6 +85,7 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
         Dialog::Restore(plan) => restore_dialog(plan),
         Dialog::Share(draft) => share_dialog(draft, app.dark),
         Dialog::OpenPack(preview) => super::modpack_open::pack_dialog(preview, app.dark),
+        Dialog::ResetPack(plan) => super::pack_reset::reset_dialog(plan),
         Dialog::ConfirmSubscribe(preview) => super::pack_fetch::confirm_subscribe_dialog(preview),
         Dialog::ConsentSteamcmd(_) => super::pack_fetch::consent_steamcmd_dialog(),
         Dialog::TrustSteamcmd { first, found, .. } => {

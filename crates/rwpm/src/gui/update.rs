@@ -96,6 +96,7 @@ impl App {
                     | M::SharePicked(..)
                     | M::OpenPack
                     | M::OpenPackPicked(_)
+                    | M::ResetPack
                     | M::RemovePackSubs
             ) || confirm_in(|d| !matches!(d, Dialog::Help));
         }
@@ -140,6 +141,7 @@ impl App {
                         | Dialog::Restore(_)
                         | Dialog::Share(_)
                         | Dialog::OpenPack(_)
+                        | Dialog::ResetPack(_)
                         | Dialog::ConfirmSubscribe(_)
                         | Dialog::ConsentSteamcmd(_)
                         | Dialog::TrustSteamcmd { .. }
@@ -255,6 +257,7 @@ impl App {
             | Message::ShareCoverPicked(_)
             | Message::ShareCoverClear
             | Message::SharePicked(..) => return self.modpack_update(message),
+            Message::ResetPack | Message::ResetSaves(_) => return self.reset_update(message),
             Message::OpenPack
             | Message::OpenPackPicked(_)
             | Message::PackOpened(_)
@@ -481,6 +484,7 @@ impl App {
                 self.dialog = Some(Dialog::OpenPack(preview));
             }
             Some(Dialog::OpenPack(preview)) => return self.pack_restore_job(*preview),
+            Some(Dialog::ResetPack(plan)) => return self.reset_job(*plan),
             Some(Dialog::ConfirmSubscribe(preview)) => return self.subscribe_job(*preview),
             Some(Dialog::ConsentSteamcmd(preview)) => self.grant_steamcmd(*preview),
             Some(Dialog::TrustSteamcmd { preview, .. }) => return self.trust_steamcmd(*preview),

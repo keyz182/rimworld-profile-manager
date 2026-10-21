@@ -15,6 +15,7 @@ mod modpack;
 mod modpack_open;
 mod mods;
 mod pack_fetch;
+mod pack_reset;
 mod picker;
 mod setup;
 mod support;
@@ -193,6 +194,8 @@ pub struct App {
     pub game_running: bool,
     /// Turned-on mods per profile; absent when the mod list cannot be read.
     pub mod_counts: HashMap<ProfileId, usize>,
+    /// What each pack profile shows of its pack, read when the list loads.
+    pub pack_cards: HashMap<ProfileId, pack_reset::PackCard>,
     /// Each profile's last `rwpm run` attempt, if any.
     pub last_runs: HashMap<ProfileId, LastRun>,
     /// First-run setup, while it is shown.
@@ -231,6 +234,7 @@ impl App {
             menu_open: false,
             game_running: false,
             mod_counts: HashMap::new(),
+            pack_cards: HashMap::new(),
             last_runs: HashMap::new(),
             setup: None,
             drill: None,
@@ -304,6 +308,11 @@ impl App {
                 let n = rwpm_core::mods::read_active_mods(&config).ok()?.len();
                 Some((p.id.clone(), n))
             })
+            .collect();
+        self.pack_cards = self
+            .profiles
+            .iter()
+            .filter_map(|p| Some((p.id.clone(), pack_reset::PackCard::of(p)?)))
             .collect();
         self.reload_last_runs();
     }
