@@ -144,6 +144,7 @@ fn the_modpack_docs_quote_the_shipped_labels_and_notices() {
         text::PACK_MANUAL,
         text::PACK_PRESENT,
         text::SHARE_MOD_SETTINGS,
+        text::SHARE_PICK,
         text::SHARE_COVER_CHOOSE,
         text::SHARE_PREVIEW,
         text::PACK_SECTION,

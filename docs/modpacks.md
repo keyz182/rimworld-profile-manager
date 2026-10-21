@@ -28,6 +28,16 @@ The app writes the file in the background. If something goes wrong, the app remo
 
 The mod list is always in. The app also records, for each mod, its Steam number, the time Steam last updated it and its version when the mod says one.
 
+#### Choose single items
+
+Under "Mod settings", and under the box for the things you made, choose "Choose which". A list opens with one box for each item. All items start ticked. Untick the items that you do not want to share.
+
+- Mod settings show one box for each settings file. If the file name has a Steam number that matches a mod in your list, the app shows the name of that mod first.
+- The things you made show under the name of their folder: Scenarios, Ideoligions, Xenotypes and Exported pawns.
+- The list shows only files that a modpack can hold.
+- If you untick every item of a box, the app unticks the box. Tick the box again to tick all items.
+- The size of the box changes to show what is ticked, for example "3 of 12".
+
 ### Description and cover
 
 The description can use Markdown. Choose "Preview" to see how it will look. Choose it again to go back to editing. The description can hold up to 2000 characters.
@@ -51,7 +61,7 @@ To add a cover, choose "Choose picture…". The picture must be a PNG or a JPEG.
 
 > Mod settings can hold private details, such as account logins. Only share settings you have checked.
 
-The box shows how many files it adds and how big they are. Untick the box if you are not sure.
+The box shows how many files it adds and how big they are. Untick the box if you are not sure. Or choose "Choose which" and share only the settings that you have checked.
 
 ### What the app leaves out
 
@@ -154,5 +164,6 @@ The app needs the kept pack file. If you removed it, the app says so.
 - The app opens only Steam pages. The "Open Steam page" button builds its address from a Steam number. A link in a description opens only if it is a Steam page. Any other link in a pack is text or does nothing.
 - A pack that is too big, or that holds anything it should not, is refused with a plain-words reason. Nothing is made.
 - Older versions of the app cannot open a pack that has a cover. A pack without a cover opens in all versions.
+- Older versions of the app cannot open a pack that shares only some of the mod settings or only some of the things you made. If you tick every item, the pack opens in all versions.
 - Older versions of the app cannot read the profile of a pack that you opened with this version. Keep to one version, or make a copy of the profile first.
 - macOS: the file does not open by double-click yet. Use "Open modpack…".
