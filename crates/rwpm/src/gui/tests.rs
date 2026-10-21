@@ -24,6 +24,7 @@ mod pack_reset;
 mod pack_steamcmd;
 mod pack_sync;
 mod picker;
+mod updates;
 
 /// A sandboxed app: fake Steam library with RimWorld and one workshop mod, settings
 /// pointing at it, and a fake `rwpm` that records how it was started.

@@ -64,7 +64,14 @@ impl App {
 
     fn header(&self) -> Element<'_, Message> {
         row![
-            text(t::TITLE).size(20).font(UI_BOLD),
+            row![
+                text(t::TITLE).size(20).font(UI_BOLD),
+                text(t::version(rwpm_core::VERSION))
+                    .size(13)
+                    .style(theme::muted)
+            ]
+            .spacing(8)
+            .align_y(Alignment::End),
             space::horizontal(),
             tip(
                 action(
@@ -90,6 +97,32 @@ impl App {
 
     fn banner(&self) -> Element<'_, Message> {
         let mut lines = Column::new().spacing(4);
+        if let Some(release) = self.announced_update() {
+            lines = lines.push(
+                row![
+                    icon(Icon::Refresh).style(theme::success),
+                    text(t::update_available(
+                        &release.version.to_string(),
+                        rwpm_core::VERSION
+                    ))
+                    .width(Length::Fill),
+                    action(
+                        Icon::Forward,
+                        t::RELEASE_PAGE,
+                        Some(Message::OpenRelease),
+                        theme::secondary
+                    ),
+                    action(
+                        Icon::Close,
+                        t::DISMISS,
+                        Some(Message::DismissUpdate),
+                        theme::ghost
+                    )
+                ]
+                .spacing(GAP)
+                .align_y(Alignment::Center),
+            );
+        }
         if let Err(e) = &self.game {
             lines = lines.push(
                 row![

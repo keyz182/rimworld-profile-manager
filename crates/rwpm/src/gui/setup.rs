@@ -8,9 +8,11 @@ use iced::widget::{button, center, column, container, row, space, text, text_inp
 use iced::{Alignment, Element, Length, Task};
 use rwpm_core::discovery::{self, GameInstall};
 use rwpm_core::profile::Mode;
+use rwpm_core::update_check::Frequency;
 
 use super::icon::{Icon, UI_BOLD, icon};
 use super::message::Message;
+use super::updates::frequency_pick;
 use super::{App, Notice, text as t, theme};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +30,8 @@ pub struct Setup {
     pub found: Result<GameInstall, String>,
     pub mode: Mode,
     pub name: String,
+    /// How often to check for a newer release. Off until the player picks.
+    pub updates: Frequency,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +42,7 @@ pub enum SetupMsg {
     Continue,
     Mode(Mode),
     Name(String),
+    Updates(Frequency),
     Create,
     Skip,
 }
@@ -50,6 +55,7 @@ impl Setup {
             found: found.clone(),
             mode: Mode::Live,
             name: t::FIRST_PROFILE_NAME.to_owned(),
+            updates: Frequency::Off,
         }
     }
 }
@@ -107,9 +113,10 @@ impl App {
             SetupMsg::Continue => {}
             SetupMsg::Mode(mode) => setup.mode = mode,
             SetupMsg::Name(name) => setup.name = name,
+            SetupMsg::Updates(frequency) => setup.updates = frequency,
             SetupMsg::Create if !setup.name.trim().is_empty() => return self.setup_create(),
             SetupMsg::Create => {}
-            SetupMsg::Skip => self.finish_setup(),
+            SetupMsg::Skip => return self.finish_setup(),
         }
         Task::none()
     }
@@ -141,7 +148,7 @@ impl App {
         };
         let (name, mode) = (setup.name.trim().to_owned(), setup.mode);
         let created = self.ctx.store().and_then(|s| s.create(&name));
-        self.finish_setup();
+        let check = self.finish_setup();
         match created {
             Ok(p) => {
                 self.reload();
@@ -154,16 +161,17 @@ impl App {
                     self.notice = Some(Notice::Info(t::created(&p.name)));
                 }
                 if mode == Mode::Offline {
-                    return self.update(Message::GoOffline);
+                    return Task::batch([check, self.update(Message::GoOffline)]);
                 }
             }
             Err(e) => self.notice = Some(Notice::Error(e.to_string())),
         }
-        Task::none()
+        check
     }
 
-    fn finish_setup(&mut self) {
-        self.setup = None;
+    /// Marks setup done and keeps the update choice; a check follows if that makes one due.
+    fn finish_setup(&mut self) -> Task<Message> {
+        let frequency = self.setup.take().map_or(Frequency::Off, |s| s.updates);
         let saved = self.ctx.settings().and_then(|mut s| {
             s.setup_done = true;
             s.save(&self.ctx.app_dir)
@@ -171,6 +179,7 @@ impl App {
         if let Err(e) = saved {
             self.notice = Some(Notice::Error(e.to_string()));
         }
+        self.set_update_frequency(frequency)
     }
 }
 
@@ -292,6 +301,12 @@ fn profile_step(setup: &Setup) -> Element<'_, Message> {
                 .on_input(|v| Message::Setup(SetupMsg::Name(v)))
                 .on_submit(Message::Setup(SetupMsg::Create))
                 .padding(8)
+        ]
+        .spacing(4),
+        column![
+            text(t::UPDATES_LABEL),
+            frequency_pick(setup.updates, |f| Message::Setup(SetupMsg::Updates(f))),
+            text(t::SETUP_UPDATES_ABOUT).size(13).style(theme::muted)
         ]
         .spacing(4),
         row![

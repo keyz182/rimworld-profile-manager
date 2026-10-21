@@ -179,6 +179,34 @@ fn the_modpack_docs_quote_the_shipped_labels_and_notices() {
     assert!(README.contains("docs/modpacks.md"));
 }
 
+/// The README's "Update check" section quotes the labels the app shows.
+#[test]
+fn the_readme_quotes_the_update_check_labels() {
+    for label in [
+        text::SETTINGS,
+        text::UPDATES_LABEL,
+        text::SAVE,
+        text::RELEASE_PAGE,
+        text::DISMISS,
+        text::CHECK_NOW,
+        "Daily",
+        "Weekly",
+        "Monthly",
+        "Off",
+    ] {
+        assert!(
+            README.contains(&quoted(label)),
+            "README.md does not quote {label:?}"
+        );
+    }
+    for frequency in rwpm_core::update_check::Frequency::ALL {
+        assert!(
+            ["Off", "Daily", "Weekly", "Monthly"].contains(&text::update_frequency(frequency)),
+            "{frequency:?}"
+        );
+    }
+}
+
 #[test]
 fn help_explains_modpacks_and_the_private_details_warning() {
     let (title, words) = text::HELP_SECTIONS[8];

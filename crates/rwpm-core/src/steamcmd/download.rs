@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use super::{Error, MAX_ARCHIVE_BYTES, SOURCE};
+use crate::http::HttpError;
 
 const TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -19,22 +20,8 @@ pub(super) fn fetch(
     cap: u64,
     timeout: Duration,
 ) -> Result<Vec<u8>, Error> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .https_only(https_only)
-        .timeout_global(Some(timeout))
-        .build()
-        .into();
-    let mut response = agent
-        .get(url)
-        .call()
-        .map_err(|e| Error::Download(e.to_string()))?;
-    response
-        .body_mut()
-        .with_config()
-        .limit(cap)
-        .read_to_vec()
-        .map_err(|e| match e {
-            ureq::Error::BodyExceedsLimit(_) => Error::TooBig,
-            other => Error::Download(other.to_string()),
-        })
+    crate::http::get(url, https_only, cap, timeout, &[]).map_err(|e| match e {
+        HttpError::TooBig => Error::TooBig,
+        HttpError::Failed(details) => Error::Download(details),
+    })
 }

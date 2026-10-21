@@ -55,16 +55,30 @@ pub fn open_path(path: &Path) -> std::io::Result<()> {
     open_with_system(path.as_os_str())
 }
 
-/// The only addresses the window opens by itself. They are Steam Workshop pages, built from
-/// a number; an address from someone else's file is shown as text and never opened.
+/// The only addresses the window opens by itself: Steam Workshop pages, built from a
+/// number, and this project's release pages. An address from someone else's file is shown
+/// as text and never opened.
 const STEAM_PAGES: &str = "https://steamcommunity.com/";
 
 /// Opens a Steam page in the system browser. Refuses any other address.
 pub fn open_url(url: &str) -> std::io::Result<()> {
-    if !url.starts_with(STEAM_PAGES) || url.chars().any(|c| c.is_control() || c.is_whitespace()) {
+    open_under(url, STEAM_PAGES, "only Steam pages are opened")
+}
+
+/// Opens one of this project's release pages. Refuses any other address, Steam's too.
+pub fn open_release(url: &str) -> std::io::Result<()> {
+    open_under(
+        url,
+        rwpm_core::update_check::RELEASES_PREFIX,
+        "only this project's release pages are opened",
+    )
+}
+
+fn open_under(url: &str, prefix: &str, refusal: &'static str) -> std::io::Result<()> {
+    if !url.starts_with(prefix) || url.chars().any(|c| c.is_control() || c.is_whitespace()) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "only Steam pages are opened",
+            refusal,
         ));
     }
     open_with_system(url.as_ref())

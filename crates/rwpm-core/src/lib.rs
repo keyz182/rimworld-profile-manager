@@ -11,6 +11,7 @@ pub mod error;
 pub mod fetch;
 pub mod flatpak;
 mod fs_copy;
+pub mod http;
 pub mod launch;
 pub mod modpack;
 pub mod mods;
@@ -20,6 +21,7 @@ pub mod rimsort;
 pub mod settings;
 pub mod space;
 pub mod steamcmd;
+pub mod update_check;
 pub mod winhttp;
 
 pub use error::ProfileError;

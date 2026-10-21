@@ -9,6 +9,7 @@ use rwpm_core::profile::guard::{self, GuardReport};
 use rwpm_core::profile::offline::{self, OfflinePlan};
 use rwpm_core::profile::relocate::{self, MovePlan};
 use rwpm_core::profile::{Mode, ProcessProbe, ProfileId};
+use rwpm_core::update_check::Frequency;
 use rwpm_core::{rimsort, space, winhttp};
 
 use super::message::{Ask, Dialog, Field, GuardChoice, Message, NameFor, Outcome};
@@ -274,6 +275,12 @@ impl App {
             | Message::RemovePackSubs => {
                 return self.pack_fetch_update(message);
             }
+            Message::UpdateTick
+            | Message::CheckUpdatesNow
+            | Message::UpdateChecked { .. }
+            | Message::SetUpdateFrequency(_)
+            | Message::OpenRelease
+            | Message::DismissUpdate => return self.updates_update(message),
             Message::DismissNotice => self.notice = None,
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,
@@ -457,8 +464,9 @@ impl App {
                 game,
                 steam,
                 move_to,
+                updates,
                 ..
-            }) => return self.save_settings(game, steam, move_to),
+            }) => return self.save_settings(game, steam, move_to, updates),
             Some(Dialog::ConfirmMove(plan)) => return self.apply_move(plan),
             Some(Dialog::ConfirmCapture(plan)) if !super::builds::fits(&plan) => {
                 // Enter must not start what the disabled button refuses.
@@ -877,10 +885,17 @@ impl App {
             game,
             steam: show(settings.steam_dir),
             move_to: String::new(),
+            updates: self.updates.frequency,
         });
     }
 
-    fn save_settings(&mut self, game: String, steam: String, move_to: String) -> Task<Message> {
+    fn save_settings(
+        &mut self,
+        game: String,
+        steam: String,
+        move_to: String,
+        updates: Frequency,
+    ) -> Task<Message> {
         let mut settings = match self.ctx.settings() {
             Ok(s) => s,
             Err(e) => return self.fail(e),
@@ -892,17 +907,20 @@ impl App {
             return self.fail(e);
         }
         self.reload();
+        // Turning checks on makes one due at once. A failed save of the schedule replaces
+        // "saved" with its own error.
         let Some(target) = path(&move_to) else {
             self.notice = Some(Notice::Info(t::SETTINGS_SAVED.into()));
-            return Task::none();
+            return self.set_update_frequency(updates);
         };
         let ctx = self.ctx.clone();
-        self.start(t::JOB_MEASURING.into(), 0, move |_| {
+        let measure = self.start(t::JOB_MEASURING.into(), 0, move |_| {
             let store = ctx.store().map_err(|e| e.to_string())?;
             relocate::plan_move(&store, &target)
                 .map(Outcome::MovePlanned)
                 .map_err(|e| e.to_string())
-        })
+        });
+        Task::batch([self.set_update_frequency(updates), measure])
     }
 
     fn apply_move(&mut self, plan: MovePlan) -> Task<Message> {

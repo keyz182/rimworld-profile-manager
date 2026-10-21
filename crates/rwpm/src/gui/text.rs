@@ -228,6 +228,46 @@ pub const LOG_COPIED: &str = "Log copied. Paste it into your message when you as
 pub const STEAM_COPIED: &str =
     "Copied. In Steam: RimWorld → Properties → Launch options, then paste.";
 pub const SETTINGS_SAVED: &str = "Settings saved.";
+
+// Update check.
+pub const UPDATES_LABEL: &str = "Check for updates";
+pub const UPDATES_ABOUT: &str = "Asks GitHub now and then whether a newer version is out. It never installs anything. While this is Off, nothing is sent.";
+pub const SETUP_UPDATES_ABOUT: &str =
+    "Optional. Asks GitHub whether a newer version is out. You can change this later in Settings.";
+pub const CHECK_NOW: &str = "Check now";
+pub const UP_TO_DATE: &str = "You have the latest version.";
+pub const RELEASE_PAGE: &str = "Release page";
+pub const DISMISS: &str = "Dismiss";
+
+pub fn version(version: &str) -> String {
+    format!("v{version}")
+}
+
+pub fn update_frequency(frequency: rwpm_core::update_check::Frequency) -> &'static str {
+    use rwpm_core::update_check::Frequency;
+    match frequency {
+        Frequency::Off => "Off",
+        Frequency::Daily => "Daily",
+        Frequency::Weekly => "Weekly",
+        Frequency::Monthly => "Monthly",
+    }
+}
+
+pub fn update_available(newest: &str, current: &str) -> String {
+    format!("Version {newest} is out. You have {current}.")
+}
+
+pub fn update_check_failed(reason: &str) -> String {
+    format!("Could not check for updates: {reason}")
+}
+
+pub fn updates_unreadable(reason: &str) -> String {
+    format!("The update settings could not be read, so checking is off: {reason}")
+}
+
+pub fn release_open_failed(reason: &str) -> String {
+    format!("Could not open the release page: {reason}")
+}
 pub const NO_GAME: &str = "RimWorld was not found. Choose its folder in Settings.";
 pub const NO_RIMSORT: &str = "RimSort's folder was not found.";
 pub const NO_RIMSORT_CONSENT: &str = "Permission to change RimSort's settings is missing.";
@@ -1483,6 +1523,7 @@ mod tests {
             ("modpack.rs", include_str!("modpack.rs")),
             ("modpack_open.rs", include_str!("modpack_open.rs")),
             ("pack_fetch.rs", include_str!("pack_fetch.rs")),
+            ("updates.rs", include_str!("updates.rs")),
         ] {
             assert_eq!(inline_words(src), [], "{file}");
         }

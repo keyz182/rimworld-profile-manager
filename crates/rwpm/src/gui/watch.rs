@@ -29,6 +29,24 @@ pub fn game_running() -> impl Stream<Item = Message> {
     rx
 }
 
+/// An open window re-asks the schedule hourly, so a window left open for days still checks.
+const UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// `Message::UpdateTick` every `UPDATE_EVERY`. The first one comes an hour after the window
+/// opens: start-up checks for itself.
+pub fn update_ticks() -> impl Stream<Item = Message> {
+    let (tx, rx) = mpsc::unbounded();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(UPDATE_EVERY);
+            if tx.unbounded_send(Message::UpdateTick).is_err() {
+                return; // The window closed.
+            }
+        }
+    });
+    rx
+}
+
 /// `Message::SyncTick` every `SYNC_EVERY`.
 pub fn sync_ticks() -> impl Stream<Item = Message> {
     let (tx, rx) = mpsc::unbounded();

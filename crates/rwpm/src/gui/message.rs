@@ -8,6 +8,7 @@ use rwpm_core::profile::ProfileId;
 use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
+use rwpm_core::update_check::{Frequency, Release};
 
 use super::modpack::{PickGroup, ShareCover, ShareDraft, ShareTick};
 use super::modpack_open::PackPreview;
@@ -155,6 +156,21 @@ pub enum Message {
     RemovePackSubs,
     /// The OK button beside a notice in the footer: the player has read it.
     DismissNotice,
+    /// Time to see whether a background update check is due.
+    UpdateTick,
+    /// Settings: "Check now". Asks GitHub whatever the frequency is.
+    CheckUpdatesNow,
+    /// An update check ended; `manual` when the player asked for it.
+    UpdateChecked {
+        manual: bool,
+        result: Result<Release, String>,
+    },
+    /// Settings: how often to check for updates.
+    SetUpdateFrequency(Frequency),
+    /// The update banner's "Release page".
+    OpenRelease,
+    /// The update banner's "Dismiss": hidden until a newer release comes out.
+    DismissUpdate,
 }
 
 /// Views that replace the detail pane, with ‹ Back.
@@ -247,6 +263,8 @@ pub enum Dialog {
         game_check: Option<Result<(), String>>,
         steam: String,
         move_to: String,
+        /// How often to check for a newer release; saved with the rest.
+        updates: Frequency,
     },
     ConfirmMove(MovePlan),
     /// Store (or update) a copy of the Steam install, after showing size and free space.

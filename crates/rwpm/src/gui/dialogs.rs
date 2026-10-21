@@ -10,11 +10,13 @@ use rwpm_core::builds::capture::{CaptureKind, CapturePlan};
 use rwpm_core::profile::guard::{Fix, GuardReport};
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
+use rwpm_core::update_check::Frequency;
 
 use super::backup::{Draft, GameFiles, Tick};
 use super::icon::UI_BOLD;
 use super::message::{Ask, Dialog, Field, GuardChoice, Message, NameFor};
 use super::modpack::{PickGroup, Picks, ShareDraft, ShareTick, creation_folder};
+use super::updates::frequency_pick;
 use super::{App, text as t, theme};
 
 const GAP: u32 = 10;
@@ -64,9 +66,18 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog) -> Element<'a, Message>
             game_check,
             steam,
             move_to,
+            updates,
         } => {
             let root = app.ctx.store().map(|s| s.root().display().to_string());
-            settings_dialog(game, game_check, steam, move_to, root.unwrap_or_default())
+            settings_dialog(SettingsForm {
+                game,
+                game_check,
+                steam,
+                move_to,
+                profiles_root: root.unwrap_or_default(),
+                updates: *updates,
+                checking: app.update_checking,
+            })
         }
         Dialog::ConfirmMove(plan) => move_dialog(plan),
         Dialog::ConfirmCapture(plan) => capture_dialog(plan),
@@ -267,13 +278,28 @@ fn guard_dialog(report: &GuardReport) -> Element<'_, Message> {
     .into()
 }
 
-fn settings_dialog<'a>(
+/// What the Settings dialog shows.
+struct SettingsForm<'a> {
     game: &'a str,
     game_check: &'a Option<Result<(), String>>,
     steam: &'a str,
     move_to: &'a str,
     profiles_root: String,
-) -> Element<'a, Message> {
+    updates: Frequency,
+    /// An update check is on its way.
+    checking: bool,
+}
+
+fn settings_dialog<'a>(form: SettingsForm<'a>) -> Element<'a, Message> {
+    let SettingsForm {
+        game,
+        game_check,
+        steam,
+        move_to,
+        profiles_root,
+        updates,
+        checking,
+    } = form;
     let field = |label: &'a str, hint: &'a str, value: &'a str, f: Field| {
         column![
             text(label),
@@ -320,6 +346,20 @@ fn settings_dialog<'a>(
             .size(13)
             .style(theme::muted),
         field(t::MOVE_TO, t::MOVE_TO_HINT, move_to, Field::MoveTo),
+        column![
+            text(t::UPDATES_LABEL).font(UI_BOLD),
+            row![
+                frequency_pick(updates, Message::SetUpdateFrequency),
+                button(text(t::CHECK_NOW))
+                    .padding([6, 12])
+                    .style(theme::secondary)
+                    .on_press_maybe((!checking).then_some(Message::CheckUpdatesNow))
+            ]
+            .spacing(GAP)
+            .align_y(Alignment::Center),
+            text(t::UPDATES_ABOUT).size(13).style(theme::muted)
+        ]
+        .spacing(4),
         buttons(t::SAVE, ok.then_some(Message::Confirm), false)
     ]
     .spacing(16)

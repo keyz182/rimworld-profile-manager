@@ -66,6 +66,16 @@ To use a modpack, choose "Open modpack…" under the profile list and pick the `
 
 Mod settings can hold private details, such as account logins. Only share settings you have checked. See [Modpacks](docs/modpacks.md) for the steps and the limits.
 
+## Update check
+
+The app can tell you when a new version is out. This is off until you turn it on. The app shows its own version next to the title.
+
+1. Choose "Settings". Pick "Daily", "Weekly" or "Monthly" under "Check for updates". Choose "Save".
+2. When a newer version is out, a line at the top says so. Choose "Release page" to open the download page in your browser. Choose "Dismiss" to hide the line until a newer version comes out.
+3. To check at once, choose "Check now" in "Settings".
+
+The check sends one request to GitHub. The request names this app and its version. GitHub also sees your internet address, as with any web request. The app sends nothing else about you or your computer. While the setting is "Off", the app sends nothing. The app does not download or install the update. You do that yourself.
+
 ## How it works
 
 - Each profile has its own save folder. The app starts RimWorld with `-savedatafolder` set to that folder.

@@ -23,6 +23,7 @@ mod support;
 pub(crate) mod text;
 mod theme;
 mod update;
+mod updates;
 mod view;
 mod watch;
 
@@ -34,6 +35,7 @@ use rwpm_core::discovery::GameInstall;
 use rwpm_core::paths::Layout;
 use rwpm_core::profile::{LastRun, OsTrash, Profile, ProfileId, ProfileStore};
 use rwpm_core::settings::AppSettings;
+use rwpm_core::update_check::{Release, UpdateState};
 use rwpm_core::{ProfileError, appimage, flatpak, paths};
 
 pub use message::Dialog;
@@ -216,6 +218,14 @@ pub struct App {
     pub builds: Option<builds::BuildsView>,
     /// Why the stored game versions could not be read, if they could not.
     pub builds_error: Option<String>,
+    /// How often to check for a newer release, and when that last happened.
+    pub updates: UpdateState,
+    /// How the window asks GitHub for the newest release; tests replace it.
+    pub update_check: updates::UpdateCheck,
+    /// The newest release the last check found.
+    pub update_found: Option<Release>,
+    /// A check is on its way; no second one starts.
+    pub update_checking: bool,
 }
 
 impl App {
@@ -248,8 +258,13 @@ impl App {
             other_profiles: None,
             builds: None,
             builds_error: None,
+            updates: UpdateState::default(),
+            update_check: updates::UpdateCheck::real(),
+            update_found: None,
+            update_checking: false,
         };
         app.reload();
+        app.load_updates();
         app.decide_setup();
         // The last played profile is ready to Play with one click.
         if let Some(id) = app.last_played() {
@@ -401,6 +416,7 @@ impl App {
             keys,
             iced::Subscription::run(watch::game_running),
             iced::Subscription::run(watch::sync_ticks),
+            iced::Subscription::run(watch::update_ticks),
         ])
     }
 }
@@ -441,12 +457,15 @@ pub fn run_with(open: Option<OpenFile>) -> iced::Result {
             }
         }
         let health = app.check_health();
+        // First-run setup comes first; a fresh install has checking off anyway.
+        let updates = app.check_updates_if_due();
         (
             app,
             iced::Task::batch([
                 iced::system::theme().map(message::Message::Theme),
                 health,
                 opened,
+                updates,
             ]),
         )
     };
