@@ -66,6 +66,10 @@ To use a modpack, choose "Open modpack…" under the profile list and pick the `
 
 Mod settings can hold private details, such as account logins. Only share settings you have checked. See [Modpacks](docs/modpacks.md) for the steps and the limits.
 
+## Use from an AI agent
+
+`rwpm mcp` runs an MCP server on standard input and output. An agent such as Claude Code can list profiles and their mods, check profile health, and make, copy and rename profiles. It cannot delete a profile, edit a mod list or start the game. See [MCP](docs/mcp.md) for the setup and the limits.
+
 ## Update check
 
 The app can tell you when a new version is out. This is off until you turn it on. The app shows its own version next to the title.
@@ -108,7 +112,7 @@ The release workflow also builds the AppImage (`scripts/appimage.sh`) and the Wi
 | Folder | What is in it |
 |---|---|
 | `crates/rwpm-core` | All the logic: profiles, freezing, launching, Steam and RimSort. |
-| `crates/rwpm` | The app (iced GUI) and the `rwpm run` launcher. |
+| `crates/rwpm` | The app (iced GUI), the `rwpm run` launcher and the `rwpm mcp` server. |
 | `payload` | The C# payloads that OFFLINE profiles load: the Doorstop payload (1.6) and the startup hook (1.7). |
 | `packaging`, `scripts` | Release bundles, installer and AppImage. |
 | `e2e` | End-to-end tests against the real game on Windows. |

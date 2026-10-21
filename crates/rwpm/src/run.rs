@@ -262,7 +262,7 @@ pub(crate) fn open_store() -> Result<ProfileStore<OsTrash>, RunError> {
 }
 
 /// The profile store and the settings it was found through.
-fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
+pub(crate) fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
     let app_dir =
         paths::app_data_dir().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
     let settings = AppSettings::load(&app_dir).map_err(|e| RunError::Failed(e.to_string()))?;

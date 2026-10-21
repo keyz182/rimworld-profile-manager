@@ -1,4 +1,5 @@
-//! `rwpm` front end. No arguments → GUI; `rwpm run <profile-id> -- <game exe> [args…]` → launch wrapper.
+//! `rwpm` front end. No arguments → GUI; `rwpm run <profile-id> -- <game exe> [args…]` → launch wrapper;
+//! `rwpm mcp` → MCP server on stdio.
 //!
 //! On Windows this is a GUI program, so double-clicking it opens no console window (one
 //! would also close the app when closed). `rwpm run` is started by Steam or RimSort and
@@ -7,6 +8,7 @@
 
 mod guard;
 mod gui;
+mod mcp;
 mod restart;
 mod run;
 
@@ -64,6 +66,7 @@ fn main() -> ExitCode {
         }
         // Full i32 exit code (Windows game codes do not fit ExitCode's u8).
         Some("run") => std::process::exit(run::main(&args[1..])),
+        Some("mcp") => std::process::exit(mcp::main()),
         Some(other) => {
             eprintln!("rwpm: unknown command `{other}`");
             ExitCode::from(EXIT_UNIMPLEMENTED)
