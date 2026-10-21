@@ -255,14 +255,11 @@ impl App {
         )
         .height(Length::Fill);
         let pane = container(
-            column![
-                heading,
-                facts,
-                self.play_row(),
-                rule::horizontal(1),
-                sections
-            ]
-            .spacing(14),
+            column![heading, facts, self.play_row()]
+                .push(self.sync_banner(p))
+                .push(rule::horizontal(1))
+                .push(sections)
+                .spacing(14),
         )
         .padding(20)
         .width(Length::Fill)

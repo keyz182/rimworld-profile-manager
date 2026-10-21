@@ -21,7 +21,7 @@ impl App {
         let recheck = matches!(message, Message::Done(_) | Message::GameRunning(_));
         let task = self.handle(message);
         if recheck || self.selected != before {
-            return Task::batch([task, self.check_health()]);
+            return Task::batch([task, self.check_health(), self.check_synced()]);
         }
         task
     }
@@ -257,6 +257,9 @@ impl App {
             | Message::ShareCoverPicked(_)
             | Message::ShareCoverClear
             | Message::SharePicked(..) => return self.modpack_update(message),
+            Message::SyncTick | Message::SyncChecked(..) | Message::DeclineOffline => {
+                return self.sync_update(message);
+            }
             Message::ResetPack | Message::ResetSaves(_) => return self.reset_update(message),
             Message::OpenPack
             | Message::OpenPackPicked(_)

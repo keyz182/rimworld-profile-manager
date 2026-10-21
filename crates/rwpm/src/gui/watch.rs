@@ -7,6 +7,8 @@ use iced::futures::channel::mpsc;
 use super::message::Message;
 
 const EVERY: std::time::Duration = std::time::Duration::from_secs(2);
+/// Steam fetches mods over minutes, so a slow look is enough.
+const SYNC_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// `Message::GameRunning` at start and whenever the answer changes.
 pub fn game_running() -> impl Stream<Item = Message> {
@@ -22,6 +24,20 @@ pub fn game_running() -> impl Stream<Item = Message> {
                 }
             }
             std::thread::sleep(EVERY);
+        }
+    });
+    rx
+}
+
+/// `Message::SyncTick` every `SYNC_EVERY`.
+pub fn sync_ticks() -> impl Stream<Item = Message> {
+    let (tx, rx) = mpsc::unbounded();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(SYNC_EVERY);
+            if tx.unbounded_send(Message::SyncTick).is_err() {
+                return; // The window closed.
+            }
         }
     });
     rx

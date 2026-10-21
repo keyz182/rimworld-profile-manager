@@ -916,6 +916,9 @@ pub fn pack_about(name: &str, mods: usize) -> String {
     format!("“{name}” lists {}.", count(mods, "mod", "mods"))
 }
 
+pub const PACK_SYNCED: &str = "Steam now has every mod of this pack. Take this profile offline, so that Steam updates cannot change it?";
+pub const PACK_SYNCED_GO: &str = "Take offline…";
+pub const PACK_SYNCED_LATER: &str = "Not now";
 pub const PACK_SECTION: &str = "From a modpack";
 pub const PACK_RESET: &str = "Reset to pack…";
 pub const RESET_TITLE: &str = "Reset to the pack";

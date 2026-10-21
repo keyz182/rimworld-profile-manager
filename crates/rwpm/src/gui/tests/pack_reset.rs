@@ -11,7 +11,7 @@ use super::pack_open::{entry, make_pack};
 use super::*;
 
 /// A profile restored from a pack that lists one mod; the app has it selected.
-fn pack_profile(sb: &Sandbox) -> (App, ProfileId) {
+pub(super) fn pack_profile(sb: &Sandbox) -> (App, ProfileId) {
     let pack = make_pack(sb, vec![entry("x.mod", "Some Mod", Some(123))], None, &[]);
     let store = sb.ctx().store().expect("store");
     let mut plan = modpack::plan_unpack(&pack, &store).expect("plan");

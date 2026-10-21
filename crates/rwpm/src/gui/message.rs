@@ -121,6 +121,12 @@ pub enum Message {
     ShareCoverPicked(Option<Result<Box<ShareCover>, String>>),
     /// Share dialog: drop the cover picture.
     ShareCoverClear,
+    /// Time to look again whether Steam has fetched a pack's mods.
+    SyncTick,
+    /// Whether Steam has fetched every mod of this profile's pack.
+    SyncChecked(ProfileId, bool),
+    /// "Not now" to taking a synced pack profile offline.
+    DeclineOffline,
     /// A pack profile's "Reset to pack…".
     ResetPack,
     /// Reset dialog: the box for the pack's saves.

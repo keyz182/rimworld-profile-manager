@@ -16,6 +16,7 @@ mod modpack_open;
 mod mods;
 mod pack_fetch;
 mod pack_reset;
+mod pack_sync;
 mod picker;
 mod setup;
 mod support;
@@ -194,6 +195,8 @@ pub struct App {
     pub game_running: bool,
     /// Turned-on mods per profile; absent when the mod list cannot be read.
     pub mod_counts: HashMap<ProfileId, usize>,
+    /// Pack profiles whose mods Steam has all fetched, as of the last look.
+    pub pack_synced: std::collections::HashSet<ProfileId>,
     /// What each pack profile shows of its pack, read when the list loads.
     pub pack_cards: HashMap<ProfileId, pack_reset::PackCard>,
     /// Each profile's last `rwpm run` attempt, if any.
@@ -235,6 +238,7 @@ impl App {
             game_running: false,
             mod_counts: HashMap::new(),
             pack_cards: HashMap::new(),
+            pack_synced: std::collections::HashSet::new(),
             last_runs: HashMap::new(),
             setup: None,
             drill: None,
@@ -396,6 +400,7 @@ impl App {
             iced::system::theme_changes().map(message::Message::Theme),
             keys,
             iced::Subscription::run(watch::game_running),
+            iced::Subscription::run(watch::sync_ticks),
         ])
     }
 }
