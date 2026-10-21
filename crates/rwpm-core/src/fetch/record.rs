@@ -56,6 +56,23 @@ fn write(profile_dir: &Path, ids: &BTreeSet<u64>) -> Result<(), ProfileError> {
     std::fs::rename(&tmp, &path).map_err(ProfileError::io("save", &path))
 }
 
+/// Has Steam finished with every mod this profile's modpack subscribed the player to?
+/// `None` when nothing was recorded, so there is nothing to wait for. Steam downloads in
+/// its own time after a subscribe: an item counts once it is installed, not behind the
+/// version Steam knows is latest, and its folder is there.
+pub fn all_synced(profile_dir: &Path, workshop_dir: &Path) -> Option<bool> {
+    let ids = read(profile_dir);
+    if ids.is_empty() {
+        return None;
+    }
+    let manifest = crate::builds::acf::workshop_manifest_path(workshop_dir)?;
+    let done = crate::builds::acf::read_workshop_synced(&manifest);
+    Some(
+        ids.iter()
+            .all(|id| done.contains(id) && workshop_dir.join(id.to_string()).is_dir()),
+    )
+}
+
 /// Adds `ids` to the record.
 pub fn add(profile_dir: &Path, ids: &[u64]) -> Result<(), ProfileError> {
     let mut all: BTreeSet<u64> = read(profile_dir).into_iter().collect();
@@ -107,5 +124,47 @@ mod tests {
             std::fs::write(&path, text).expect("write");
             assert!(read(tmp.path()).is_empty(), "{text:?}");
         }
+    }
+
+    fn steam(tmp: &Path, installed: &[u64]) -> std::path::PathBuf {
+        let workshop = tmp.join("steamapps/workshop/content/294100");
+        std::fs::create_dir_all(&workshop).expect("workshop");
+        let items: String = installed
+            .iter()
+            .map(|i| format!("\"{i}\"\n{{\n\"manifest\"\"m\"\n}}\n"))
+            .collect();
+        std::fs::write(
+            tmp.join("steamapps/workshop/appworkshop_294100.acf"),
+            format!("\"AppWorkshop\"\n{{\n\"WorkshopItemsInstalled\"\n{{\n{items}}}\n}}\n"),
+        )
+        .expect("acf");
+        workshop
+    }
+
+    #[test]
+    fn a_pack_is_synced_when_steam_has_every_recorded_mod() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let profile = tmp.path().join("profile");
+        std::fs::create_dir_all(&profile).expect("dir");
+        let workshop = steam(tmp.path(), &[10, 20]);
+        assert_eq!(all_synced(&profile, &workshop), None, "nothing recorded");
+
+        add(&profile, &[10, 20]).expect("add");
+        assert_eq!(
+            all_synced(&profile, &workshop),
+            Some(false),
+            "installed, but the folders are not there yet"
+        );
+        std::fs::create_dir_all(workshop.join("10")).expect("mod 10");
+        std::fs::create_dir_all(workshop.join("20")).expect("mod 20");
+        assert_eq!(all_synced(&profile, &workshop), Some(true));
+
+        add(&profile, &[30]).expect("add");
+        std::fs::create_dir_all(workshop.join("30")).expect("mod 30");
+        assert_eq!(
+            all_synced(&profile, &workshop),
+            Some(false),
+            "a folder without an installed record is still downloading"
+        );
     }
 }

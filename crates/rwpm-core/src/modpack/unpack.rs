@@ -254,6 +254,7 @@ impl Job<'_> {
             description: manifest.description.clone(),
             has_cover: self.cover,
             imported_at: now_datetime(),
+            declined_offline: false,
         });
         file.write_atomic(&self.dir.join(PROFILE_FILE))
     }

@@ -79,3 +79,27 @@ fn a_copy_of_a_pack_profile_is_its_own_profile() {
     let file = ProfileFile::read(&dir.join(PROFILE_FILE)).expect("profile.toml");
     assert_eq!(file.schema, 1, "no pack origin, so older builds can read it");
 }
+
+#[test]
+fn not_now_is_remembered_and_costs_a_plain_profile_nothing() {
+    let fx = fixture();
+    let restored = fx.unpack(&packed(&fx, false)).expect("unpack");
+    assert!(!restored.profile.pack.as_ref().expect("origin").declined_offline);
+    let dir = restored.profile.save_data_dir();
+    let path = dir.parent().expect("profile dir").join(PROFILE_FILE);
+    let before = std::fs::read_to_string(&path).expect("read");
+    assert!(!before.contains("declined_offline"), "not written until set");
+
+    let declined = fx
+        .target
+        .decline_offline_prompt(&restored.profile.id)
+        .expect("decline");
+    assert!(declined.pack.expect("origin").declined_offline);
+    let file = ProfileFile::read(&path).expect("profile.toml");
+    assert_eq!(file.schema, 3);
+    assert!(file.pack.expect("origin").declined_offline);
+
+    let plain = fx.target.create("Plain").expect("create");
+    let after = fx.target.decline_offline_prompt(&plain.id).expect("decline");
+    assert!(after.pack.is_none());
+}

@@ -308,6 +308,23 @@ impl<T: Trash> ProfileStore<T> {
         Ok(Self::profile(id.clone(), dir, file))
     }
 
+    /// Records that the player does not want to be asked again whether to take this pack
+    /// profile offline.
+    pub fn decline_offline_prompt(&self, id: &ProfileId) -> Result<Profile, ProfileError> {
+        let dir = self
+            .get(id)?
+            .stored_dir()
+            .map(Path::to_path_buf)
+            .ok_or(ProfileError::DefaultImmutable("changed"))?;
+        let path = dir.join(FILE_NAME);
+        let mut file = ProfileFile::read(&path)?;
+        if let Some(pack) = &mut file.pack {
+            pack.declined_offline = true;
+            file.write_atomic(&path)?;
+        }
+        Ok(Self::profile(id.clone(), dir, file))
+    }
+
     /// Pins the profile to a stored game build, or clears the pin with `None`.
     /// `key` must be a build key; anything else is refused before the file is touched.
     /// Default cannot be pinned — it has no `profile.toml` to hold the key, and it

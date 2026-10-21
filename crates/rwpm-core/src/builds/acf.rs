@@ -12,7 +12,7 @@
 //! installed bits, so `MountedConfig` wins; `UserConfig` is the fallback. Those two differ
 //! between a branch switch and the download that follows it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::error::ProfileError;
@@ -124,8 +124,10 @@ pub fn read_workshop_times(path: &Path) -> BTreeMap<u64, u64> {
         .unwrap_or_default()
 }
 
-fn parse_workshop_times(text: &str) -> BTreeMap<u64, u64> {
-    let mut times = BTreeMap::new();
+/// One `"key" "value"` line three levels down: `(block, item id, key, value)`, the block
+/// and key lower case. Both Workshop readers walk the file once through this.
+fn workshop_lines(text: &str) -> Vec<(String, String, String, String)> {
+    let mut lines = Vec::new();
     let mut block: Vec<String> = Vec::new();
     let mut pending: Option<String> = None;
     for line in text.lines() {
@@ -139,20 +141,65 @@ fn parse_workshop_times(text: &str) -> BTreeMap<u64, u64> {
                 let Some(key) = tokens.next() else { continue };
                 match (tokens.next(), block.as_slice()) {
                     (None, _) => pending = Some(key.to_ascii_lowercase()),
-                    (Some(value), [_, installed, item])
-                        if installed == "workshopitemsinstalled"
-                            && key.eq_ignore_ascii_case("timeupdated") =>
-                    {
-                        if let (Ok(item), Ok(value)) = (item.parse(), value.parse()) {
-                            times.insert(item, value);
-                        }
+                    (Some(value), [_, group, item]) => {
+                        lines.push((group.clone(), item.clone(), key.to_ascii_lowercase(), value));
                     }
                     _ => {}
                 }
             }
         }
     }
+    lines
+}
+
+fn parse_workshop_times(text: &str) -> BTreeMap<u64, u64> {
+    let mut times = BTreeMap::new();
+    for (group, item, key, value) in workshop_lines(text) {
+        if group == "workshopitemsinstalled"
+            && key == "timeupdated"
+            && let (Ok(item), Ok(value)) = (item.parse(), value.parse())
+        {
+            times.insert(item, value);
+        }
+    }
     times
+}
+
+/// The Workshop items Steam has finished with: installed, and not behind the version it
+/// knows is latest. An item that is being downloaded or updated is not in this set.
+/// A missing or unreadable file reads as empty.
+pub fn read_workshop_synced(path: &Path) -> BTreeSet<u64> {
+    std::fs::read_to_string(path)
+        .map(|text| parse_workshop_synced(&text))
+        .unwrap_or_default()
+}
+
+fn parse_workshop_synced(text: &str) -> BTreeSet<u64> {
+    let mut installed = BTreeSet::new();
+    let mut manifest: BTreeMap<u64, String> = BTreeMap::new();
+    let mut latest: BTreeMap<u64, String> = BTreeMap::new();
+    for (group, item, key, value) in workshop_lines(text) {
+        let Ok(id) = item.parse::<u64>() else { continue };
+        match (group.as_str(), key.as_str()) {
+            ("workshopitemsinstalled", "timeupdated" | "manifest") => {
+                installed.insert(id);
+            }
+            ("workshopitemdetails", "manifest") => {
+                manifest.insert(id, value);
+            }
+            ("workshopitemdetails", "latest_manifest") => {
+                latest.insert(id, value);
+            }
+            _ => {}
+        }
+    }
+    installed
+        .into_iter()
+        .filter(|id| match (manifest.get(id), latest.get(id)) {
+            (Some(now), Some(newest)) => now == newest,
+            _ => true,
+        })
+        .collect()
 }
 
 /// The double-quoted tokens of one line, unescaped only for `\"` and `\\`.
@@ -200,6 +247,29 @@ mod tests {
         assert_eq!(times[&717_575_199], 1_785_962_405);
         assert_eq!(times[&730_936_602], 1_786_739_756);
         assert!(!times.contains_key(&999), "details block is not installed");
+    }
+
+    /// Item 1 is done; 2 is installed but Steam knows a newer manifest; 3 has details only
+    /// (still downloading); 4 is installed with no details at all.
+    const SYNC: &str = "\"AppWorkshop\"\n{\n\t\"WorkshopItemsInstalled\"\n\t{\n\
+        \t\t\"1\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"a\"\n\t\t}\n\
+        \t\t\"2\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"b\"\n\t\t}\n\
+        \t\t\"4\"\n\t\t{\n\t\t\t\"timeupdated\"\t\t\"5\"\n\t\t}\n\t}\n\
+        \t\"WorkshopItemDetails\"\n\t{\n\
+        \t\t\"1\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"a\"\n\t\t\t\"latest_manifest\"\t\t\"a\"\n\t\t}\n\
+        \t\t\"2\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"b\"\n\t\t\t\"latest_manifest\"\t\t\"c\"\n\t\t}\n\
+        \t\t\"3\"\n\t\t{\n\t\t\t\"manifest\"\t\t\"0\"\n\t\t\t\"latest_manifest\"\t\t\"d\"\n\t\t}\n\t}\n}\n";
+
+    #[test]
+    fn an_item_is_synced_when_installed_and_not_behind_the_latest() {
+        let done = parse_workshop_synced(SYNC);
+        assert_eq!(done.into_iter().collect::<Vec<_>>(), [1, 4]);
+    }
+
+    #[test]
+    fn synced_survives_junk_and_a_missing_file() {
+        assert!(parse_workshop_synced("not a manifest").is_empty());
+        assert!(read_workshop_synced(Path::new("/nonexistent/appworkshop.acf")).is_empty());
     }
 
     #[test]

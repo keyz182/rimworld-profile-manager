@@ -55,6 +55,9 @@ pub struct PackOrigin {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub has_cover: bool,
     pub imported_at: toml::value::Datetime,
+    /// The player answered "Not now" to "take this offline?", so it is not asked again.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub declined_offline: bool,
 }
 
 impl PackOrigin {
@@ -200,6 +203,7 @@ mod tests {
             description: "# Hard mode\n\n- no saves\n- no mercy".into(),
             has_cover: true,
             imported_at: "2026-10-21T12:00:00Z".parse().expect("datetime"),
+            declined_offline: false,
         }
     }
 
