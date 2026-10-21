@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.17.0](https://github.com/keyz182/rimworld-profile-manager/compare/5d7c8c5fd62eea952bb3d513c138e5840fb2e01e..v1.17.0) - 2026-10-21
+#### Features
+- add rwpm --help - ([b69e846](https://github.com/keyz182/rimworld-profile-manager/commit/b69e846b271483f1e2ef43058b312221b7c30b97)) - [@keyz182](https://github.com/keyz182)
+#### Bug Fixes
+- let the scroll area of a dialog fill its width - ([8811eb0](https://github.com/keyz182/rimworld-profile-manager/commit/8811eb0bb1f6c209912bcf1666753a6c20d53b3d)) - [@keyz182](https://github.com/keyz182)
+#### Continuous Integration
+- stop a hand-run publish from using the build caches - ([5d7c8c5](https://github.com/keyz182/rimworld-profile-manager/commit/5d7c8c5fd62eea952bb3d513c138e5840fb2e01e)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.16.0](https://github.com/keyz182/rimworld-profile-manager/compare/d57fd49912fcfe4be5937f7815af5b17572140d9..v1.16.0) - 2026-10-21
 #### Features
 - add deb and rpm packages to the release - ([1c87994](https://github.com/keyz182/rimworld-profile-manager/commit/1c8799405e5257fd7d07c5e86cfc4bd4079b9cf4)) - [@keyz182](https://github.com/keyz182)
