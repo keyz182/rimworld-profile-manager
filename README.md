@@ -56,7 +56,7 @@ A backup holds other people's mods. Check each mod's licence or ask its author b
 
 ## Modpacks
 
-A modpack is a small file that names the mods of a profile, in load order. The file name ends in `.rimpack`. It holds no mods and no game files. Use it to share a setup.
+A modpack is a small file that names the mods of a profile, in load order. The file name ends in `.rimpack`. It holds no mods and no game files. Use it to share a setup. A pack can have a cover picture and a description in Markdown, and a profile made from a pack can be reset to it.
 
 1. Select a profile. Choose "⋯", then "Share as modpack…".
 2. Tick what goes in: mod settings, your own scenarios and similar, game settings and saves. The mod list is always in.

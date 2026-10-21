@@ -144,6 +144,14 @@ fn the_modpack_docs_quote_the_shipped_labels_and_notices() {
         text::PACK_MANUAL,
         text::PACK_PRESENT,
         text::SHARE_MOD_SETTINGS,
+        text::SHARE_COVER_CHOOSE,
+        text::SHARE_PREVIEW,
+        text::PACK_SECTION,
+        text::PACK_RESET,
+        text::RESET_SAVES,
+        text::RESET_IT,
+        text::PACK_SYNCED_GO,
+        text::PACK_SYNCED_LATER,
     ] {
         assert!(
             MODPACKS.contains(&quoted(label)),
@@ -154,6 +162,7 @@ fn the_modpack_docs_quote_the_shipped_labels_and_notices() {
         text::SHARE_NOTICE,
         text::SHARE_SETTINGS_NOTICE,
         text::PACK_HINT,
+        text::PACK_SYNCED,
     ] {
         assert!(
             MODPACKS.contains(&format!("> {notice}")),
