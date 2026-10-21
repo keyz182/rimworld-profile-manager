@@ -288,7 +288,8 @@ pub fn pack_dialog(preview: &PackPreview, dark: bool, room: Room) -> Element<'_,
             .padding(8)
             .on_input(|v| Message::Input(Field::Name, v))
             .on_submit(Message::Confirm),
-        container(scrollable(details.padding(gutter()))).max_height(DETAILS_HEIGHT + room.grow),
+        container(scrollable(details.width(Length::Fill).padding(gutter())).width(Length::Fill))
+            .max_height(DETAILS_HEIGHT + room.grow),
         text(t::SHARE_NOTICE).size(13),
         offline_choice(preview),
         pack_buttons(preview, ok),

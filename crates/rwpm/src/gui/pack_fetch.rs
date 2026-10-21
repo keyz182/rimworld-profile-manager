@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use iced::widget::{Column, column, container, scrollable, text};
-use iced::{Element, Task};
+use iced::{Element, Length, Task};
 use rwpm_core::ProfileError;
 use rwpm_core::consent::{Consent, ConsentStore, Scope};
 use rwpm_core::discovery::GameInstall;
@@ -553,7 +553,8 @@ pub fn confirm_subscribe_dialog(preview: &PackPreview, room: Room) -> Element<'_
     column![
         heading(title),
         text(about),
-        container(scrollable(names.padding(gutter()))).max_height(NAMES_HEIGHT + room.grow),
+        container(scrollable(names.width(Length::Fill).padding(gutter())).width(Length::Fill))
+            .max_height(NAMES_HEIGHT + room.grow),
         text(t::SUBSCRIBE_TRUST)
             .size(13)
             .font(UI_BOLD)

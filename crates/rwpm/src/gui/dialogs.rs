@@ -161,7 +161,10 @@ fn help_list_height(window_height: f32) -> f32 {
 /// the smallest window. The list takes only as much height as its text needs, up to
 /// what the window leaves. The sections once filled 600 px on their own.
 fn help_dialog(list_height: f32) -> Element<'static, Message> {
-    let mut sections = Column::new().spacing(12).padding(gutter());
+    let mut sections = Column::new()
+        .spacing(12)
+        .width(Length::Fill)
+        .padding(gutter());
     for (title, words) in t::HELP_SECTIONS {
         sections =
             sections.push(column![text(title).font(UI_BOLD), text(words).size(14)].spacing(2));
@@ -169,7 +172,7 @@ fn help_dialog(list_height: f32) -> Element<'static, Message> {
     let sections = sections.push(text(t::ICON_CREDIT).size(12).style(theme::muted));
     column![
         heading(t::HELP_TITLE),
-        container(scrollable(sections)).max_height(list_height),
+        container(scrollable(sections).width(Length::Fill)).max_height(list_height),
         row![
             space::horizontal(),
             button(t::OK)
@@ -584,9 +587,14 @@ fn share_dialog(draft: &ShareDraft, dark: bool, room: Room) -> Element<'_, Messa
     // The title and the buttons stay on screen; the form scrolls.
     column![
         heading(t::SHARE_TITLE),
-        container(scrollable(
-            body.push(text(t::SHARE_NOTICE).size(13)).padding(gutter())
-        ))
+        container(
+            scrollable(
+                body.push(text(t::SHARE_NOTICE).size(13))
+                    .width(Length::Fill)
+                    .padding(gutter())
+            )
+            .width(Length::Fill)
+        )
         .max_height(SHARE_FORM_HEIGHT + room.grow),
         buttons(
             t::SHARE_IT,
