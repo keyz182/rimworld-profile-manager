@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.14.0](https://github.com/keyz182/rimworld-profile-manager/compare/beb2d97e40cb5b613b9ff376bfe6520861cb3c9b..v1.14.0) - 2026-10-21
+#### Features
+- choose single mod settings and creations when sharing a pack - ([133346d](https://github.com/keyz182/rimworld-profile-manager/commit/133346da188f4848c125b3400c456c4feacdeb9e)) - [@keyz182](https://github.com/keyz182)
+- let a pack list single mod settings and creations (schema 3) - ([beb2d97](https://github.com/keyz182/rimworld-profile-manager/commit/beb2d97e40cb5b613b9ff376bfe6520861cb3c9b)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- describe choosing single mod settings and creations - ([3872371](https://github.com/keyz182/rimworld-profile-manager/commit/3872371a1fd790a8d2689986901ede4171901eff)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.13.0](https://github.com/keyz182/rimworld-profile-manager/compare/b6dc8dd0b6591c19d52fe141617cd7004a059f73..v1.13.0) - 2026-10-21
 #### Features
 - offer to take a pack profile offline once Steam has its mods - ([62eea2c](https://github.com/keyz182/rimworld-profile-manager/commit/62eea2cee7b07c31b52e9efa0da8595dcad6fc07)) - [@keyz182](https://github.com/keyz182)
