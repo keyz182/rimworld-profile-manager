@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T18: Windows e2e on the VM, driven from Linux. Packages the Windows bundle, ships it with
+# Windows e2e on the VM, driven from Linux. Packages the Windows bundle, ships it with
 # the probe mod and scripts, runs e2e.ps1, fetches logs, then always cleans up.
 # usage: remote.sh <scenario|all>
 # exit: e2e.ps1's code (0 pass, 1 fail, 2 inconclusive)

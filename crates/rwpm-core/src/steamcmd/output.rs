@@ -1,4 +1,4 @@
-//! Reading what steamcmd prints (R52). Its output is coloured with ANSI codes, and there is
+//! Reading what steamcmd prints. Its output is coloured with ANSI codes, and there is
 //! no line break between one item's result and the next, so results are found by their
 //! wording in a growing buffer, not by lines. The exit code is not used: it was 0, 7 and 0 on
 //! three systems that all downloaded the same mods.

@@ -1,4 +1,4 @@
-//! V55: every consumer of a profile's game follows its pin. One world per test: Steam
+//! Every consumer of a profile's game follows its pin. One world per test: Steam
 //! on one version with `live.local` in its `Mods`, a stored build of another version
 //! with `build.local` in its `Mods`, and the workshop item `steam.only` shared by both.
 
@@ -91,7 +91,7 @@ impl World {
 }
 
 #[test]
-fn v55_go_offline_copies_local_mods_from_the_pinned_build() {
+fn go_offline_copies_local_mods_from_the_pinned_build() {
     let w = World::new();
     let p = w.profile(Mode::Live, true);
     let plan = plan_offline(&w.store(), &p.id, &w.game(&p), false).expect("plan");
@@ -108,7 +108,7 @@ fn v55_go_offline_copies_local_mods_from_the_pinned_build() {
 }
 
 #[test]
-fn v55_go_offline_unpinned_still_uses_the_steam_install() {
+fn go_offline_unpinned_still_uses_the_steam_install() {
     let w = World::new();
     let p = w.profile(Mode::Live, false);
     let plan = plan_offline(&w.store(), &p.id, &w.game(&p), true).expect("plan");
@@ -117,7 +117,7 @@ fn v55_go_offline_unpinned_still_uses_the_steam_install() {
 }
 
 #[test]
-fn v55_mod_list_reads_the_pinned_build() {
+fn mod_list_reads_the_pinned_build() {
     let w = World::new();
     let p = w.profile(Mode::Live, true);
     let rows = mod_list(&p, &w.game(&p)).expect("rows");
@@ -135,7 +135,7 @@ fn v55_mod_list_reads_the_pinned_build() {
 }
 
 #[test]
-fn v55_guard_offers_copies_from_the_pinned_build() {
+fn guard_offers_copies_from_the_pinned_build() {
     let w = World::new();
     let p = w.profile(Mode::Offline, true);
     let report = check_offline(&w.store(), &p.id, &w.game(&p)).expect("report");
@@ -154,7 +154,7 @@ fn v55_guard_offers_copies_from_the_pinned_build() {
 }
 
 #[test]
-fn v55_health_checks_the_loader_in_the_pinned_build() {
+fn health_checks_the_loader_in_the_pinned_build() {
     let w = World::new();
     let app = w.path("app");
     let p = w.profile(Mode::Offline, true);
@@ -183,7 +183,7 @@ fn v55_health_checks_the_loader_in_the_pinned_build() {
 }
 
 #[test]
-fn v55_missing_build_is_the_one_health_problem() {
+fn missing_build_is_the_one_health_problem() {
     let w = World::new();
     let p = w.profile(Mode::Offline, true);
     w.games.lose_build();
@@ -201,10 +201,10 @@ fn v55_missing_build_is_the_one_health_problem() {
     );
 }
 
-/// Review F1: a pinned build that is there but cannot be read, or a build store that
+/// A pinned build that is there but cannot be read, or a build store that
 /// cannot be opened, is also the build-missing problem — never silence.
 #[test]
-fn v55_unreadable_build_or_store_is_the_build_missing_problem() {
+fn unreadable_build_or_store_is_the_build_missing_problem() {
     let w = World::new();
     let p = w.profile(Mode::Offline, true);
     let key = w.games.build_key.to_string();
@@ -225,9 +225,9 @@ fn v55_unreadable_build_or_store_is_the_build_missing_problem() {
     assert_eq!(check(), [Problem::BuildMissing(key)]);
 }
 
-/// Review F4: an invalid key resolves to `BuildNotFound`, so health reports it as missing.
+/// An invalid key resolves to `BuildNotFound`, so health reports it as missing.
 #[test]
-fn v55_invalid_build_key_is_the_build_missing_problem() {
+fn invalid_build_key_is_the_build_missing_problem() {
     let w = World::new();
     let p = Profile {
         game_build: Some("Not A Key!".into()),

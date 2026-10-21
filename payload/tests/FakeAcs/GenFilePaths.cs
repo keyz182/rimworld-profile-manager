@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Verse
 {
-    // Same shape as the game (R38): a private static, null until first read, filled in by
+    // Same shape as the game: a private static, null until first read, filled in by
     // the getter. No initialiser and no static constructor, so a value set before first
     // use is the one the game sees.
     public static class GenFilePaths

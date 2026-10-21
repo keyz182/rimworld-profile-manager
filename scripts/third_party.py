@@ -16,7 +16,7 @@ import pathlib
 import shutil
 import sys
 
-# T83e: both programs in a bundle. rwpm-steam is the Steam helper.
+# Both programs in a bundle. rwpm-steam is the Steam helper.
 SHIPPED_BINARIES = ("rwpm", "rwpm-steam")
 LICENCE_PREFIXES = ("license", "licence", "copying", "notice", "unlicense")
 LICENCE_DIRS = ("licenses", "licences", "license")
@@ -32,7 +32,7 @@ FROM_REPO = {
     "profiling": "aclysma_profiling",
     "spirv": "gfx-rs_rspirv",
     "svg_fmt": "nical_rust_debug",
-    # Published without a licence file; the same repository as `steamworks` (T83e).
+    # Published without a licence file; the same repository as `steamworks`.
     "steamworks-sys": "Noxime_steamworks-rs",
     "winapi-x86_64-pc-windows-gnu": "retep998_winapi-rs",
     **{
@@ -51,7 +51,7 @@ FROM_REPO = {
             "winit",
         )
     },
-    # macOS-only transitive deps (T46), pulled in by iced's Cocoa backend (winit/wgpu).
+    # macOS-only transitive deps, pulled in by iced's Cocoa backend (winit/wgpu).
     "block": "SSheldon_rust-block",
     "dispatch": "SSheldon_rust-dispatch",
     "malloc_buf": "SSheldon_malloc_buf",

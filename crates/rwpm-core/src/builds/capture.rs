@@ -1,11 +1,11 @@
 //! Capturing a Steam install as a stored build, and updating one that is already stored.
 //!
-//! The flow follows the proven T50 spike (`spike/linux-builds/capture.sh`): read the
+//! The flow follows the proven Linux spike (`spike/linux-builds/capture.sh`): read the
 //! version and the Steam app manifest, refuse unless the install is complete, clone into a
 //! staging folder, drop the files that are Steam's rather than the game's, then rename the
 //! staging folder into place.
 //!
-//! An update (V60) is the same capture into a staging folder *beside* the build, with the
+//! An update is the same capture into a staging folder *beside* the build, with the
 //! old build's `Mods/` carried over, verified, and only then swapped in. Until the swap the
 //! old build is whole and launchable; a failure at any earlier point leaves it untouched.
 //!
@@ -27,10 +27,10 @@ use crate::profile::lock::take_run_lock;
 use crate::profile::running::RunningProbe;
 use crate::space;
 
-/// Why a stored build is being offered as an update rather than skipped (V63, §C).
+/// Why a stored build is being offered as an update rather than skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateReason {
-    /// Same `Version.txt`, different `buildid`: a hotfix (B8).
+    /// Same `Version.txt`, different `buildid`: a hotfix.
     NewBuildId,
     /// The player installed or removed an expansion.
     DlcChanged,
@@ -42,9 +42,9 @@ pub enum UpdateReason {
 pub enum CaptureKind {
     /// Nothing stored under this key or this `buildid`.
     New,
-    /// This exact build is already stored, possibly under another key (V53).
+    /// This exact build is already stored, possibly under another key.
     NoOp { stored: BuildKey },
-    /// The key is taken by an older build of the same version (V60).
+    /// The key is taken by an older build of the same version.
     Update {
         reason: UpdateReason,
         old: Box<BuildFile>,
@@ -64,14 +64,14 @@ pub struct CapturePlan {
     pub beta_source: BetaSource,
     pub dlc: Vec<String>,
     pub source_dir: PathBuf,
-    /// `Mods/` relative to the game dir: inside the bundle on macOS (R29).
+    /// `Mods/` relative to the game dir: inside the bundle on macOS.
     mods_rel: PathBuf,
     manifest: PathBuf,
     /// Bytes the copy will add. Reflink copies usually cost far less; this is the
     /// worst case, which is what a free-space check has to assume.
     pub bytes: u64,
     /// Bytes the store holds while an update runs: the new copy and the old build, which
-    /// is kept until the swap so a failure leaves it launchable (V60).
+    /// is kept until the swap so a failure leaves it launchable.
     pub peak_bytes: u64,
     pub free_bytes: Option<u64>,
 }
@@ -85,8 +85,8 @@ impl CapturePlan {
 /// Files that belong to Steam or to a crash, not to the game.
 ///
 /// Matched on the file name at any depth: Steam writes `steam_appid.txt` at the install
-/// root, beside the macOS bundle, and inside `RimWorldMac.app/Contents/MacOS/` (T52). V52
-/// needs the capture to run on the `SteamAppId` env var alone.
+/// root, beside the macOS bundle, and inside `RimWorldMac.app/Contents/MacOS/`. The
+/// capture must run on the `SteamAppId` env var alone.
 fn skip(rel: &Path) -> bool {
     let name = rel.file_name().and_then(|n| n.to_str()).unwrap_or_default();
     name == "steam_appid.txt"
@@ -106,7 +106,7 @@ pub fn plan_capture(
     let key = BuildKey::from_version(&version)?;
     let manifest = manifest_path(install)?;
     let app = acf::read(&manifest)?;
-    // V58: 4 exactly. Anything else means Steam has not finished with the folder.
+    // 4 exactly. Anything else means Steam has not finished with the folder.
     if !app.fully_installed() {
         return Err(ProfileError::SourceChanging("RimWorld".to_owned()));
     }
@@ -140,8 +140,8 @@ pub fn plan_capture(
     })
 }
 
-/// V53: an identical build already stored is a no-op, even under another key.
-/// V63/B8: the same `Version.txt` with a new `buildid` is an update, never a no-op.
+/// An identical build already stored is a no-op, even under another key.
+/// The same `Version.txt` with a new `buildid` is an update, never a no-op.
 fn classify(
     stored: &[Build],
     key: &BuildKey,
@@ -185,7 +185,7 @@ fn manifest_path(install: &GameInstall) -> Result<PathBuf, ProfileError> {
         .ok_or_else(|| ProfileError::NotSteamInstall(install.game_dir.clone()))
 }
 
-/// Runs the capture. `Ok(None)` when there was nothing to do (V53).
+/// Runs the capture. `Ok(None)` when there was nothing to do.
 pub fn apply_capture(
     store: &BuildStore,
     plan: &CapturePlan,
@@ -204,7 +204,7 @@ fn apply_with_hook(
     progress: &mut dyn FnMut(u64),
     after_copy: &mut dyn FnMut(&Path) -> Result<(), ProfileError>,
 ) -> Result<Option<Build>, ProfileError> {
-    // V59: both capture and update are refused while the game runs.
+    // Both capture and update are refused while the game runs.
     let _lock = take_run_lock(store.app_dir())?;
     if probe.any_game() {
         return Err(ProfileError::GameRunning);
@@ -213,7 +213,7 @@ fn apply_with_hook(
         return Ok(None);
     }
     // Steam does not respect our lock, so re-read the manifest inside it: the install may
-    // have started updating since the plan was made (V58).
+    // have started updating since the plan was made.
     let app = acf::read(&plan.manifest)?;
     if !app.fully_installed() || app.buildid != plan.buildid {
         return Err(ProfileError::SourceChanging("RimWorld".to_owned()));
@@ -235,7 +235,7 @@ fn apply_with_hook(
     let built = stage(plan, &staging, store, progress, after_copy);
     if built.is_err() {
         // Nothing outside the staging folder has been touched yet, so the old build (if
-        // any) is still whole and launchable (V60).
+        // any) is still whole and launchable.
         let _ = std::fs::remove_dir_all(&staging);
     }
     built?;
@@ -276,7 +276,7 @@ fn stage(
     file.write_atomic(&staging.join(file::FILE_NAME))
 }
 
-/// V60: `<build>/Mods/` comes from the OLD build, not from the Steam install, so local
+/// `<build>/Mods/` comes from the OLD build, not from the Steam install, so local
 /// mods kept per build survive an update. The old build is only read here.
 fn carry_mods(
     plan: &CapturePlan,
@@ -303,7 +303,7 @@ fn carry_mods(
 }
 
 /// Puts the staged build in place. For an update this is two renames: a crash between
-/// them leaves `.replaced-<key>` behind, which `recover` puts back (V60).
+/// them leaves `.replaced-<key>` behind, which `recover` puts back.
 fn swap_in(store: &BuildStore, plan: &CapturePlan, staging: &Path) -> Result<(), ProfileError> {
     let live = store.dir_of(&plan.key);
     let replaced = store.root().join(format!("{REPLACED_PREFIX}{}", plan.key));
@@ -311,7 +311,7 @@ fn swap_in(store: &BuildStore, plan: &CapturePlan, staging: &Path) -> Result<(),
         std::fs::rename(&live, &replaced).map_err(ProfileError::io("replace", &live))?;
     }
     if let Err(e) = std::fs::rename(staging, &live) {
-        // Put the old build back before giving up; it must stay launchable (V60).
+        // Put the old build back before giving up; it must stay launchable.
         if replaced.exists() {
             let _ = std::fs::rename(&replaced, &live);
         }

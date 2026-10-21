@@ -1,4 +1,4 @@
-//! T56 PR C: the profile's Game version row and picker, V61 and V54.
+//! The profile's Game version row and picker.
 
 use super::super::message::Drill;
 use iced::Task;
@@ -55,7 +55,7 @@ fn default_has_a_caption_and_no_picker() {
     let sb = Sandbox::new();
     let app = sb.app();
     assert!(found(&app, text::DEFAULT_GAME_VERSION));
-    assert!(!found(&app, text::CHANGE), "V54: Default cannot be pinned");
+    assert!(!found(&app, text::CHANGE), "Default cannot be pinned");
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn picking_a_stored_version_pins_and_picking_steam_unpins() {
 }
 
 #[test]
-fn v61_older_version_with_saves_asks_and_cancel_changes_nothing() {
+fn older_version_with_saves_asks_and_cancel_changes_nothing() {
     let (sb, id, key) = world(OLD);
     saves(&sb, &id);
     let before = profile_toml(&sb, &id);
@@ -145,7 +145,7 @@ fn v61_older_version_with_saves_asks_and_cancel_changes_nothing() {
 }
 
 #[test]
-fn v61_no_question_without_saves_or_for_a_newer_version() {
+fn no_question_without_saves_or_for_a_newer_version() {
     let (sb, id, key) = world(OLD);
     let mut app = open_picker(&sb, &id);
     let _ = pick(&mut app, Some(&key));
@@ -188,10 +188,10 @@ fn change_waits_while_a_game_runs_and_a_removed_build_is_refused() {
     assert_eq!(profile_toml(&sb, &id), before);
 }
 
-/// N3: an unreadable version still gets a question, with words that name no version
+/// An unreadable version still gets a question, with words that name no version
 /// instead of a blank ("Saves made in  may not open in …").
 #[test]
-fn v61_question_without_a_readable_version_names_none() {
+fn question_without_a_readable_version_names_none() {
     assert_eq!(
         text::confirm_downgrade("", "1.5.4409 rev1118"),
         text::CONFIRM_DOWNGRADE_UNKNOWN

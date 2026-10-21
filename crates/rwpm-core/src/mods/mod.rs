@@ -1,4 +1,4 @@
-//! Installed mods: the active list in `ModsConfig.xml` and where each packageId lives (R1).
+//! Installed mods: the active list in `ModsConfig.xml` and where each packageId lives.
 //! Read-only: scans the game's `Data` and `Mods` folders and the workshop content dir.
 
 mod config;
@@ -10,7 +10,7 @@ pub use config::{read_active_mods, rewrite_active_mods};
 pub use index::{InstalledMod, ModIndex, Origin, Resolution, Skipped};
 pub(crate) use index::{about_field, manifest_version};
 
-/// Workshop copies of a packageId that also exists locally get this suffix (R1).
+/// Workshop copies of a packageId that also exists locally get this suffix.
 pub const STEAM_POSTFIX: &str = "_steam";
 
 #[derive(Debug, thiserror::Error)]

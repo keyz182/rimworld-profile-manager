@@ -1,4 +1,4 @@
-//! `App::view` (T23 layout A): searchable profile list on the left; on the right the
+//! `App::view`: searchable profile list on the left; on the right the
 //! chosen profile with Play pinned under its name, then its mods and how to start it from
 //! Steam or RimSort. Rare actions sit in the ⋯ More menu. Dialogs go on top.
 
@@ -16,7 +16,7 @@ use super::message::{Dialog, Drill, Message};
 use super::{App, Notice, dialogs, keys, setup, text as t, theme};
 
 const GAP: u32 = 10;
-/// List rows show this many characters of a name; the tooltip shows all of it (V33).
+/// List rows show this many characters of a name; the tooltip shows all of it.
 const LIST_NAME_CHARS: usize = 24;
 
 impl App {
@@ -39,7 +39,7 @@ impl App {
         .width(Length::Fill)
         .height(Length::Fill);
         match &self.dialog {
-            // Help sizes its list to the window, so its OK button stays on screen (T59).
+            // Help sizes its list to the window, so its OK button stays on screen.
             Some(Dialog::Help) => stack![
                 main,
                 opaque(responsive(|size| dialogs::help_layer(size.height)))
@@ -172,7 +172,7 @@ impl App {
             row![
                 icon(mode_icon(p)).width(18),
                 text(name).wrapping(Wrapping::None),
-                // A known health problem (T30): shape and colour, not colour alone.
+                // A known health problem: shape and colour, not colour alone.
                 self.health
                     .get(&p.id)
                     .is_some_and(|probs| !probs.is_empty())
@@ -321,7 +321,7 @@ impl App {
         if p.is_default() {
             return body.push(text(t::DEFAULT_MODS)).push(view_list).into();
         }
-        // M9: these need RimWorld; without it they wait, with the reason on Play.
+        // These need RimWorld; without it they wait, with the reason on Play.
         let wait = self.blocked().is_some() || self.game_problem(p).is_some();
         let (about, buttons) = if p.mode == Mode::Offline {
             (
@@ -355,7 +355,7 @@ impl App {
                 )],
             )
         };
-        // Own line: three buttons in a row do not fit at 960 px (V33).
+        // Own line: three buttons in a row do not fit at 960 px.
         body = body
             .push(text(about))
             .push(buttons.spacing(GAP))
@@ -496,7 +496,7 @@ impl App {
             ]
             .spacing(8)
             .align_y(Alignment::Center);
-            // A job that can be stopped (T83c) says so with a button.
+            // A job that can be stopped says so with a button.
             if self.cancel.is_some() {
                 head = head.push(space::horizontal()).push(
                     button(t::CANCEL)

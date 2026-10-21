@@ -38,7 +38,7 @@ appdir="$ROOT/target/appimage/$name.AppDir"
 mkdir -p "$(dirname "$appdir")"
 cp -a "$src" "$appdir"
 # The AppImage is its own menu entry (via the player's AppImage integration tool). That
-# tool reads `MimeType` below and the type definition in usr/share/mime/packages (V83).
+# tool reads `MimeType` below and the type definition in usr/share/mime/packages.
 rm -f "$appdir/install-desktop-entry.sh" "$appdir/rwpm-mime.xml"
 mkdir -p "$appdir/usr/share/mime/packages"
 cp "$ROOT/packaging/linux/rwpm-mime.xml" "$appdir/usr/share/mime/packages/rwpm.xml"

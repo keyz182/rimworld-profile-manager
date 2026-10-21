@@ -16,7 +16,7 @@ use super::{App, Job, Notice, jobs, text as t};
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        // T30: re-check health when the selection changes, a job ends or a game starts or stops.
+        // Re-check health when the selection changes, a job ends or a game starts or stops.
         let before = self.selected.clone();
         let recheck = matches!(message, Message::Done(_) | Message::GameRunning(_));
         let task = self.handle(message);
@@ -52,7 +52,7 @@ impl App {
         if !matches!(message, Message::ToggleMenu) {
             self.menu_open = false;
         }
-        // V33: while a job runs or the game is open, actions that clash with it wait.
+        // While a job runs or the game is open, actions that clash with it wait.
         if self.clashes(&message)
             && let Some(reason) = self.blocked()
         {
@@ -62,7 +62,7 @@ impl App {
         self.act(message)
     }
 
-    /// Must `message` wait for the running job or game (V33)?
+    /// Must `message` wait for the running job or game?
     fn clashes(&self, message: &Message) -> bool {
         use Message as M;
         let confirm_in = |acting: fn(&Dialog) -> bool| {
@@ -292,7 +292,7 @@ impl App {
     }
 
     fn ask_name(&mut self, purpose: NameFor, value: String) {
-        // T33: a new profile starts from Default's settings unless the player changes it.
+        // A new profile starts from Default's settings unless the player changes it.
         let copy = (purpose == NameFor::New)
             .then(|| self.copy_choice(Some(rwpm_core::profile::ProfileId::default_id())));
         self.dialog = Some(Dialog::Name {
@@ -373,7 +373,7 @@ impl App {
                 self.reload();
                 self.notice = Some(Notice::Info(line));
             }
-            // Nothing to ask about: earlier copies are reused, or there is nothing to copy (V36).
+            // Nothing to ask about: earlier copies are reused, or there is nothing to copy.
             Ok(Outcome::OfflinePlanned(plan))
                 if plan.reuse
                     || (plan.copies.is_empty()
@@ -584,7 +584,7 @@ impl App {
         }
     }
 
-    /// Play: the OFFLINE guard (V5) first, then the Windows loader, then start.
+    /// Play: the OFFLINE guard first, then the Windows loader, then start.
     fn launch(&mut self) -> Task<Message> {
         let game = match self.effective_game() {
             Ok(g) => g,
@@ -638,7 +638,7 @@ impl App {
         }
     }
 
-    /// Windows OFFLINE needs the loader beside the game (T12); ask before installing it.
+    /// Windows OFFLINE needs the loader beside the game; ask before installing it.
     fn loader_then_play(&mut self) -> Task<Message> {
         let game = match self.effective_game() {
             Ok(g) => g,
@@ -658,15 +658,15 @@ impl App {
                 }
             }
         }
-        // The effective game's exe: a pinned profile's build, never Steam's (T55).
+        // The effective game's exe: a pinned profile's build, never Steam's.
         self.play(&game.exe);
         Task::none()
     }
 
     /// Starts `rwpm run <id> -- <game>`; the guard already ran here, so it is told so.
-    /// With Flatpak Steam it runs inside Steam's sandbox, or the game cannot reach Steam (V31).
+    /// With Flatpak Steam it runs inside Steam's sandbox, or the game cannot reach Steam.
     fn play(&mut self, game_exe: &std::path::Path) {
-        // The guard already ran here; and the run is recorded as started by the app (V32).
+        // The guard already ran here; and the run is recorded as started by the app.
         let env = [
             (crate::guard::CHOICE_ENV, "launch"),
             (rwpm_core::profile::last_run::STARTED_BY_ENV, "app"),
@@ -920,7 +920,7 @@ impl App {
     }
 }
 
-/// M8: a typed RimWorld folder, checked as it changes; `None` while empty.
+/// A typed RimWorld folder, checked as it changes; `None` while empty.
 fn check_game_folder(folder: &str) -> Option<Result<(), String>> {
     let folder = folder.trim();
     (!folder.is_empty()).then(|| {

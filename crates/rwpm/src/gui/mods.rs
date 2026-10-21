@@ -1,4 +1,4 @@
-//! The profile's mod list (T29): read-only, in load order, searchable. Read off the
+//! The profile's mod list: read-only, in load order, searchable. Read off the
 //! window's thread, since a big list means reading a thousand About.xml files.
 
 use iced::widget::text::Wrapping;

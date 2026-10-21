@@ -1,4 +1,4 @@
-//! Colours and widget styles (T24). One token set for light and one for dark; the OS
+//! Colours and widget styles. One token set for light and one for dark; the OS
 //! setting picks which (C: theme follows OS only). Every text colour meets WCAG AA on the
 //! surfaces it is drawn on (tested below).
 

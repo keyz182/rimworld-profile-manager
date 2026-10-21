@@ -1,10 +1,10 @@
-//! `rwpm run <profile-id> -- <game exe> [args…]` (I.cmd).
+//! `rwpm run <profile-id> -- <game exe> [args…]`.
 //!
 //! Holds `run.lock` from before the "is a game running?" check until the last game
-//! process exits (V11), waits through the in-game Restart child (V17), and exits
-//! with the first game process's code. OFFLINE profiles pass the V5 guard first; a
+//! process exits, waits through the in-game Restart child, and exits
+//! with the first game process's code. OFFLINE profiles pass the guard first; a
 //! player who cancels there exits 0 without starting the game. Every attempt is recorded
-//! in the profile's `last-run.toml` (V32): who started it and how it went.
+//! in the profile's `last-run.toml`: who started it and how it went.
 
 use std::ffi::OsString;
 use std::fs::{File, TryLockError};
@@ -34,7 +34,7 @@ const USAGE: &str = "usage: rwpm run [--from rimsort] <profile-id> -- <game comm
 pub(crate) enum RunError {
     Usage(String),
     Busy(String),
-    /// A check said no (V8 loader); the game was not started.
+    /// A check said no (the loader); the game was not started.
     Refused(String),
     Failed(String),
 }
@@ -65,11 +65,11 @@ impl RunError {
 /// How a launch that got past the checks ended.
 enum Ended {
     Played(i32),
-    /// The player chose Cancel in the OFFLINE guard (V5).
+    /// The player chose Cancel in the OFFLINE guard.
     Cancelled,
 }
 
-/// Records attempts in `last-run.toml`; a failed write is logged, never fatal (V32).
+/// Records attempts in `last-run.toml`; a failed write is logged, never fatal.
 struct Record<'a> {
     profile: &'a Profile,
     path: PathBuf,
@@ -140,12 +140,12 @@ fn run(args: &[OsString]) -> Result<i32, RunError> {
 }
 
 /// Steam and RimSort show no console, so a pinned-launch refusal also gets a dialog
-/// where the player is looking (V72). The app shows it in its own Play row.
+/// where the player is looking. The app shows it in its own Play row.
 fn refusal_needs_dialog(by: StartedBy) -> bool {
     matches!(by, StartedBy::Steam | StartedBy::Rimsort)
 }
 
-/// T55 (V51, V57): a pinned profile's command with the stored build in place of Steam's
+/// A pinned profile's command with the stored build in place of Steam's
 /// game, before anything reads it. Unpinned: unchanged. A build that is gone or cannot be
 /// read, or a command with no single game entry, is refused: never Steam's game instead.
 fn pinned_command(
@@ -219,7 +219,7 @@ fn launch(
     // Started: say so now, so the app can show it worked while the game runs.
     record.write(RunOutcome::Ok, "", None);
     let code = child.wait().map_err(failed)?.code().unwrap_or(EX_FAILED);
-    // V17: an in-game Restart spawns the child before the parent quits, so there is no gap.
+    // An in-game Restart spawns the child before the parent quits, so there is no gap.
     while any_game_running() {
         std::thread::sleep(POLL);
     }
@@ -279,7 +279,7 @@ fn open() -> Result<(ProfileStore<OsTrash>, AppSettings), RunError> {
 pub(crate) const LOCK_BUSY: &str =
     "another profile is already being launched or played; close it first";
 
-/// V11: exclusive OS lock, released on drop or if rwpm dies.
+/// Exclusive OS lock, released on drop or if rwpm dies.
 fn acquire_lock() -> Result<File, RunError> {
     let path =
         paths::run_lock_path().ok_or_else(|| RunError::Failed("no user data folder".into()))?;
@@ -302,7 +302,7 @@ fn acquire_lock() -> Result<File, RunError> {
 }
 
 /// Windows OFFLINE needs `winhttp.dll` beside the game: ours, or a compatible foreign
-/// Doorstop whose own target the payload then chain-loads (T12, V8).
+/// Doorstop whose own target the payload then chain-loads.
 fn windows_loader(profile: &Profile, command: &[OsString]) -> Result<Option<PathBuf>, RunError> {
     let game_dir =
         game_dir(command).ok_or_else(|| RunError::Failed("cannot find the game folder".into()))?;
@@ -319,7 +319,7 @@ fn game_dir(command: &[OsString]) -> Option<&Path> {
     launch::game_program(command).and_then(|p| Path::new(p).parent())
 }
 
-/// Payload + Doorstop beside this binary; this binary is the restart trampoline (V28).
+/// Payload + Doorstop beside this binary; this binary is the restart trampoline.
 pub(crate) fn payload_files() -> Result<PayloadFiles, String> {
     let exe = std::env::current_exe().map_err(|e| format!("cannot find rwpm itself: {e}"))?;
     let app_dir = exe
@@ -354,7 +354,7 @@ pub(crate) fn command_for(plan: &LaunchPlan) -> Command {
 mod tests {
     use super::*;
 
-    /// T55: the Windows loader looks beside the game's own program, behind any wrappers,
+    /// The Windows loader looks beside the game's own program, behind any wrappers,
     /// so a swapped command checks the build's folder.
     #[test]
     fn game_dir_is_the_game_programs_folder() {
@@ -365,7 +365,7 @@ mod tests {
         assert_eq!(game_dir(&plain), Some(Path::new("/builds/1.6")));
     }
 
-    /// V72: the refusal dialog is for launches without a console, not for the app's own.
+    /// The refusal dialog is for launches without a console, not for the app's own.
     #[test]
     fn refusal_dialog_only_for_steam_and_rimsort() {
         let shown = [

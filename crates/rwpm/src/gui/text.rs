@@ -415,7 +415,7 @@ pub fn build_missing(key: &str) -> String {
     )
 }
 
-/// T55: a pinned launch where no single part of the command is the game (decision 2).
+/// A pinned launch where no single part of the command is the game (decision 2).
 pub fn build_target_unknown(key: &str) -> String {
     format!(
         "This profile uses the stored game version “{key}”, but rwpm cannot tell which part \
@@ -602,7 +602,7 @@ pub fn launcher_failed(reason: &str) -> String {
     )
 }
 
-/// V46/R30: an un-notarised `.app` run from a quarantined location (eg straight out of
+/// An un-notarised `.app` run from a quarantined location (eg straight out of
 /// Downloads) can execute from a Gatekeeper-translocated path that changes on every
 /// launch, so Steam/RimSort references to it would break.
 pub fn macos_launcher_failed(reason: &str) -> String {
@@ -621,7 +621,7 @@ pub fn other_profiles(other: &Path, used: &Path) -> String {
     )
 }
 
-// Game versions (T56): stored copies of the game, kept so a profile can stay on one.
+// Game versions: stored copies of the game, kept so a profile can stay on one.
 pub const GAME_VERSIONS: &str = "Game versions";
 pub const TIP_GAME_VERSIONS: &str = "Store copies of RimWorld, so a profile can keep playing one version while Steam moves to another.";
 pub const GV_ABOUT: &str = "A stored game version is a full copy of RimWorld that a profile can play. To store one: switch Steam to that version, wait until it finishes updating, then choose Capture.";
@@ -720,7 +720,7 @@ pub fn version_deleted(key: &str) -> String {
     format!("Moved game version “{key}” to the recycle bin.")
 }
 
-// Game version row and picker (T56).
+// Game version row and picker.
 pub const GAME_VERSION: &str = "Game version";
 pub const CHANGE: &str = "Change…";
 pub const MANAGE: &str = "Manage…";
@@ -768,7 +768,7 @@ pub fn short_version(version: &str) -> String {
 
 pub const CONFIRM_DOWNGRADE_UNKNOWN: &str = "Saves made in the game version this profile plays now may not open in the one you chose. Change anyway?";
 
-/// V61/§C: names both versions; when either cannot be read (the question is asked for an
+/// Names both versions; when either cannot be read (the question is asked for an
 /// unreadable version too) the words do not name one, rather than showing a blank.
 pub fn confirm_downgrade(from: &str, into: &str) -> String {
     if from.trim().is_empty() || into.trim().is_empty() {
@@ -789,7 +789,7 @@ pub fn gv_unreadable(reason: &str) -> String {
     format!("The stored game versions cannot be read: {reason}")
 }
 
-// Backups (T74, V80). The two notices live in rwpm-core, which also writes them into the file.
+// Backups. The two notices live in rwpm-core, which also writes them into the file.
 pub const BACKUP_MENU: &str = "Back up…";
 pub const RESTORE_MENU: &str = "Restore backup…";
 pub const BACKUP_TITLE: &str = "Back up this profile";
@@ -846,7 +846,7 @@ pub fn restoring(name: &str) -> String {
     format!("Restoring “{name}”")
 }
 
-// Modpacks (T81). A pack holds no mods, so it carries its own notice, not the licence one.
+// Modpacks. A pack holds no mods, so it carries its own notice, not the licence one.
 pub const SHARE_MENU: &str = "Share as modpack…";
 pub const SHARE_TITLE: &str = "Share as a modpack";
 pub const SHARE_IT: &str = "Share";
@@ -891,7 +891,7 @@ pub fn share_description_long(max: usize) -> String {
     format!("The description is longer than {max} characters.")
 }
 
-// Opening a modpack (T81b).
+// Opening a modpack.
 pub const OPEN_PACK_MENU: &str = "Open modpack…";
 pub const OPEN_PACK_TITLE: &str = "Open a modpack";
 pub const OPEN_PACK_IT: &str = "Restore";
@@ -954,7 +954,7 @@ pub fn open_page_failed(reason: &str) -> String {
     format!("Could not open the page: {reason}")
 }
 
-// Getting the missing mods through Steam (T83c).
+// Getting the missing mods through Steam.
 pub const SUBSCRIBE_MENU: &str = "Restore and subscribe…";
 pub const SUBSCRIBE_TITLE: &str = "Subscribe in Steam";
 pub const SUBSCRIBE_IT: &str = "Subscribe";
@@ -970,7 +970,7 @@ pub const STEAM_HELPER_MISSING: &str = "The Steam helper is missing, so this can
 pub const STEAM_NO_LIBRARY: &str =
     "Steam's Workshop folder was not found, so mods cannot be fetched from Steam.";
 
-// Downloading private copies into an OFFLINE profile (T83d).
+// Downloading private copies into an OFFLINE profile.
 pub const PACK_OFFLINE_TICK: &str =
     "Make it an OFFLINE profile: download private copies, and do not subscribe";
 pub const DOWNLOAD_MENU: &str = "Restore and download…";
@@ -981,7 +981,7 @@ pub const DOWNLOAD_KEEPS: &str =
 pub const OFFLINE_NOT_ALL: &str = "not every mod arrived as the pack named it";
 pub const OFFLINE_CONFLICTS: &str = "some mods are installed in more than one place";
 
-// The steamcmd route: Valve's own downloader, for a machine with no Steam client (T82c).
+// The steamcmd route: Valve's own downloader, for a machine with no Steam client.
 pub const CMD_NOTE: &str = "Steam cannot be reached here, so Valve's steamcmd can download the mods into an OFFLINE profile instead.";
 pub const CMD_DOWNLOAD_TITLE: &str = "Download with steamcmd";
 pub const CMD_DOWNLOAD_KEEPS: &str =

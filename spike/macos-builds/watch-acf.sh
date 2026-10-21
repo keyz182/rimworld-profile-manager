@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# T52 spike (V58): log appmanifest state changes while Steam switches branch.
+# Spike: log appmanifest state changes while Steam switches branch.
 # Usage: watch-acf.sh <appmanifest_294100.acf> <log file>   (runs until killed)
 #
-# Same as the Linux T50 script except BSD date has no -Is.
+# Same as the Linux script except BSD date has no -Is.
 set -uo pipefail
 
 acf=${1:?acf}

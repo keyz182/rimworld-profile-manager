@@ -1,6 +1,6 @@
-//! The profile's game version (T56): a row in the detail pane and a picker. Default cannot
-//! be pinned (V54). A pin that goes to an older version asks first when there are saves
-//! (V61). The core takes `run.lock`, so a pin never races Delete build or a capture.
+//! The profile's game version: a row in the detail pane and a picker. Default cannot
+//! be pinned. A pin that goes to an older version asks first when there are saves.
+//! The core takes `run.lock`, so a pin never races Delete build or a capture.
 
 use iced::widget::{Column, button, column, row, space, text};
 use iced::{Alignment, Element, Length, Task};
@@ -98,7 +98,7 @@ impl App {
         }
     }
 
-    /// Picker confirmed: no change, a pin, or the V61 question first.
+    /// Picker confirmed: no change, a pin, or the downgrade question first.
     pub(super) fn confirm_pick(&mut self, to: Option<String>) -> Task<Message> {
         let Some(p) = self.current().filter(|p| !p.is_default()).cloned() else {
             return Task::none();

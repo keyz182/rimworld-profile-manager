@@ -1,4 +1,4 @@
-//! The steamcmd route (T82): getting a modpack's missing mods with Valve's own command-line
+//! The steamcmd route: getting a modpack's missing mods with Valve's own command-line
 //! downloader, for a machine that has no Steam client to ask.
 //!
 //! steamcmd is not bundled. It is downloaded from Valve once, into this app's own folder
@@ -30,7 +30,7 @@ pub struct Source {
     pub kind: ArchiveKind,
 }
 
-/// The three files measured in R52, 2026-10-19. The URL is fixed in the program: nothing a
+/// The three files measured on 2026-10-19. The URL is fixed in the program: nothing a
 /// pack or a setting says can change where steamcmd comes from.
 pub const SOURCE: Source = if cfg!(windows) {
     Source {
@@ -58,7 +58,7 @@ pub const MAX_ENTRIES: usize = 1000;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// The text inside is the technical reason, for a details line (T82 review M1).
+    /// The text inside is the technical reason, for a details line.
     #[error(
         "Could not download steamcmd from Valve. Check the internet connection, then try again."
     )]

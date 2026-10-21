@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds a release bundle (T19, T46): rwpm, payload/, doorstop/ and every licence text.
+# Builds a release bundle: rwpm, payload/, doorstop/ and every licence text.
 # usage: package.sh linux|windows|macos
 # out:   target/dist/rwpm-<version>-<os>-x86_64.tar.gz (linux) | .zip (windows, macos)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VENDOR="$ROOT/vendor/unitydoorstop/4.5.0"
-# B4: Linux builds run in Valve's soldier SDK (Debian 10, glibc 2.28) so rwpm starts on
+# Linux builds run in Valve's soldier SDK (Debian 10, glibc 2.28) so rwpm starts on
 # older distros and inside Steam's soldier runtime container. Pinned by digest.
 SOLDIER_SDK="registry.gitlab.steamos.cloud/steamrt/soldier/sdk@sha256:f87b72ad00e2eafa93e5c1c717d3bf3e7756e0a800a3599eec999d626b21b4c9"
 GLIBC_FLOOR="2.28"
@@ -50,12 +50,12 @@ windows)
   steam_dir="win64"
   loader="win_x64/winhttp.dll"
   rustup target list --installed | grep -qx "$target" || {
-    echo "package.sh: no Rust target $target; see T19 notes for the Windows toolchain" >&2
+    echo "package.sh: no Rust target $target; see packaging/windows for the Windows toolchain" >&2
     exit 1
   }
   ;;
 macos)
-  # T46/V42: arm64 only — x86_64-apple-darwin isn't installed, and a universal binary
+  # Arm64 only — x86_64-apple-darwin isn't installed, and a universal binary
   # costs a second target + lipo + an x86 CI leg for zero present Intel-Mac users.
   target="aarch64-apple-darwin"
   exe="rwpm"
@@ -81,7 +81,7 @@ arch="x86_64"
 name="rwpm-$version-$os-$arch"
 out="$ROOT/target/dist/$name"
 [[ ! -e "$out" ]] || discard "$out"
-# T46: macOS ships an .app bundle. `PayloadFiles::beside(app_dir)` resolves payload/ and
+# MacOS ships an .app bundle. `PayloadFiles::beside(app_dir)` resolves payload/ and
 # doorstop/ as siblings of the exe (launch.rs/run.rs — unchanged for macOS), so the exe,
 # payload/ and doorstop/ all live in Contents/MacOS/ together, exactly like the flat
 # linux/windows layout. licenses/ goes in Resources/ (not read by anything at runtime).
@@ -116,7 +116,7 @@ check_glibc() {
   local need
   need="$(objdump -T "$1" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -1)"
   [[ "$(printf '%s\n%s\n' "$need" "$GLIBC_FLOOR" | sort -V | tail -1)" == "$GLIBC_FLOOR" ]] || {
-    echo "package.sh: rwpm needs glibc $need, above the $GLIBC_FLOOR floor (B4)" >&2
+    echo "package.sh: rwpm needs glibc $need, above the $GLIBC_FLOOR floor" >&2
     exit 1
   }
   echo "[package] needs glibc $need (floor $GLIBC_FLOOR)" >&2
@@ -134,7 +134,7 @@ else
 fi
 cp "$release_dir/$exe" "$release_dir/$steam_exe" "$bin_dir/"
 
-# T83e: Valve's Steamworks library, beside rwpm-steam (the helper finds it there: $ORIGIN on
+# Valve's Steamworks library, beside rwpm-steam (the helper finds it there: $ORIGIN on
 # Linux, @loader_path on macOS, the exe folder on Windows). It is taken from the pinned
 # steamworks-sys crate, so it is the very file the helper was built against. rwpm itself
 # never loads it.
@@ -149,7 +149,7 @@ cp "$steam_src" "$bin_dir/"
 
 dotnet build "$ROOT/payload/Rwpm.Payload" -c Release -o "$ROOT/target/dist/payload-build" -nologo >/dev/null
 cp "$ROOT/target/dist/payload-build/Rwpm.Payload.dll" "$bin_dir/payload/"
-# T64: the RimWorld 1.7 startup hook ships in every bundle. The launcher copy needs it
+# The RimWorld 1.7 startup hook ships in every bundle. The launcher copy needs it
 # (flatpak::sync_launcher), so a bundle without it could not launch any profile.
 dotnet build "$ROOT/payload/Rwpm.Payload.Hook" -c Release -o "$ROOT/target/dist/hook-build" -nologo >/dev/null
 cp "$ROOT/target/dist/hook-build/Rwpm.Payload.Hook.dll" "$bin_dir/payload/"
@@ -162,7 +162,7 @@ cp "$VENDOR/LICENSE" "$license_dir/UnityDoorstop-LGPL-2.1.txt"
 # Embedded fonts: Inter (OFL 1.1), Font Awesome Free (icons CC BY 4.0, font OFL 1.1).
 cp "$ROOT"/licenses/*.txt "$license_dir/"
 # App icon and the desktop menu entry installer (Linux; Windows has it inside rwpm.exe;
-# macOS bundle icon is T46's follow-up — Info.plist works without one, falling back to
+# macOS bundle icon is a follow-up — Info.plist works without one, falling back to
 # the generic app icon).
 if [[ "$os" == linux ]]; then
   mkdir -p "$out/icons"
@@ -172,9 +172,9 @@ fi
 cargo metadata --format-version 1 --filter-platform "$target" --manifest-path "$ROOT/Cargo.toml" |
   python3 -I "$ROOT/scripts/third_party.py" "$license_dir" "$ROOT/vendor/licenses"
 
-# V42: Info.plist + adhoc codesign. `--deep` covers the vendored dylib and payload DLL
+# Info.plist + adhoc codesign. `--deep` covers the vendored dylib and payload DLL
 # too (codesign walks the whole bundle); neither needs its own signature to load under
-# Mono/dyld (R24/R25 — only arm64 Mach-O images need one), but `--deep` signing them
+# Mono/dyld (only arm64 Mach-O images need one), but `--deep` signing them
 # anyway costs nothing and keeps `codesign --verify --deep --strict` clean end to end.
 if [[ "$os" == macos ]]; then
   cat >"$bundle/Contents/Info.plist" <<PLIST

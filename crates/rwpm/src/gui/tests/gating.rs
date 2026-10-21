@@ -1,6 +1,6 @@
-//! T56: with no Steam install, a pinned profile with a real stored build still plays, and
+//! With no Steam install, a pinned profile with a real stored build still plays, and
 //! its mod-list and RimSort buttons work; an unpinned one, or a pinned one whose build is
-//! gone, is held back with a reason (T55/T60 deferred this).
+//! gone, is held back with a reason.
 
 use rwpm_core::profile::health::Problem;
 

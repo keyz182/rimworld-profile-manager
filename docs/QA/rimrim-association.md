@@ -1,10 +1,10 @@
-# T75 QA runbook: open `.rimrim` files from the file manager
+# QA runbook: open `.rimrim` files from the file manager
 
 Check that a double-click on a `.rimrim` file opens this app on the Restore question, and that uninstalling removes the link.
 
-- **Platform:** Windows 10 or 11 (installer), and Linux (tar.gz and AppImage). macOS is out of scope (T76).
+- **Platform:** Windows 10 or 11 (installer), and Linux (tar.gz and AppImage). macOS is out of scope.
 - **Time:** about 30 minutes.
-- **Needs:** one `.rimrim` file made with "Back up…" (see the T74 runbook).
+- **Needs:** one `.rimrim` file made with "Back up…" (see `rimrim-backup.md`).
 - **Not covered by the automated tests:** the Windows steps and every double-click. The tests check the files the installers write, and run the Linux script against a scratch home folder.
 
 ## What this does to your computer

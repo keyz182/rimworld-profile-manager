@@ -43,7 +43,7 @@ pub enum Message {
     GameRunning(bool),
     /// Open a drill-in over the detail pane, or close it (`None`).
     Drill(Option<Drill>),
-    /// A profile's mod list, read off the window's thread (T29).
+    /// A profile's mod list, read off the window's thread.
     ModsRead(super::mods::ModList),
     /// Text typed into the mod search.
     ModSearch(String),
@@ -53,15 +53,15 @@ pub enum Message {
     ToggleGroup(rwpm_core::profile::copy_settings::Group, bool),
     /// More → "Copy settings from…".
     OpenCopySettings,
-    /// A profile's health check (T30).
+    /// A profile's health check.
     HealthRead(ProfileId, Vec<rwpm_core::profile::health::Problem>),
     /// Health fix: freeze the mods that would load from Steam.
     FreezeUnfrozen,
     /// Health fix: install the Windows loader (asks first).
     InstallLoader,
-    /// Open the other layout's profiles folder (V31 notice).
+    /// Open the other layout's profiles folder.
     OpenOtherProfiles,
-    /// First-run setup (T27).
+    /// First-run setup.
     Setup(super::setup::SetupMsg),
     /// Open the system folder dialog for a Settings field.
     Browse(Field),
@@ -79,19 +79,19 @@ pub enum Message {
     Done(Result<Outcome, String>),
     /// The OS light/dark setting, at start and when it changes.
     Theme(iced::theme::Mode),
-    /// The stored game versions, read off the window's thread (T56).
+    /// The stored game versions, read off the window's thread.
     BuildsRead(Result<super::builds::BuildsView, String>),
     /// Game versions: measure the Steam install, then ask before storing a copy.
     CaptureBuild,
     /// Game versions: ask before moving this stored version to the recycle bin.
     DeleteBuild(String),
-    /// Profile row: open the game version picker (T56).
+    /// Profile row: open the game version picker.
     ChangeGameVersion,
     /// The stored versions, read for the picker.
     PickerRead(Result<super::builds::BuildsView, String>),
     /// Picker: choose a stored version (`Some(key)`) or the Steam install (`None`).
     PickBuild(Option<String>),
-    /// More → "Back up…" (T74).
+    /// More → "Back up…".
     Backup,
     /// Backup dialog: a box ticked or unticked.
     BackupTick(super::backup::Tick, bool),
@@ -101,7 +101,7 @@ pub enum Message {
     RestoreBackup,
     /// The backup file chosen to restore; `None` when the dialog was closed.
     RestorePicked(Option<PathBuf>),
-    /// More → "Share as modpack…" (T81).
+    /// More → "Share as modpack…".
     Share,
     /// Share dialog: a settings box ticked or unticked.
     ShareTick(ShareTick, bool),
@@ -111,7 +111,7 @@ pub enum Message {
     ShareStart(Option<usize>),
     /// The file chosen to save the pack in; `None` when the dialog was closed.
     SharePicked(Box<ShareDraft>, Option<PathBuf>),
-    /// "Open modpack…": open the file dialog (T81b).
+    /// "Open modpack…": open the file dialog.
     OpenPack,
     /// The pack chosen to open; `None` when the dialog was closed.
     OpenPackPicked(Option<PathBuf>),
@@ -119,11 +119,11 @@ pub enum Message {
     PackOpened(Box<PackPreview>),
     /// A Steam page link in the Open dialog (Steam pages only).
     OpenUrl(String),
-    /// Open dialog: "Restore and subscribe…" (T83c).
+    /// Open dialog: "Restore and subscribe…".
     PackSubscribe,
-    /// Open dialog: the box "Make it an OFFLINE profile" ticked or unticked (T83d).
+    /// Open dialog: the box "Make it an OFFLINE profile" ticked or unticked.
     PackOffline(bool),
-    /// Open dialog: "Restore and download…" through Valve's steamcmd (T82c).
+    /// Open dialog: "Restore and download…" through Valve's steamcmd.
     PackSteamcmd,
     /// The Cancel button on the progress bar of a job that can be stopped.
     CancelJob,
@@ -133,7 +133,7 @@ pub enum Message {
     DismissNotice,
 }
 
-/// Views that replace the detail pane, with ‹ Back (T23 layout).
+/// Views that replace the detail pane, with ‹ Back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Drill {
     SteamGuide,
@@ -169,7 +169,7 @@ pub enum Outcome {
     MovePlanned(MovePlan),
     /// Fixes are done (guard or loader); continue starting the game.
     ReadyToPlay(ProfileId),
-    /// A capture was measured: ask before copying (T56).
+    /// A capture was measured: ask before copying.
     CapturePlanned(Box<CapturePlan>),
     /// A game version was stored, updated or deleted: reload and show this line.
     BuildsChanged(String),
@@ -207,10 +207,10 @@ pub enum Dialog {
     Name {
         purpose: NameFor,
         value: String,
-        /// New profile only: where its settings start from (T33).
+        /// New profile only: where its settings start from.
         copy: Option<super::copy::SettingsCopy>,
     },
-    /// More → "Copy settings from…" into the selected profile (T33).
+    /// More → "Copy settings from…" into the selected profile.
     CopySettings(super::copy::SettingsCopy),
     ConfirmDelete,
     Offline {
@@ -239,25 +239,25 @@ pub enum Dialog {
         builds: Vec<(String, String)>,
         chosen: Option<String>,
     },
-    /// V61: the new version is older and the profile has saves.
+    /// The new version is older and the profile has saves.
     ConfirmDowngrade {
         to: Option<String>,
         from: String,
         into: String,
     },
-    /// What goes in a backup (T74).
+    /// What goes in a backup.
     Backup(Box<super::backup::Draft>),
     /// A backup file's contents and the name of the profile it will become.
     Restore(Box<RestorePlan>),
-    /// What goes in a modpack (T81).
+    /// What goes in a modpack.
     Share(Box<ShareDraft>),
-    /// A modpack's contents and the name of the profile it will become (T81b).
+    /// A modpack's contents and the name of the profile it will become.
     OpenPack(Box<PackPreview>),
-    /// What opening the pack would subscribe the player to (T83c).
+    /// What opening the pack would subscribe the player to.
     ConfirmSubscribe(Box<PackPreview>),
-    /// First use of steamcmd: what will be downloaded and run, asked before anything is (T82c).
+    /// First use of steamcmd: what will be downloaded and run, asked before anything is.
     ConsentSteamcmd(Box<PackPreview>),
-    /// Valve's steamcmd file differs from the one first seen (T82 review M1).
+    /// Valve's steamcmd file differs from the one first seen.
     TrustSteamcmd {
         preview: Box<PackPreview>,
         first: String,

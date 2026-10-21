@@ -1,4 +1,4 @@
-//! `<profile>/profile.toml` (§I.file).
+//! `<profile>/profile.toml`.
 
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::builds::BuildKey;
 use crate::error::ProfileError;
 
-/// Highest schema this build reads. Written only when `game_build` is set (§I.file);
+/// Highest schema this build reads. Written only when `game_build` is set;
 /// without a pin the file stays schema 1, so an older rwpm can still read it.
 pub const SCHEMA: u32 = 2;
 /// The schema a profile with no pinned game build is written as.
@@ -98,7 +98,7 @@ impl ProfileFile {
         Ok(file)
     }
 
-    /// §I.file: schema 2 only while a game build is pinned. Recomputed on every write, so
+    /// Schema 2 only while a game build is pinned. Recomputed on every write, so
     /// unpinning takes the file back to schema 1 instead of stranding it on 2.
     fn to_write(&self) -> Self {
         let mut out = self.clone();
@@ -170,7 +170,7 @@ mod tests {
         ));
     }
 
-    /// §I.file: 2 while pinned, back to 1 when the pin goes.
+    /// 2 while pinned, back to 1 when the pin goes.
     #[test]
     fn schema_follows_the_pin_in_both_directions() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(read.schema, 1);
     }
 
-    /// §I.file: `game_build` names a stored build, so it must be a build key. A path
+    /// `game_build` names a stored build, so it must be a build key. A path
     /// such as `../x` would otherwise point the game lookup outside the build store.
     #[test]
     fn rejects_a_game_build_that_is_not_a_build_key() {

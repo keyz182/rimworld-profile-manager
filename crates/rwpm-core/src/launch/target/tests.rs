@@ -1,4 +1,4 @@
-//! T55 / V51 / V57: the per-OS swap, by explicit paths, so every OS's shapes run on any host.
+//! The per-OS swap, by explicit paths, so every OS's shapes run on any host.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -84,7 +84,7 @@ fn install(dir: &Path, exe: &str, engine: Engine) -> GameInstall {
     }
 }
 
-/// R34's native Steam chain on 1.6, as Steam hands it to `rwpm run`.
+/// The native Steam chain on 1.6, as Steam hands it to `rwpm run`.
 fn native_chain(game: &str) -> Vec<OsString> {
     cmd(&[
         "/steam/ubuntu12_32/steam-launch-wrapper",
@@ -112,7 +112,7 @@ fn linux_native_chain_1_6_to_waylith_build_keeps_wrappers_and_args() {
     assert_eq!(swapped, want);
 }
 
-/// R23: the Flatpak chain names the script behind `scout-on-soldier-entry-point-v2`.
+/// The Flatpak chain names the script behind `scout-on-soldier-entry-point-v2`.
 #[test]
 fn flatpak_chain_script_to_unity_build_script() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -132,7 +132,7 @@ fn flatpak_chain_script_to_unity_build_script() {
     assert_eq!(swapped[6], os(&dir.join(LINUX_START_SCRIPT)));
 }
 
-/// Decision 4: Steam's shape decides. A 1.7 exe or a script → the build's script; the ELF
+/// Steam's shape decides. A 1.7 exe or a script → the build's script; the ELF
 /// (app Play) stays an ELF; a build without a script → its ELF.
 #[test]
 fn linux_unity_build_mirrors_steams_shape() {
@@ -159,7 +159,7 @@ fn linux_unity_build_mirrors_steams_shape() {
     assert_eq!(swapped, [os(&bare.join(LINUX_ELF))]);
 }
 
-/// R45 / R46: Windows paths, mixed case, both directions.
+/// Windows paths, mixed case, both directions.
 #[test]
 fn windows_paths_swap_both_ways() {
     let steam = r"C:\Program Files (x86)\Steam\steamapps\common\RimWorld";
@@ -177,8 +177,8 @@ fn windows_paths_swap_both_ways() {
     }
 }
 
-/// V57 macOS: Steam names the install's bundle; the build's own bundle is resolved through
-/// ITS Info.plist (R50: the 1.6 and 1.7 bundle names differ, so no prefix substitution).
+/// MacOS: Steam names the install's bundle; the build's own bundle is resolved through
+/// ITS Info.plist (the 1.6 and 1.7 bundle names differ, so no prefix substitution).
 #[test]
 fn macos_bundle_resolves_inside_the_build() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -206,7 +206,7 @@ fn macos_bundle_resolves_inside_the_build() {
     assert_eq!(plan.program, bundle.join("Contents/MacOS/RimWorldMac"));
 }
 
-/// §C: macOS 1.7 is refused, also when it arrives as a pinned build.
+/// MacOS 1.7 is refused, also when it arrives as a pinned build.
 #[test]
 fn macos_waylith_build_is_refused() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -225,7 +225,7 @@ fn macos_waylith_build_is_refused() {
     assert!(matches!(refused, Err(LaunchError::MacOsWaylithUnsupported)));
 }
 
-/// Decision 2 / M1: no match and more than one match are refused; flags never match.
+/// No match and more than one match are refused; flags never match.
 #[test]
 fn locator_refuses_none_and_ambiguous_and_skips_flags() {
     assert!(matches!(
@@ -290,8 +290,8 @@ fn swap_target_follows_the_effective_game() {
     assert_eq!(swapped[1], command[1]);
 }
 
-/// V57: in-game Restart re-runs the pinned build. Plain OFFLINE → the build's ELF;
-/// wrapped OFFLINE → the build's start script (rwpm goes between, V29).
+/// In-game Restart re-runs the pinned build. Plain OFFLINE → the build's ELF;
+/// wrapped OFFLINE → the build's start script (rwpm goes between).
 #[test]
 fn restart_env_names_the_build() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -317,7 +317,7 @@ fn restart_env_names_the_build() {
     );
 }
 
-/// V62 follows the build, not Steam: a Unity Steam command on a Waylith build gets the
+/// The result follows the build, not Steam: a Unity Steam command on a Waylith build gets the
 /// startup hook and no Doorstop; a Waylith Steam command on a Unity build gets Doorstop.
 #[test]
 fn engine_follows_the_build() {

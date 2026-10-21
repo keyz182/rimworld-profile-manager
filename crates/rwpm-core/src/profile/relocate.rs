@@ -1,4 +1,4 @@
-//! Settings → "Profiles folder" Move (V14, V19, V27): copy every profile, verify the
+//! Settings → "Profiles folder" Move: copy every profile, verify the
 //! copy byte for byte, switch `settings.toml`, then send the old folders to the recycle
 //! bin. Nothing old is removed before the copy is verified.
 
@@ -26,7 +26,7 @@ pub struct MovePlan {
     pub profiles: Vec<ProfileId>,
     pub bytes: u64,
     pub free_bytes: Option<u64>,
-    /// V56: the game-build store moves with the profiles. Carried by name, never by
+    /// The game-build store moves with the profiles. Carried by name, never by
     /// `ProfileId`, because `builds` is not a profile.
     pub builds: bool,
     /// Profile copies from an interrupted earlier move to the same target.
@@ -34,7 +34,7 @@ pub struct MovePlan {
 }
 
 impl MovePlan {
-    /// Every folder this move copies: the profiles, then the build store (V56).
+    /// Every folder this move copies: the profiles, then the build store.
     fn moved_names(&self) -> Vec<String> {
         let mut names: Vec<String> = self.profiles.iter().map(ToString::to_string).collect();
         if self.builds {
@@ -171,8 +171,8 @@ fn apply_with_hook<T: Trash>(
     })
 }
 
-/// RimSort instances exported for these profiles that still point into `old_root` (V19).
-/// Reads only; re-exporting (T13) rewrites them with the player's consent.
+/// RimSort instances exported for these profiles that still point into `old_root`.
+/// Reads only; re-exporting rewrites them with the player's consent.
 pub fn stale_rimsort(settings: &Path, old_root: &Path, profiles: &[ProfileId]) -> Vec<String> {
     let Ok(bytes) = std::fs::read(settings) else {
         return Vec::new();
@@ -207,7 +207,7 @@ fn is_legacy_profile(root: &Path) -> bool {
 }
 
 /// Every profile-id folder under the old root, with or without `profile.toml`. The build
-/// store is left out on purpose (V56): it is carried by name, not as a `ProfileId`.
+/// store is left out on purpose: it is carried by name, not as a `ProfileId`.
 fn profile_ids(root: &Path) -> Result<Vec<ProfileId>, ProfileError> {
     let entries = match std::fs::read_dir(root) {
         Ok(e) => e,

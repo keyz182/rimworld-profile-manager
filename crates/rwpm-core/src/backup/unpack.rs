@@ -1,4 +1,4 @@
-//! Restore: a `.rimrim` → a NEW profile (T73; V73-V79, V82).
+//! Restore: a `.rimrim` → a NEW profile.
 //!
 //! The archive is untrusted. Every entry name, kind, size and link target is checked
 //! before anything is written, nothing is ever written through a link (links are made
@@ -25,7 +25,7 @@ use crate::profile::running::RunningProbe;
 use crate::profile::{Mode, Profile, ProfileFile, ProfileId, ProfileStore, Trash};
 use crate::space;
 
-/// Refused outright, whatever a manifest claims (V75).
+/// Refused outright, whatever a manifest claims.
 const MAX_BYTES: u64 = 128 << 30;
 const MAX_ENTRIES: u64 = 2_000_000;
 /// Free space wanted on top of the declared size.
@@ -122,8 +122,8 @@ pub fn plan_restore<T: Trash>(
     })
 }
 
-/// Restores into a new profile. Refused while a game runs (V79). On any error the new
-/// profile folder and the build staging folder are removed (V76, V77).
+/// Restores into a new profile. Refused while a game runs. On any error the new
+/// profile folder and the build staging folder are removed.
 pub fn apply_restore<T: Trash>(
     plan: &RestorePlan,
     store: &ProfileStore<T>,
@@ -202,7 +202,7 @@ fn build_action(
     } else {
         BuildAction::Extract(key.clone())
     };
-    // The pin is kept either way; say so when nothing will provide the build (V78).
+    // The pin is kept either way; say so when nothing will provide the build.
     if !stored && !matches!(action, BuildAction::Extract(_)) {
         notes.push(RestoreNote::BuildMissing(key.to_string()));
     }
@@ -218,7 +218,7 @@ struct Job<'a> {
     progress: &'a mut dyn FnMut(u64),
     bytes: u64,
     entries: u64,
-    /// Mod folders seen in the archive, for the folder check on `profile.toml` (V74).
+    /// Mod folders seen in the archive, for the folder check on `profile.toml`.
     mod_dirs: BTreeSet<String>,
     profile_toml: Option<String>,
     build_toml: Option<String>,
@@ -299,7 +299,7 @@ impl Job<'_> {
             Place::Profile(rel) => self.profile_entry(&rel, kind, &mut entry),
             Place::Build { key, rel } => self.build_entry(&key, &rel, kind, &mut entry),
         };
-        // Files are created new, so a repeated name fails instead of overwriting (V73).
+        // Files are created new, so a repeated name fails instead of overwriting.
         done.map_err(|e| match &e {
             ProfileError::Io { source, .. } if source.kind() == io::ErrorKind::AlreadyExists => {
                 self.fault(format!("it holds `{}` twice", name.display()))
@@ -343,7 +343,7 @@ impl Job<'_> {
         write_entry(&dest, kind, entry)
     }
 
-    /// Every name directly below `Mods/` must be a plain folder name (V74).
+    /// Every name directly below `Mods/` must be a plain folder name.
     fn note_mod_dir(&mut self, rest: &[&str], kind: EntryType) -> Result<(), ProfileError> {
         let Some(folder) = rest.first() else {
             return Ok(());
@@ -391,8 +391,8 @@ impl Job<'_> {
         write_entry(&self.staging.join(rel), kind, entry)
     }
 
-    /// After the stream: check `profile.toml` against what was unpacked (V74), settle the
-    /// build, then write `profile.toml` last (V76).
+    /// After the stream: check `profile.toml` against what was unpacked, settle the
+    /// build, then write `profile.toml` last.
     fn finish(&mut self, name: &str) -> Result<(), ProfileError> {
         let text = self
             .profile_toml
@@ -452,7 +452,7 @@ impl Job<'_> {
         Ok(())
     }
 
-    /// Links, then verification, then the move into the store (V77).
+    /// Links, then verification, then the move into the store.
     fn install_build(&mut self, key: &BuildKey) -> Result<(), String> {
         make_links(self.staging, &self.links)?;
         let file = BuildFile::read(&self.staging.join(crate::builds::file::FILE_NAME))
@@ -461,7 +461,7 @@ impl Job<'_> {
             .map_err(|_| "it is not a RimWorld game folder".to_owned())?;
         let live = self.builds.dir_of(key);
         if live.exists() {
-            // Someone stored this key while the restore ran; theirs stays (V77).
+            // Someone stored this key while the restore ran; theirs stays.
             let _ = std::fs::remove_dir_all(self.staging);
             return Ok(());
         }
@@ -507,7 +507,7 @@ fn write_bytes(dest: &Path, bytes: &[u8]) -> Result<(), ProfileError> {
     io::Write::write_all(&mut file, bytes).map_err(ProfileError::io("unpack", dest))
 }
 
-/// Folders and regular files only (V73). A file is created new, so a repeated name fails
+/// Folders and regular files only. A file is created new, so a repeated name fails
 /// instead of overwriting an earlier entry. Modes are reduced to plain or executable.
 pub(crate) fn write_entry<R: Read>(
     dest: &Path,
@@ -553,7 +553,7 @@ fn set_mode(_: &File, _: u32) -> io::Result<()> {
     Ok(())
 }
 
-/// Makes the build's links once every file is in place (V73). A link goes only into a real
+/// Makes the build's links once every file is in place. A link goes only into a real
 /// folder, never over an existing name, and its target was checked when it was read.
 #[cfg(unix)]
 fn make_links(root: &Path, links: &[(PathBuf, PathBuf)]) -> Result<(), String> {

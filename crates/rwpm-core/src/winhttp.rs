@@ -1,9 +1,9 @@
-//! Windows OFFLINE loader: UnityDoorstop's `winhttp.dll` beside `RimWorldWin64.exe`
-//! (V6, V7, V8, V23). It stays inert unless the game is started with Doorstop's
+//! Windows OFFLINE loader: UnityDoorstop's `winhttp.dll` beside `RimWorldWin64.exe`.
+//! It stays inert unless the game is started with Doorstop's
 //! arguments, so LIVE launches are unaffected.
 //!
 //! A `winhttp.dll` is ours only when its SHA-256 matches the one recorded when we
-//! installed it; anything else is foreign and never overwritten or removed (V8). A
+//! installed it; anything else is foreign and never overwritten or removed. A
 //! foreign UnityDoorstop 4.x (e.g. pardeike's Rimworld-Doorstop setup) is reused: its
 //! `doorstop_config.ini` target is chain-loaded by our payload after the redirect.
 
@@ -108,7 +108,7 @@ pub fn inspect(game_dir: &Path, app_dir: &Path) -> Result<DllState, WinhttpError
 }
 
 /// Installs (or repairs, or upgrades our own) `winhttp.dll` from `vendor_dll`. Refuses a
-/// foreign one (V8) and needs consent for this exact path (V7).
+/// foreign one and needs consent for this exact path.
 pub fn install(
     game_dir: &Path,
     app_dir: &Path,

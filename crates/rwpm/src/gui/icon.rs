@@ -42,7 +42,7 @@ pub fn fonts() -> Vec<std::borrow::Cow<'static, [u8]>> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(
     dead_code,
-    reason = "glyphs for the T25-T30 screens; the font test covers every one"
+    reason = "glyphs for several screens; the font test covers every one"
 )]
 pub enum Icon {
     Play,

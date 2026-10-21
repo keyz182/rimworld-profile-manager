@@ -1,9 +1,9 @@
-# T18 Windows e2e: drives the packaged rwpm.exe against the real game on the VM.
+# Windows e2e: drives the packaged rwpm.exe against the real game on the VM.
 # usage: e2e.ps1 -Scenario <name|all|cleanup>
 # exit: 0 pass, 1 fail, 2 inconclusive.
 # Changes outside C:\rwpm-e2e (consented 2026-10-12): our winhttp.dll beside the game
 # (removed at cleanup), test profiles in %LOCALAPPDATA%\RimWorld Profile Manager (to the
-# recycle bin at cleanup), one scheduled task, and a dummy foreign winhttp.dll (V8 only).
+# recycle bin at cleanup), one scheduled task, and a dummy foreign winhttp.dll (one scenario only).
 param([Parameter(Mandatory = $true)][string]$Scenario)
 $ErrorActionPreference = 'Stop'
 
@@ -42,7 +42,7 @@ function Open-Tool {
 
 # Our dll, recorded as ours the way rwpm records an install (winhttp.rs: installs.toml).
 function Install-Dll([bool]$record = $true) {
-    if ((Test-Path $GameDll) -and (Sha $GameDll) -ne (Sha $OurDll)) { throw "foreign winhttp.dll present; refusing (V8)" }
+    if ((Test-Path $GameDll) -and (Sha $GameDll) -ne (Sha $OurDll)) { throw "foreign winhttp.dll present; refusing" }
     Copy-Item $OurDll $GameDll -Force
     if ($record) {
         "[[winhttp]]`npath = '$GameDll'`nsha256 = `"$(Sha $OurDll)`"`n" | Set-Content $Installs -Encoding ASCII

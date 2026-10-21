@@ -1,4 +1,4 @@
-//! OFFLINE pre-launch guard (V5): every active mod must be a frozen copy in the profile.
+//! OFFLINE pre-launch guard: every active mod must be a frozen copy in the profile.
 //!
 //! In OFFLINE the game lists `<install>/Data`, the profile's `Mods` (redirected) and the
 //! subscribed workshop items; `<install>/Mods` is not seen. A workshop item turned on
@@ -148,7 +148,7 @@ pub fn add_to_profile<T: Trash>(
     store.get(id)
 }
 
-/// Copies to a hidden temp folder, then renames it into place (V12: same folder name).
+/// Copies to a hidden temp folder, then renames it into place (same folder name).
 fn copy_in(
     mods: &Path,
     copy: &PlannedCopy,

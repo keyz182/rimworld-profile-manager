@@ -1,9 +1,9 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2015 # pass() always returns 0, so `cond && pass || fail` is a safe if/else.
-# T37 spike scenarios, sourced by run.sh. Each sc_* sets RESULT via pass/fail/inconclusive.
-# Mirrors spike/linux's T2 scenarios (removed at tag v1.0.0, kept in git history) for the
+# Spike scenarios, sourced by run.sh. Each sc_* sets RESULT via pass/fail/inconclusive.
+# Mirrors spike/linux's scenarios (removed at tag v1.0.0, kept in git history) for the
 # macOS equivalents: DYLD_INSERT_LIBRARIES instead of LD_PRELOAD, direct bundle-binary exec
-# instead of a start script, and the new macOS-only unknowns (?10 quarantine, ?11/?12
+# instead of a start script, and the new macOS-only unknowns (quarantine,
 # Steam %command% shape + argv[0] restart).
 
 BASE_MODS=(ludeon.rimworld "${DLCS[@]}")
@@ -32,11 +32,11 @@ timed_run() {
   wait "$LAUNCH_PID" || LAUNCH_CODE=$?
 }
 
-# ---- R24/R25/V42: does a normal, unredirected launch even work via our direct-exec
+# ---- does a normal, unredirected launch even work via our direct-exec
 # recipe, against the REAL Default save dir? (user's explicit choice: real profile, not
 # an isolated scratch one, for the baseline sanity check — no -savedatafolder at all.)
 sc_live_baseline() {
-  # No probe mod here (this is a plain LIVE-mode launch of the real profile, V13: no
+  # No probe mod here (this is a plain LIVE-mode launch of the real profile: no
   # Doorstop at all) so nothing auto-quits the game — we run it for a short window
   # then kill it ourselves. TIMED_OUT=1 (we had to kill it) is the EXPECTED outcome,
   # not a failure; the thing under test is "did it even launch and write its log".
@@ -57,8 +57,8 @@ sc_live_baseline() {
   ((mtime >= before)) && pass "live_baseline: Default Player.log freshly written this run" || inconclusive "live_baseline: Player.log predates this run"
 }
 
-# launches the real game with no Doorstop, no -savedatafolder — LIVE profile semantics
-# (V13), direct-exec of the bundle binary, same mechanism the OFFLINE scenarios use minus
+# launches the real game with no Doorstop, no -savedatafolder — LIVE profile semantics,
+# direct-exec of the bundle binary, same mechanism the OFFLINE scenarios use minus
 # injection. Runs in foreground-background like timed_run but skips the profile machinery.
 timed_run_live() {
   local t="$1"
@@ -86,7 +86,7 @@ wait_gone_live() {
   return 0
 }
 
-# ---- R24/R25/V42: does our vendored, un-quarantined dylib load under SIP at all, and
+# ---- does our vendored, un-quarantined dylib load under SIP at all, and
 # does the reflection write land? Oracle for the OFFLINE redirect mechanism itself.
 sc_basic() {
   local p
@@ -121,7 +121,7 @@ assert_redirected() {
   fi
 }
 
-# ---- ?10 headline unknown: does a com.apple.quarantine xattr block the dylib from
+# ---- headline unknown: does a com.apple.quarantine xattr block the dylib from
 # loading at all? A downloaded release asset will always carry one; our curl'd vendor
 # copy does not (curl never sets quarantine), so we synthesize it for the main scenario
 # and the control runs with it stripped.
@@ -132,10 +132,10 @@ sc_quarantine() {
   p="$(new_profile quarantine 1 "${BASE_MODS[@]}" rwpm.spike.probe)"
   timed_run "$p" release 180
   if [[ "$(probe_lines "$p")" -eq 1 ]]; then
-    pass "?10 quarantined dylib still loaded under SIP"
+    pass "quarantined dylib still loaded under SIP"
     assert_redirected "$p" 1
   else
-    fail "?10 quarantined dylib did not load (probe never ran, timed_out=$TIMED_OUT)"
+    fail "quarantined dylib did not load (probe never ran, timed_out=$TIMED_OUT)"
   fi
   xattr -d com.apple.quarantine "$dylib" 2>/dev/null || true
 }
@@ -147,13 +147,13 @@ sc_quarantine_control() {
   p="$(new_profile quarantine_control 1 "${BASE_MODS[@]}" rwpm.spike.probe)"
   timed_run "$p" release 180
   if [[ "$(probe_lines "$p")" -eq 1 ]]; then
-    pass "?10 control: un-quarantined dylib loads (baseline confirmed working)"
+    pass "control: un-quarantined dylib loads (baseline confirmed working)"
   else
-    inconclusive "?10 control: un-quarantined dylib also failed to load (harness problem, not quarantine)"
+    inconclusive "control: un-quarantined dylib also failed to load (harness problem, not quarantine)"
   fi
 }
 
-# ---- R25: arm64 requires a signature; adhoc should suffice, an unsigned copy should fail.
+# ---- arm64 requires a signature; adhoc should suffice, an unsigned copy should fail.
 sc_adhoc_sign() {
   local p scratch
   scratch="$OUT/unsigned-doorstop"
@@ -163,17 +163,17 @@ sc_adhoc_sign() {
   p="$(new_profile adhoc_sign_unsigned 1 "${BASE_MODS[@]}" rwpm.spike.probe)"
   timed_run "$p" release 90 RWPM_DOORSTOP_DIR="$scratch"
   if [[ "$(probe_lines "$p")" -eq 0 ]]; then
-    pass "R25: unsigned dylib refused to load on arm64"
+    pass "unsigned dylib refused to load on arm64"
   else
-    inconclusive "R25: unsigned dylib loaded anyway (probe lines=$(probe_lines "$p")) — arm64 signing requirement not confirmed strict here"
+    inconclusive "unsigned dylib loaded anyway (probe lines=$(probe_lines "$p")) — arm64 signing requirement not confirmed strict here"
   fi
   p="$(new_profile adhoc_sign_signed 1 "${BASE_MODS[@]}" rwpm.spike.probe)"
   codesign -s - "$scratch/libdoorstop.dylib"
   timed_run "$p" release 180 RWPM_DOORSTOP_DIR="$scratch"
-  [[ "$(probe_lines "$p")" -eq 1 ]] && pass "R25: adhoc-signed dylib loads" || fail "R25: adhoc-signed dylib did not load"
+  [[ "$(probe_lines "$p")" -eq 1 ]] && pass "adhoc-signed dylib loads" || fail "adhoc-signed dylib did not load"
 }
 
-# ---- R11/V1/?11/?48: GenCommandLine.Restart re-execs argv[0] — does the macOS game do
+# ---- GenCommandLine.Restart re-execs argv[0] — does the macOS game do
 # the same, and does the Doorstop redirect survive the restart?
 sc_restart() {
   local p
@@ -181,21 +181,21 @@ sc_restart() {
   touch "$p/restart.flag"
   timed_run "$p" release 300
   ((TIMED_OUT == 0)) || {
-    fail "V1/?11 restart: game did not quit (lines=$(payload_starts "$p"))"
+    fail "restart: game did not quit (lines=$(payload_starts "$p"))"
     return
   }
   [[ "$(probe_lines "$p")" -eq 2 ]] || {
-    fail "V1/?11 restart: probe lines=$(probe_lines "$p")"
+    fail "restart: probe lines=$(probe_lines "$p")"
     return
   }
   [[ "$(probe_field "$p" pid 1)" != "$(probe_field "$p" pid 2)" ]] && pass "two processes across restart" || fail "same pid twice"
   assert_redirected "$p" 1
   assert_redirected "$p" 2
-  [[ "$(payload_starts "$p")" -eq 2 ]] && pass "V1 payload ran in restart child (redirect held)" || fail "payload starts=$(payload_starts "$p")"
+  [[ "$(payload_starts "$p")" -eq 2 ]] && pass "payload ran in restart child (redirect held)" || fail "payload starts=$(payload_starts "$p")"
   pass_or_fail_rwpm_exit restart "$p"
 }
 
-# ---- V2: Prepatcher reloads Assembly-CSharp in-process; redirect must survive the 2nd copy.
+# ---- Prepatcher reloads Assembly-CSharp in-process; redirect must survive the 2nd copy.
 copy_prepatcher_deps() {
   local p="$1" h="$WORKSHOP/$HARMONY_WS" z="$WORKSHOP/$PREPATCHER_WS"
   grep -q 'Andreas Pardeike' "$h/About/About.xml" || return 1
@@ -215,20 +215,20 @@ prepatcher_profile() {
 sc_prepatcher() {
   local p patched
   p="$(prepatcher_profile prepatcher)" || {
-    inconclusive "V2: Harmony/Prepatcher author or file check failed"
+    inconclusive "Harmony/Prepatcher author or file check failed"
     return
   }
   timed_run "$p" release 300
   [[ "$(probe_lines "$p")" -ge 1 ]] || {
-    fail "V2: probe never ran (timed_out=$TIMED_OUT)"
+    fail "probe never ran (timed_out=$TIMED_OUT)"
     return
   }
   assert_redirected "$p" "$(probe_lines "$p")"
   patched="$( (grep -oE 'patched Assembly-CSharp#-?[0-9]+' "$p/payload.log" || true) | sort -u | wc -l | tr -d ' ')"
-  if ((patched >= 2)); then pass "V2 patched $patched GenFilePaths copies"; else inconclusive "V2 only $patched copy patched; Prepatcher reload not exercised"; fi
+  if ((patched >= 2)); then pass "patched $patched GenFilePaths copies"; else inconclusive "only $patched copy patched; Prepatcher reload not exercised"; fi
 }
 
-# ---- R10/V24: SteamAppId env lets Steam init without steam_appid.txt.
+# ---- SteamAppId env lets Steam init without steam_appid.txt.
 hide_appid() {
   [[ -f "$APPID_FILE" ]] || return 1
   printf '%s\n' "$APPID_FILE" >"$APPID_MARKER"
@@ -240,25 +240,25 @@ hide_appid() {
 sc_appid() {
   local p
   hide_appid || {
-    inconclusive "V24: no steam_appid.txt to hide"
+    inconclusive "no steam_appid.txt to hide"
     return
   }
   p="$(new_profile appid 1 "${BASE_MODS[@]}" rwpm.spike.probe)"
   timed_run "$p" release 180
   [[ "$(probe_lines "$p")" -eq 1 ]] || {
-    fail "V24: probe lines=$(probe_lines "$p") timed_out=$TIMED_OUT"
+    fail "probe lines=$(probe_lines "$p") timed_out=$TIMED_OUT"
     restore_appid
     trap - EXIT
     return
   }
-  [[ "$(probe_field "$p" steam 1)" == "True" ]] && pass "V24 Steam initialised without steam_appid.txt" || fail "V24 steam=$(probe_field "$p" steam 1)"
+  [[ "$(probe_field "$p" steam 1)" == "True" ]] && pass "Steam initialised without steam_appid.txt" || fail "steam=$(probe_field "$p" steam 1)"
   assert_redirected "$p" 1
   restore_appid
   trap - EXIT
 }
 
-# ---- R27/R28: does injecting the dylib into a plain shell break command substitution,
-# the way it does on Linux (B1/B2/B3)? /bin/bash on macOS is Apple platform/hardened-
+# ---- does injecting the dylib into a plain shell break command substitution,
+# the way it does on Linux? /bin/bash on macOS is Apple platform/hardened-
 # runtime-signed, so this also tests whether SIP refuses the injection into the shell
 # itself (in which case the Linux-style breakage simply cannot occur on macOS — a
 # materially different, better outcome than Linux, worth confirming rather than assuming).
@@ -270,27 +270,27 @@ sc_shellhook() {
     /bin/bash -c 'v=$(printf ok); printf "subst=%s\n" "$v"' 2>&1 || true)"
   log "shellhook: $out"
   if [[ "$out" == *"subst=ok"* ]]; then
-    pass "R27/R28: command substitution unaffected when a hardened shell refuses foreign injection (or hook is harmless)"
+    pass "command substitution unaffected when a hardened shell refuses foreign injection (or hook is harmless)"
   elif [[ "$out" == *"subst="* ]]; then
-    fail "R27/R28: command substitution broken (B1/B2/B3 analogue reproduced on macOS)"
+    fail "command substitution broken (the Linux shell-hook breakage reproduced on macOS)"
   else
-    inconclusive "R27/R28: shell crashed or produced no output: $out"
+    inconclusive "shell crashed or produced no output: $out"
   fi
 }
 
-# ---- V26: payload fails closed (FailFast) → non-zero exit, no window, reason logged.
+# ---- payload fails closed (FailFast) → non-zero exit, no window, reason logged.
 sc_payload_fail() {
   local p
   p="$(new_profile payload_fail 0 "${BASE_MODS[@]}" rwpm.spike.probe)"
   touch "$p/Mods"
   timed_run "$p" release 60
-  ((TIMED_OUT == 0)) || fail "V26 game still running at 60 s"
-  ((LAUNCH_CODE != 0)) && pass "V26 rwpm non-zero exit ($LAUNCH_CODE)" || fail "V26 exit 0"
-  grep -q 'FATAL' "$p/payload.log" && pass "V26 reason in payload log" || fail "V26 no FATAL in payload log"
-  [[ "$(probe_lines "$p")" -eq 0 ]] && pass "V26 game never loaded mods" || fail "V26 probe ran"
+  ((TIMED_OUT == 0)) || fail "game still running at 60 s"
+  ((LAUNCH_CODE != 0)) && pass "rwpm non-zero exit ($LAUNCH_CODE)" || fail "exit 0"
+  grep -q 'FATAL' "$p/payload.log" && pass "reason in payload log" || fail "no FATAL in payload log"
+  [[ "$(probe_lines "$p")" -eq 0 ]] && pass "game never loaded mods" || fail "probe ran"
 }
 
-# ---- ?11/?12: what Steam's %command% actually does on macOS — needs one manual click.
+# ---- what Steam's %command% actually does on macOS — needs one manual click.
 # Prints the exact Steam launch-options line to set and what to look for afterwards;
 # cannot be driven headlessly (native Steam GUI, no CLI launch API on macOS).
 sc_steam_cmdline() {
@@ -301,19 +301,19 @@ sc_steam_cmdline() {
 exec "\$@"
 EOF
   chmod +x "$wrapper"
-  log "?11/?12 MANUAL STEP: set RimWorld's Steam launch options to:"
+  log "MANUAL STEP: set RimWorld's Steam launch options to:"
   log "    $wrapper %command%"
   log "  then click Play once from the Steam app, quit the game, and re-run:"
   log "    spike/macos/run.sh steam_cmdline_check"
-  inconclusive "?11/?12: needs one manual Steam Play click (instructions logged above)"
+  inconclusive "needs one manual Steam Play click (instructions logged above)"
 }
 
 sc_steam_cmdline_check() {
   [[ -s "$OUT/steam-cmdline.log" ]] || {
-    fail "?11/?12: $OUT/steam-cmdline.log is empty — did you click Play with the wrapper set?"
+    fail "$OUT/steam-cmdline.log is empty — did you click Play with the wrapper set?"
     return
   }
-  log "?11/?12 captured chain:"
+  log "captured chain:"
   cat "$OUT/steam-cmdline.log" >&2
   # Finding (2026-10-12, live Steam macOS 1.6.4871): %command% names the .app BUNDLE
   # DIRECTORY itself (eg ".../RimWorldMac.app -disable-compute-shaders"), passed as a
@@ -321,11 +321,11 @@ sc_steam_cmdline_check() {
   # cannot exec a directory and fails immediately, which is exactly why this probe
   # wrapper doesn't itself start the game — that failure IS the answer, not a bug to
   # chase. It confirms rwpm's own launch.sh must resolve CFBundleExecutable and exec the
-  # inner Mach-O directly (V41's design, already implemented) rather than re-exec argv
+  # inner Mach-O directly (the design already implemented) rather than re-exec argv
   # as given.
   if grep -q 'RimWorldMac.app' "$OUT/steam-cmdline.log"; then
-    pass "V49: Steam macOS %command% = exec-style argv naming the .app bundle dir (not a shell, not LaunchServices); V41's resolve-and-exec design is required and correct"
+    pass "Steam macOS %command% = exec-style argv naming the .app bundle dir (not a shell, not LaunchServices); the resolve-and-exec design is required and correct"
   else
-    fail "?11/?12: %command% did not name the bundle at all — see $OUT/steam-cmdline.log, Stage 2 design needs revisiting"
+    fail "%command% did not name the bundle at all — see $OUT/steam-cmdline.log, Stage 2 design needs revisiting"
   fi
 }

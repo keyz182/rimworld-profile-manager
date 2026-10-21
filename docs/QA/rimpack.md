@@ -1,4 +1,4 @@
-# T81 QA runbook: share and open a modpack
+# QA runbook: share and open a modpack
 
 Check that a modpack made from a real profile holds only what it should, and that opening it in another place shows the right mods.
 
@@ -28,8 +28,8 @@ Check that a modpack made from a real profile holds only what it should, and tha
 8. On the second computer, start the app. Choose "Open modpack…" and pick the file. Expected: the question shows the pack name and description. "Mods to get from Steam", "Mods to find yourself" and "Mods you already have" hold the right mods.
 9. Choose "Open Steam page" for one mod. Expected: your browser opens the Steam page for that mod. Nothing else opens.
 10. Change the name. Choose "Restore". Expected: a new LIVE profile shows and is selected. Its mod list has the same order as the first profile.
-11. Without installing the mods, choose Play on the new profile once, then quit the game from its menu. Open the profile's mod list in the app. Expected: it still lists every mod of the pack (the load order is kept; see R55). If it does not, write down what changed.
-12. Choose "Export to RimSort" for the new profile. In RimSort, refresh. Expected: RimSort offers to download the missing mods. If RimSort's Steam database is off, the window is empty (R54): note it.
+11. Without installing the mods, choose Play on the new profile once, then quit the game from its menu. Open the profile's mod list in the app. Expected: it still lists every mod of the pack (the load order is kept). If it does not, write down what changed.
+12. Choose "Export to RimSort" for the new profile. In RimSort, refresh. Expected: RimSort offers to download the missing mods. If RimSort's Steam database is off, the window is empty: note it.
 
 ## Refusals
 

@@ -1,5 +1,5 @@
 //! `<app dir>/run.lock`: the one guard that stops a profile launch racing a bulk file
-//! operation. Shared by the Profiles-folder Move (V14) and the build store (V59).
+//! operation. Shared by the Profiles-folder Move and the build store.
 
 use std::fs::{File, TryLockError};
 use std::path::Path;
@@ -8,7 +8,7 @@ use crate::error::ProfileError;
 
 pub(crate) const RUN_LOCK: &str = "run.lock";
 
-/// Takes the lock, or `GameRunning` when something else holds it (V59).
+/// Takes the lock, or `GameRunning` when something else holds it.
 pub(crate) fn take_run_lock(app_dir: &Path) -> Result<File, ProfileError> {
     try_run_lock(app_dir)?.ok_or(ProfileError::GameRunning)
 }

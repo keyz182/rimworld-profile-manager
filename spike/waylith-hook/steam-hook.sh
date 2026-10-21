@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T63 spike W4: Steam launch-option wrapper. Sets the startup-hook env for profile spike-17,
+# Spike W4: Steam launch-option wrapper. Sets the startup-hook env for profile spike-17,
 # keeps Steam's wrapper chain as given, and adds -savedatafolder so Default is never used.
 set -euo pipefail
 P="$HOME/.local/share/RimWorld Profile Manager/profiles/spike-17"

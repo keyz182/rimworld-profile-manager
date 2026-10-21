@@ -1,4 +1,4 @@
-//! Copy settings between profiles (T33): "Start from" in the New profile dialog, the
+//! Copy settings between profiles: "Start from" in the New profile dialog, the
 //! More → "Copy settings from…" dialog, and first-run setup's seeding from Default.
 
 use iced::widget::{Column, checkbox, column, pick_list, row, text};
@@ -16,7 +16,7 @@ pub struct SettingsCopy {
     /// `None`: start empty (New profile only).
     pub from: Option<ProfileId>,
     pub groups: Vec<Group>,
-    /// Each group's size in the chosen source (review M1).
+    /// Each group's size in the chosen source.
     pub sizes: Vec<(Group, u64)>,
 }
 

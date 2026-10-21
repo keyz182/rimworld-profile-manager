@@ -1,4 +1,4 @@
-//! T74: "Back up…" and "Restore backup…". The core's own tests cover the file format and
+//! "Back up…" and "Restore backup…". The core's own tests cover the file format and
 //! every refusal; these cover what the window adds: who is offered what, the notices, the
 //! blocking rules, and one real backup and restore through the job thread.
 

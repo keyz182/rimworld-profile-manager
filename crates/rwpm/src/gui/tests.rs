@@ -1,5 +1,5 @@
-// T43: Linux only — fixtures assume `RimWorldLinux`, `start_RimWorld.sh`, zenity, a flat
-// `Mods`/`Data` install layout. Real macOS GUI/launch coverage is T48's e2e against the
+// Linux only — fixtures assume `RimWorldLinux`, `start_RimWorld.sh`, zenity, a flat
+// `Mods`/`Data` install layout. Real macOS GUI/launch coverage is the macOS e2e test against the
 // actual Steam install, not a fake-binary port of this harness.
 #![cfg(target_os = "linux")]
 
@@ -174,7 +174,7 @@ fn rename_flow_and_default_is_protected() {
     let _ = app.update(Message::Input(Field::Name, "New Name".into()));
     let _ = app.update(Message::Confirm);
     assert_eq!(names(&app), ["Default", "New Name"]);
-    assert_eq!(app.selected.as_str(), "old", "id stays (V19)");
+    assert_eq!(app.selected.as_str(), "old", "id stays");
     let _ = app.update(Message::Delete);
     assert!(matches!(app.dialog, Some(Dialog::ConfirmDelete)));
     let _ = app.update(Message::Cancel);
@@ -218,7 +218,7 @@ fn play_starts_rwpm_run_with_guard_already_answered() {
     );
 }
 
-/// V31: with Flatpak Steam, Play runs the launcher copy inside Steam's sandbox.
+/// With Flatpak Steam, Play runs the launcher copy inside Steam's sandbox.
 #[test]
 fn play_with_flatpak_steam_runs_in_its_sandbox() {
     let sb = Sandbox::new();
@@ -384,7 +384,7 @@ fn guard_dialog_view_offers_all_choices() {
 }
 
 /// Manual: renders every screen and dialog headless at the smallest supported window
-/// (960×600, V33), light and dark, to PNGs in `$RWPM_SNAPSHOT_DIR` for review.
+/// (960×600), light and dark, to PNGs in `$RWPM_SNAPSHOT_DIR` for review.
 #[test]
 #[ignore = "writes PNG renders for manual review"]
 fn render_screens_manual() {
@@ -492,7 +492,7 @@ fn render_screens_manual() {
     shot(&app, "23-copy-settings");
     let _ = app.update(Message::Cancel);
 
-    // T74: the Backup dialog with the game files ticked (both notices show), and the
+    // The Backup dialog with the game files ticked (both notices show), and the
     // Restore question on a computer that lacks the profile's game version.
     let packed = Sandbox::new();
     let pinned = backups::offline_pinned(&packed);
@@ -506,7 +506,7 @@ fn render_screens_manual() {
     let _ = app.update(Message::RestorePicked(Some(file)));
     shot(&app, "25-restore-dialog");
 
-    // T81: the Share dialog (two saves, one chosen to start from; the privacy notice
+    // The Share dialog (two saves, one chosen to start from; the privacy notice
     // shows) and the Open modpack question on a computer that lacks some of the mods.
     let shared = Sandbox::new();
     let id = modpacks::live_profile(&shared, "Ironman", &["ludeon.rimworld"]);
@@ -620,10 +620,10 @@ fn support_text_has_versions_logs_and_trims_long_ones() {
     assert!(report.len() < 270 * 1024, "trimmed to the end of the log");
 }
 
-/// V67: with a 1.7 (Waylith) game, the game log is `<profile>/Logs/Player.log`; our own
+/// With a 1.7 (Waylith) game, the game log is `<profile>/Logs/Player.log`; our own
 /// logs still come from the profile folder.
 #[test]
-fn v67_support_text_reads_waylith_log() {
+fn support_text_reads_waylith_log() {
     let sb = Sandbox::new();
     std::fs::write(sb.game_dir().join("Waylith.dll"), "").expect("marker");
     let id = sb.offline_profile("Seventeen", &[]);
@@ -666,7 +666,7 @@ fn help_opens_and_ok_closes() {
     assert!(app.dialog.is_none());
 }
 
-/// T69 / B9: Help explains 1.7, including the mod list the game clears on a first 1.7 start.
+/// Help explains 1.7, including the mod list the game clears on a first 1.7 start.
 #[test]
 fn help_explains_rimworld_17() {
     let sb = Sandbox::new();
@@ -692,7 +692,7 @@ fn steam_launch_options_shown_and_copyable() {
         iced_test::simulator(app.view())
             .find(line.as_str())
             .is_err(),
-        "the raw line stays in the guide (M7)"
+        "the raw line stays in the guide"
     );
     click(&mut app, text::SET_UP_STEAM);
     let mut ui = iced_test::simulator(app.view());
@@ -708,7 +708,7 @@ fn steam_launch_options_shown_and_copyable() {
     assert!(matches!(&app.notice, Some(Notice::Info(n)) if n.contains("Launch options")));
 }
 
-/// V38: a failed launcher copy (AppImage, Flatpak) never hands out a launch line or
+/// A failed launcher copy (AppImage, Flatpak) never hands out a launch line or
 /// writes RimSort's settings, since the path in them would not work.
 #[test]
 fn failed_launcher_copy_refuses_launch_line_and_rimsort() {
@@ -732,7 +732,7 @@ fn failed_launcher_copy_refuses_launch_line_and_rimsort() {
     assert!(ui.find(text::COPY_STEAM).is_err(), "no Copy button");
 }
 
-/// V34 B5: set up a Steam launch in ≤ 3 steps (select, Set up Steam, Copy line).
+/// Set up a Steam launch in ≤ 3 steps (select, Set up Steam, Copy line).
 #[test]
 fn steam_setup_in_three_steps_then_guide_shows_it_worked() {
     use rwpm_core::profile::{LastRun, RunOutcome, StartedBy};
@@ -980,7 +980,7 @@ fn opens_on_last_played_profile_and_says_how_it_went() {
         .write(&LastRun::path(store.root(), &profile(&newer)))
         .expect("w");
     let app = sb.app();
-    assert_eq!(app.selected, newer, "B2: last played is selected");
+    assert_eq!(app.selected, newer, "last played is selected");
     let mut ui = iced_test::simulator(app.view());
     ui.find("Last run just now: worked (started from Steam).")
         .expect("Play row says how it went");
@@ -1008,7 +1008,7 @@ fn established_install_skips_setup_and_remembers() {
     assert!(AppSettings::load(&sb.path("app")).expect("s").setup_done);
 }
 
-/// V34 B1: first open → Play a new profile in ≤ 3 steps when RimWorld is found.
+/// First open → Play a new profile in ≤ 3 steps when RimWorld is found.
 #[test]
 fn first_run_to_play_in_three_steps_when_game_found() {
     use super::setup::Setup;
@@ -1027,7 +1027,7 @@ fn first_run_to_play_in_three_steps_when_game_found() {
     assert!(AppSettings::load(&sb.path("app")).expect("s").setup_done);
 }
 
-/// V34 B1b: not found → a folder is typed (one step) → ≤ 5 steps to Play.
+/// Not found → a folder is typed (one step) → ≤ 5 steps to Play.
 #[test]
 fn first_run_without_game_asks_for_the_folder() {
     use super::setup::SetupMsg;
@@ -1111,7 +1111,7 @@ fn mod_list_shows_load_order_sources_and_flags() {
     assert!(ui.find("me.gone").is_err() && ui.find("brrainz.harmony").is_ok());
 }
 
-/// V33: a 1,000-mod list builds quickly and search narrows it.
+/// A 1,000-mod list builds quickly and search narrows it.
 #[test]
 fn thousand_mod_list_stays_quick() {
     use rwpm_core::profile::mod_list::{ModRow, Source};
@@ -1165,7 +1165,7 @@ fn guard_dialog_names_mods() {
     app.dialog = Some(Dialog::Guard(report));
     let mut ui = iced_test::simulator(app.view());
     ui.find(text::unfrozen_steam_copy("Harmony").as_str())
-        .expect("the name, not the package id (M6)");
+        .expect("the name, not the package id");
 }
 
 /// What the background health check would hand back for the selected profile.
@@ -1182,7 +1182,7 @@ fn health_now(app: &mut App, sb: &Sandbox) {
     let _ = app.update(Message::HealthRead(p.id, problems));
 }
 
-/// V34 B6: fix a health problem in ≤ 2 steps (select, fix).
+/// Fix a health problem in ≤ 2 steps (select, fix).
 #[test]
 fn health_shows_unfrozen_mods_and_fixes_in_two_steps() {
     let sb = Sandbox::new();
@@ -1249,7 +1249,7 @@ fn other_layout_profiles_get_a_banner_with_a_folder_button() {
     ));
 }
 
-/// V34 B2 + B3: the last played profile plays in 1 step; another in ≤ 2.
+/// The last played profile plays in 1 step; another in ≤ 2.
 #[test]
 fn play_last_played_in_one_step_and_another_in_two() {
     use rwpm_core::profile::{LastRun, RunOutcome, StartedBy};
@@ -1262,7 +1262,7 @@ fn play_last_played_in_one_step_and_another_in_two() {
         .expect("w");
     let mut app = sb.app();
     click(&mut app, text::LAUNCH);
-    let args = sb.launched().expect("B2: one click plays the last played");
+    let args = sb.launched().expect("one click plays the last played");
     assert_eq!(args[1], played.id.as_str());
 
     let sb = Sandbox::new();
@@ -1273,10 +1273,13 @@ fn play_last_played_in_one_step_and_another_in_two() {
         click(&mut app, label);
         steps += 1;
     }
-    assert!(steps <= 2 && sb.launched().is_some(), "B3");
+    assert!(
+        steps <= 2 && sb.launched().is_some(),
+        "another profile plays in 2 steps"
+    );
 }
 
-/// V34 B4: go OFFLINE in ≤ 3 steps (select, Freeze mods, confirm the plan).
+/// Go OFFLINE in ≤ 3 steps (select, Freeze mods, confirm the plan).
 #[test]
 fn go_offline_in_three_steps() {
     let sb = Sandbox::new();
@@ -1323,7 +1326,7 @@ fn go_offline_in_three_steps() {
     );
 }
 
-/// V36: a new profile with no mod list goes OFFLINE without a dialog (setup's OFFLINE).
+/// A new profile with no mod list goes OFFLINE without a dialog (setup's OFFLINE).
 #[test]
 fn new_profile_goes_offline_without_asking() {
     let sb = Sandbox::new();
@@ -1349,7 +1352,7 @@ fn new_profile_goes_offline_without_asking() {
     );
 }
 
-/// V34 B7: find a profile among 50 in ≤ 2 steps (type in search, Enter).
+/// Find a profile among 50 in ≤ 2 steps (type in search, Enter).
 #[test]
 fn find_one_of_fifty_in_two_steps() {
     use iced::keyboard::key::Named;
@@ -1365,7 +1368,7 @@ fn find_one_of_fifty_in_two_steps() {
     let _ = Named::Enter; // Enter in the search field sends SearchSubmit.
 }
 
-/// M8 + M9: Settings checks the typed game folder at once; without RimWorld, actions
+/// Settings checks the typed game folder at once; without RimWorld, actions
 /// that need it wait.
 #[test]
 fn settings_checks_folder_and_game_needing_actions_wait() {
@@ -1460,7 +1463,7 @@ fn copy_settings_from_menu_runs_a_job_and_is_not_for_default() {
         .expect("says what happens to old files");
     let _ = app.update(Message::GameRunning(true));
     let _ = app.update(Message::Confirm);
-    assert!(app.job.is_none(), "waits while RimWorld runs (V37)");
+    assert!(app.job.is_none(), "waits while RimWorld runs");
     let _ = app.update(Message::GameRunning(false));
     let _ = app.update(Message::OpenCopySettings);
     let _ = app.update(Message::Confirm);
@@ -1483,7 +1486,7 @@ fn first_run_profile_gets_defaults_mod_list_without_an_extra_step() {
     let p = app.current().cloned().expect("p");
     assert!(!p.is_default());
     let copied = p.save_data_dir().join("Config/ModsConfig.xml");
-    // V37 uses the real process check: with a RimWorld open on this machine the copy is
+    // The real process check is used: with a RimWorld open on this machine the copy is
     // refused, and the player is told why.
     if rwpm_core::profile::any_game_running() {
         assert!(!copied.is_file());
@@ -1513,10 +1516,10 @@ fn empty_profile_gets_a_health_line_that_opens_copy_settings() {
     assert!(matches!(app.dialog, Some(Dialog::CopySettings(_))));
 }
 
-/// V55: Open log and Copy log refuse for a pinned profile whose build is gone, rather
+/// Open log and Copy log refuse for a pinned profile whose build is gone, rather
 /// than fall back to another game's log.
 #[test]
-fn v55_logs_refuse_when_the_pinned_build_is_missing() {
+fn logs_refuse_when_the_pinned_build_is_missing() {
     let sb = Sandbox::new();
     let store = sb.ctx().store().expect("store");
     let p = store.create("Pinned").expect("create");
@@ -1531,10 +1534,10 @@ fn v55_logs_refuse_when_the_pinned_build_is_missing() {
     assert!(refused(&app), "{:?}", app.notice);
 }
 
-/// V55 (T57): Add to RimSort refuses for a pinned profile whose build is gone, in the
+/// Add to RimSort refuses for a pinned profile whose build is gone, in the
 /// same words as every other game action, and leaves RimSort's settings alone.
 #[test]
-fn v55_rimsort_export_refuses_when_the_pinned_build_is_missing() {
+fn rimsort_export_refuses_when_the_pinned_build_is_missing() {
     let sb = Sandbox::new();
     let store = sb.ctx().store().expect("store");
     let p = store.create("Pinned").expect("create");
@@ -1558,7 +1561,7 @@ fn v55_rimsort_export_refuses_when_the_pinned_build_is_missing() {
     );
 }
 
-/// T55 decision 1: Play on a pinned profile hands `rwpm run` the stored build's exe, not
+/// Play on a pinned profile hands `rwpm run` the stored build's exe, not
 /// the Steam install's.
 #[test]
 fn play_on_a_pinned_profile_passes_the_builds_exe() {
@@ -1588,7 +1591,7 @@ fn play_on_a_pinned_profile_passes_the_builds_exe() {
     assert_eq!(args[..4], ["run", p.id.as_str(), "--", exe.as_str()]);
 }
 
-/// T56: what `game_problem` says per profile, from the health the app has read. (Pressing
+/// What `game_problem` says per profile, from the health the app has read. (Pressing
 /// the buttons with no Steam install is in `tests/gating.rs`.)
 #[test]
 fn play_gating_follows_the_effective_game() {
@@ -1701,8 +1704,8 @@ fn ok_clears_a_notice() {
     }
 }
 
-/// T59 D36: the Help dialog keeps its OK button inside the smallest window the layout is
-/// designed for (V33), however many sections it has.
+/// The Help dialog keeps its OK button inside the smallest window the layout is
+/// designed for, however many sections it has.
 #[test]
 fn help_keeps_ok_on_screen_at_the_smallest_window() {
     let (ok, first) = help_bounds(600.0);

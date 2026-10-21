@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T50 spike: capture the Steam RimWorld install as a stored build.
+# Spike: capture the Steam RimWorld install as a stored build.
 # Usage: capture.sh <steam install dir> <builds dir>
 # Copies with reflink (btrfs/xfs) and records version, Steam build id and space use.
 set -euo pipefail
@@ -31,7 +31,7 @@ staging="$builds/.staging-$slug"
 rm -rf "$staging"
 start=$(date +%s)
 cp -a --reflink=always "$src" "$staging"
-# Not part of the game: Steam's appid file (V52 must prove SteamAppId alone) and crash dumps.
+# Not part of the game: Steam's appid file (the capture must prove SteamAppId alone) and crash dumps.
 rm -f "$staging/steam_appid.txt" "$staging"/mono_crash.*
 mv "$staging" "$dest"
 end=$(date +%s)

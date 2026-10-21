@@ -1,14 +1,14 @@
-//! Default on-disk locations (§I).
+//! Default on-disk locations.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::flatpak;
 
-/// App data folder name (§I `<app>`).
+/// App data folder name.
 pub const APP_DIR: &str = "RimWorld Profile Manager";
 
-/// Where this app and the game keep their files (V31).
+/// Where this app and the game keep their files.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
     /// The user's own data and config folders (inside a sandbox: the sandbox's).
@@ -25,11 +25,11 @@ pub struct GameIn {
     pub flatpak: bool,
 }
 
-/// V31: Flatpak when RimWorld is only in Flatpak Steam, or in both and this app
+/// Flatpak when RimWorld is only in Flatpak Steam, or in both and this app
 /// already keeps its data there. Inside a sandbox the standard folders already are
 /// Flatpak Steam's.
 pub fn decide_layout(in_sandbox: bool, game: GameIn, flatpak_data_exists: bool) -> Layout {
-    // V44: macOS has no Flatpak analogue — always Standard. Also true by the match's
+    // MacOS has no Flatpak analogue — always Standard. Also true by the match's
     // fallback arm below (no Flatpak Steam install is ever found there), but spelled out
     // so the invariant doesn't depend on that happening to be the only unmatched case.
     if in_sandbox || cfg!(windows) || cfg!(target_os = "macos") {
@@ -89,14 +89,14 @@ pub fn default_profiles_root() -> Option<PathBuf> {
     app_data_dir().map(|d| d.join("profiles"))
 }
 
-/// `<app data>/run.lock`: held by `rwpm run` while its game runs (V11).
+/// `<app data>/run.lock`: held by `rwpm run` while its game runs.
 pub fn run_lock_path() -> Option<PathBuf> {
     app_data_dir().map(|d| d.join("run.lock"))
 }
 
-/// The game's own save-data dir, used by the Default profile (§I).
+/// The game's own save-data dir, used by the Default profile.
 /// Unity `persistentDataPath`: Windows `AppData\LocalLow\…`, Linux `$XDG_CONFIG_HOME/unity3d/…`,
-/// macOS `~/Library/Application Support/RimWorld` directly (R16/R29, live-confirmed — NOT
+/// macOS `~/Library/Application Support/RimWorld` directly (live-confirmed — NOT
 /// a `unity3d`/`Ludeon Studios` subpath, unlike the other two); Flatpak Steam: its
 /// sandbox's `$XDG_CONFIG_HOME`.
 pub fn default_game_save_dir() -> Option<PathBuf> {
@@ -149,7 +149,7 @@ mod tests {
         assert!(dir.ends_with(PathBuf::from("Ludeon Studios").join("RimWorld by Ludeon Studios")));
     }
 
-    /// R16/R29/V44, live-confirmed: no `unity3d`/`Ludeon Studios` subpath on macOS.
+    /// Live-confirmed: no `unity3d`/`Ludeon Studios` subpath on macOS.
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_game_save_dir_is_application_support_rimworld() {
@@ -181,7 +181,7 @@ mod tests {
         }
     }
 
-    /// V44: macOS has no Flatpak analogue — always Standard, whatever the inputs say.
+    /// MacOS has no Flatpak analogue — always Standard, whatever the inputs say.
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_layout_is_always_standard() {
@@ -199,7 +199,7 @@ mod tests {
         }
     }
 
-    /// The same folders Flatpak Steam's sandbox gets as XDG data and config (R23).
+    /// The same folders Flatpak Steam's sandbox gets as XDG data and config.
     #[test]
     fn flatpak_folders_match_the_sandbox() {
         let home = Path::new("/home/u");

@@ -1,4 +1,4 @@
-//! Backup: one OFFLINE profile → one `.rimrim` (T72; V75, V79, V81, V82, V84).
+//! Backup: one OFFLINE profile → one `.rimrim`.
 //!
 //! `plan_backup` shows the player what a backup would hold. `apply_backup` takes the run
 //! lock, walks the profile again (so the totals in `rimrim.toml` describe the bytes it is
@@ -29,7 +29,7 @@ const MODS: &str = "Mods";
 const CONFIG: &str = "Config";
 /// Archive folder for the profile's log files; restore puts each back at the profile root.
 const ARCHIVE_LOGS: &str = "logs";
-/// Logs at the profile root, and the Waylith log folder (R41).
+/// Logs at the profile root, and the Waylith log folder.
 const LOG_FILES: [&str; 4] = ["Player.log", "Player-prev.log", "payload.log", "rwpm.log"];
 const LOG_DIR: &str = "Logs";
 /// Builds are mostly textures and DLLs; level 3 is zstd's own default speed/size balance.
@@ -104,8 +104,8 @@ pub fn plan_backup<T: Trash>(
     Ok(plan)
 }
 
-/// Writes the backup to `dest`. Refused while a game runs (V79). Nothing is left at `dest`
-/// or beside it on failure (V81); an existing `dest` is replaced only on success.
+/// Writes the backup to `dest`. Refused while a game runs. Nothing is left at `dest`
+/// or beside it on failure; an existing `dest` is replaced only on success.
 pub fn apply_backup(
     plan: &BackupPlan,
     dest: &Path,
@@ -287,12 +287,12 @@ struct Item {
     kind: Kind,
 }
 
-/// Everything a backup would write after `rimrim.toml`, in archive order (V82).
+/// Everything a backup would write after `rimrim.toml`, in archive order.
 #[derive(Default)]
 struct Inventory {
     items: Vec<Item>,
     bytes: u64,
-    /// Links and special files in the profile, which a backup cannot hold (V84).
+    /// Links and special files in the profile, which a backup cannot hold.
     refused: Vec<String>,
     skipped_links: Vec<PathBuf>,
     build_links: Vec<Item>,
@@ -332,7 +332,7 @@ impl Inventory {
         Err(ProfileError::NotBackupable(named))
     }
 
-    /// The build folder: files and folders, then its links, then `build.toml` (V82), so an
+    /// The build folder: files and folders, then its links, then `build.toml`, so an
     /// unfinished extract never looks like a whole build.
     fn build(&mut self, key: &BuildKey, dir: &Path) -> Result<(), ProfileError> {
         let root = Path::new(BUILD_ROOT).join(key.as_str());
@@ -349,7 +349,7 @@ impl Inventory {
         Ok(())
     }
 
-    /// `build_root` is `Some` below a game build, where safe links are carried (V73).
+    /// `build_root` is `Some` below a game build, where safe links are carried.
     fn tree(
         &mut self,
         src: &Path,
@@ -445,7 +445,7 @@ impl Inventory {
     }
 }
 
-/// Names restore would refuse (V73) are refused here, so no backup is unrestorable.
+/// Names restore would refuse are refused here, so no backup is unrestorable.
 fn name_ok(name: &OsStr) -> bool {
     name.to_str()
         .is_some_and(|s| !s.contains(['\\', ':', '\0']))

@@ -1,6 +1,6 @@
 //! A profile's turned-on mods in load order, each with where it loads from and anything
-//! wrong with it (T29, read-only). OFFLINE profiles load from their own frozen copies,
-//! so anything else is flagged the way the launch guard (V5) would see it.
+//! wrong with it (read-only). OFFLINE profiles load from their own frozen copies,
+//! so anything else is flagged the way the launch guard would see it.
 
 use crate::builds::EffectiveGame;
 use crate::mods::{ModIndex, Origin, read_active_mods};
@@ -23,7 +23,7 @@ pub enum Source {
 pub enum Flag {
     /// Turned on, but not installed anywhere the game looks.
     Missing,
-    /// OFFLINE, but this mod would load from Steam and can change (V5).
+    /// OFFLINE, but this mod would load from Steam and can change.
     NotFrozen,
     /// Installed more than once in the same place; the game picks one.
     Twice,

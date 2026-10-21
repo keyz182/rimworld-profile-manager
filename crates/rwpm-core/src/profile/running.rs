@@ -1,4 +1,4 @@
-//! Is a profile's game running? (V17 detection, used by V27 and later the T10 lock.)
+//! Is a profile's game running?
 //!
 //! A profile is running when any process carries that profile's exact
 //! `-savedatafolder=<SaveData>` argument. This also catches the in-game Restart
@@ -35,7 +35,7 @@ impl RunningProbe for ProcessProbe {
 }
 
 /// Executable names of the game on Linux and Windows. `RimWorld` / `RimWorld.exe`: the 1.7
-/// (Waylith) exes (V69, B13), so the one-game check (V11) and the exit wait (V17) see 1.7 too.
+/// (Waylith) exes, so the one-game check and the exit wait see 1.7 too.
 pub const GAME_PROCESS_NAMES: [&str; 4] = [
     "RimWorldLinux",
     "RimWorldWin64.exe",
@@ -44,7 +44,7 @@ pub const GAME_PROCESS_NAMES: [&str; 4] = [
 ];
 
 /// Is any RimWorld process alive (whatever its profile, launched by us or not)?
-/// V11: profiles share `temporaryCachePath`, so only one game may run at once.
+/// Profiles share `temporaryCachePath`, so only one game may run at once.
 pub fn any_game_running() -> bool {
     use sysinfo::{ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 
@@ -92,12 +92,12 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(10));
     }
 
-    /// V69: a 1.7 game process is named `RimWorld`; `sleep` run through a symlink of that
+    /// A 1.7 game process is named `RimWorld`; `sleep` run through a symlink of that
     /// name stands in for it (the name comes from the exec path). A symlink, not a copy:
     /// a freshly written binary can be "text file busy" while other tests fork.
     #[cfg(target_os = "linux")]
     #[test]
-    fn v69_probe_sees_process_named_rimworld() {
+    fn probe_sees_process_named_rimworld() {
         let dir = tempfile::tempdir().expect("tempdir");
         let exe = dir.path().join("RimWorld");
         std::os::unix::fs::symlink("/bin/sleep", &exe).expect("symlink sleep");
@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn v69_process_names_cover_windows_waylith() {
+    fn process_names_cover_windows_waylith() {
         assert!(GAME_PROCESS_NAMES.contains(&"RimWorld.exe"));
     }
 }

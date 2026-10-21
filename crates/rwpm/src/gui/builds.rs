@@ -1,4 +1,4 @@
-//! Game versions (T56): the list of stored builds, Capture and Delete. A drill-in, like the
+//! Game versions: the list of stored builds, Capture and Delete. A drill-in, like the
 //! mod list, so the job bar stays visible while a copy runs. The core does the work (lock,
 //! free-space check, staging, recovery); this file only asks, shows progress and reports.
 
@@ -23,9 +23,9 @@ pub struct BuildRow {
     pub stored: Option<String>,
     /// Why `build.toml` cannot be read, if it cannot.
     pub problem: Option<String>,
-    /// Display names of profiles pinned to it (V54).
+    /// Display names of profiles pinned to it.
     pub used_by: Vec<String>,
-    /// Profiles whose `profile.toml` could not be read, so their pin is unknown (D27).
+    /// Profiles whose `profile.toml` could not be read, so their pin is unknown.
     pub unchecked: Vec<String>,
 }
 
@@ -36,7 +36,7 @@ pub fn fits(plan: &CapturePlan) -> bool {
 }
 
 impl BuildRow {
-    /// Delete is open only when nobody uses the build and nobody can be unsure (V54).
+    /// Delete is open only when nobody uses the build and nobody can be unsure.
     pub fn deletable(&self) -> bool {
         self.used_by.is_empty() && self.unchecked.is_empty()
     }

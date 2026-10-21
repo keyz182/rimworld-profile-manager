@@ -1,4 +1,4 @@
-# T82: restore a modpack with steamcmd (manual QA)
+# Restore a modpack with steamcmd (manual QA)
 
 Run this on a machine where Steam is closed or not installed, so the Steam route is not offered. Use a test pack of 2 or 3 small mods.
 
@@ -28,4 +28,4 @@ Delete `<app data>/steamcmd/`, remove the `steamcmd` entry from `consent.toml`, 
 
 ## Not yet run
 
-Windows and macOS (T82d). Linux without the 32-bit libraries, to see the plain-words message. A Mac without Rosetta is parked: the consent dialog says Rosetta 2 is needed, and the failure message is covered by a test.
+Windows and macOS. Linux without the 32-bit libraries, to see the plain-words message. A Mac without Rosetta is parked: the consent dialog says Rosetta 2 is needed, and the failure message is covered by a test.

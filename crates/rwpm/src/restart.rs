@@ -1,9 +1,9 @@
-//! Restart trampoline (V28). On Linux OFFLINE the game runs with argv[0] = rwpm, so the
+//! Restart trampoline. On Linux OFFLINE the game runs with argv[0] = rwpm, so the
 //! in-game Restart (GenCommandLine.cs:45-58) runs `rwpm <game args…>` with the game's
 //! environment. That environment no longer enables Doorstop (the payload turned it off
 //! for helpers), so rebuild the launch and exec the real game in this process.
 //!
-//! The same path runs the game behind wrappers (V29): `rwpm run` puts
+//! The same path runs the game behind wrappers: `rwpm run` puts
 //! `rwpm --rwpm-inner <game args…>` where the start script was, with the same env.
 //!
 //! No lock and no guard: the original `rwpm run` still holds the lock and is waiting.

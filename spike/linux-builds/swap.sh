@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T50 spike: Steam launch-option stand-in for the planned `rwpm run` target swap.
+# Spike: Steam launch-option stand-in for the planned `rwpm run` target swap.
 # Steam launch options: RWPM_SPIKE_BUILD=<build dir> RWPM_SPIKE_PROFILE=<id> <this> %command%
 # Replaces Steam's start_RimWorld.sh token with the build's, keeps every wrapper before
 # it, then hands the whole line to `rwpm run` as Steam would.

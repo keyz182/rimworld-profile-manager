@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Stands in for the game's Assembly-CSharp. `-p:DefineConstants=NO_FIELD` builds a copy
-       without the field, for the fail-closed case (V26). -->
+       without the field, for the fail-closed case. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Assembly-CSharp</AssemblyName>

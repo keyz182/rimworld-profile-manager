@@ -77,8 +77,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        # T47: macOS can't be cross-compiled from Linux — codesign and the adhoc-sign
-        # step (T46/V42) need the real toolchain — so it gets its own Mac runner, unlike
+        # MacOS can't be cross-compiled from Linux — codesign and the adhoc-sign
+        # step need the real toolchain — so it gets its own Mac runner, unlike
         # Windows which cross-builds fine with mingw from the ubuntu runner.
         include:
           - os: linux
@@ -129,7 +129,7 @@ jobs:
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          # perl, not `sed -i`: BSD sed (macOS runner, T47) takes -i's next arg as a
+          # perl, not `sed -i`: BSD sed (macOS runner) takes -i's next arg as a
           # backup suffix and would eat the filename. -0777 slurps so the //m match
           # without /g hits only the first `version =`, i.e. [workspace.package].
           perl -0777 -i -pe 's/^version = ".*"/version = "$ENV{VERSION}"/m' Cargo.toml

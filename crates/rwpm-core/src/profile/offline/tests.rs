@@ -160,7 +160,7 @@ fn offline_copies_active_mods_keeping_folder_names() {
     assert!(plan.conflicts.is_empty() && plan.missing.is_empty() && !plan.reuse);
     let p = f.apply(&plan, &[]).expect("apply");
     assert_eq!(p.mode, Mode::Offline);
-    // V12: source folder names; official Core and inactive mods not copied.
+    // Source folder names; official Core and inactive mods not copied.
     assert_eq!(f.mods(&id), ["2009463077", "MyMod"]);
     let copied = f.profile_dir(&id).join("Mods/2009463077/payload.txt");
     assert_eq!(
@@ -194,7 +194,7 @@ fn offline_never_writes_sources() {
     let result = f.apply(&f.plan(&id, false), &[]);
     ro(0o755);
     result.expect("apply with read-only sources");
-    // V6
+    // The read-only sources are untouched.
     assert_eq!(snapshot(&f.path("install")), install);
     assert_eq!(snapshot(&f.path("ws")), ws);
 }
@@ -225,7 +225,7 @@ fn both_ids_active_is_conflict_until_chosen() {
         matches!(f.apply(&plan, &[]), Err(ProfileError::Unresolved(ids)) if ids == ["brrainz.harmony"])
     );
     assert_eq!(f.file(&id).mode, Mode::Live, "nothing changed");
-    // V20: never both.
+    // Never both.
     f.apply(&plan, &[("brrainz.harmony".into(), local)])
         .expect("apply");
     assert_eq!(f.mods(&id), ["Harmony"]);
@@ -254,7 +254,7 @@ fn missing_active_mod_reported_not_fatal() {
     assert_eq!(f.mods(&id), ["2009463077"]);
 }
 
-/// V36: a new profile with no mod list goes OFFLINE with nothing frozen.
+/// A new profile with no mod list goes OFFLINE with nothing frozen.
 #[test]
 fn no_modsconfig_plans_nothing_and_goes_offline() {
     let f = Fixture::new();

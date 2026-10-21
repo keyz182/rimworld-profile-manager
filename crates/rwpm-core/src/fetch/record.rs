@@ -1,5 +1,5 @@
 //! `<profile>/pack-subscriptions.toml`: the Workshop ids that opening a modpack subscribed this
-//! account to, and only those (M2 of the T83 review). "Remove subscriptions from the pack"
+//! account to, and only those. "Remove subscriptions from the pack"
 //! unsubscribes exactly these, so a mod the player already had is never touched.
 
 use std::collections::BTreeSet;

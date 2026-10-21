@@ -1,5 +1,5 @@
-//! T59: the docs and the Help section quote the labels the app really shows, so a renamed
-//! button cannot leave them describing a screen that is gone (D39).
+//! The docs and the Help section quote the labels the app really shows, so a renamed
+//! button cannot leave them describing a screen that is gone.
 
 use super::*;
 
@@ -99,8 +99,8 @@ fn help_explains_game_versions() {
         .expect("the dialog shows its sections");
 }
 
-/// T74: the backup guide and the README quote the labels the app shows, and the guide
-/// quotes the two sharing notes word for word (V80).
+/// The backup guide and the README quote the labels the app shows, and the guide
+/// quotes the two sharing notes word for word.
 #[test]
 fn the_backup_docs_quote_the_shipped_labels_and_notices() {
     for label in [
@@ -130,7 +130,7 @@ fn the_backup_docs_quote_the_shipped_labels_and_notices() {
     assert!(README.contains("docs/backups.md"));
 }
 
-/// T81: the modpack guide and the README quote the labels the app shows, and the guide
+/// The modpack guide and the README quote the labels the app shows, and the guide
 /// quotes the notices word for word.
 #[test]
 fn the_modpack_docs_quote_the_shipped_labels_and_notices() {

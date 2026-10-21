@@ -1,8 +1,8 @@
-//! `<builds>/<key>/build.toml` (§I.file).
+//! `<builds>/<key>/build.toml`.
 //!
-//! The file sits beside the game files, inside the build folder itself: §I.file puts it at
-//! `<builds>/<key>/build.toml`, V60 names `<build>/Mods/` as the build's local-mods folder
-//! and V54 allows writes to `<build>/Mods/`, which only agree if `<builds>/<key>/` *is* the
+//! The file sits beside the game files, inside the build folder itself, at
+//! `<builds>/<key>/build.toml`. `<build>/Mods/` is the build's local-mods folder and the app
+//! may write to it, which only agree if `<builds>/<key>/` *is* the
 //! copied game directory. RimWorld ignores the extra file.
 
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ pub struct BuildFile {
     pub schema: u32,
     /// Raw `Version.txt`, trimmed (e.g. `1.6.4871 rev598`).
     pub version: String,
-    /// Steam app manifest `buildid`. The build's identity (V63).
+    /// Steam app manifest `buildid`. The build's identity.
     pub buildid: String,
     /// Steam branch; `""` is the default branch.
     pub beta: String,
@@ -81,7 +81,7 @@ impl BuildFile {
     }
 }
 
-/// Sorted names of the folders directly in the game's `Data` dir (§I.file). Takes the
+/// Sorted names of the folders directly in the game's `Data` dir. Takes the
 /// `Data` dir itself, because it sits inside the bundle on macOS (`GameInstall::data_dir`).
 ///
 /// Folders only: a macOS install also keeps a plain `Place official expansions here.txt`
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(names, vec![std::ffi::OsString::from(FILE_NAME)]);
     }
 
-    /// §I.file: folder names. A macOS install keeps a stray text file in `Data/`.
+    /// Folder names. A macOS install keeps a stray text file in `Data/`.
     #[test]
     fn dlc_lists_sorted_folders_only() {
         let dir = tempfile::tempdir().expect("tempdir");

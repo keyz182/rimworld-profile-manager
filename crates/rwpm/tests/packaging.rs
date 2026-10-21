@@ -1,4 +1,4 @@
-//! T75, T81 (V83): `.rimrim` backups and `.rimpack` modpacks open in this app on Windows and
+//! `.rimrim` backups and `.rimpack` modpacks open in this app on Windows and
 //! Linux. The release files cannot be run in CI, so the installer scripts are checked as
 //! text, and the Linux one is also run against a scratch home folder.
 
@@ -145,7 +145,7 @@ fn the_linux_installer_adds_and_removes_the_entry_and_the_type() {
 const THIRD_PARTY_PY: &str = include_str!("../../../scripts/third_party.py");
 const VALVE_NOTE: &str = include_str!("../../../licenses/Steamworks-redistributable.txt");
 
-/// (helper, Valve library) per bundle, as `package.sh` sets them (T83e).
+/// (helper, Valve library) per bundle, as `package.sh` sets them.
 const STEAM_FILES: [(&str, &str); 3] = [
     ("rwpm-steam", "libsteam_api.so"),
     ("rwpm-steam.exe", "steam_api64.dll"),

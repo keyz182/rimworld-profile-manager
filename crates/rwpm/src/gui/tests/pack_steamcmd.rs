@@ -1,4 +1,4 @@
-//! T82c: "Restore and download…" through Valve's steamcmd, for a machine where Steam cannot be
+//! "Restore and download…" through Valve's steamcmd, for a machine where Steam cannot be
 //! reached. The core's tests cover downloading, unpacking and running steamcmd; these cover
 //! what the window adds: when the button is there, the first-use consent, the changed-file
 //! question, and that the job makes an OFFLINE profile. steamcmd is replaced by a fake, so no

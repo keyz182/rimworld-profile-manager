@@ -422,7 +422,7 @@ fn no_answer_for_the_resend_time_asks_once_more() {
     assert_eq!(f.started_at, [SETTLE.as_secs(), resend]);
 }
 
-/// Review M4, M5: after the second call an error may belong to the lost first one, so Steam's
+/// After the second call an error may belong to the lost first one, so Steam's
 /// own state decides.
 #[test]
 fn after_a_resend_an_error_answer_does_not_fail_what_steam_shows_done() {

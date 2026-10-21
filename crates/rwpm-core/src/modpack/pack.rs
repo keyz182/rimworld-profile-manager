@@ -1,4 +1,4 @@
-//! Pack: one profile → one `.rimpack` (C.58b).
+//! Pack: one profile → one `.rimpack`.
 //!
 //! `plan_pack` shows the creator what a pack would hold. `apply_pack` walks the profile
 //! again (so the totals in `rimpack.toml` describe the bytes it is about to write) and

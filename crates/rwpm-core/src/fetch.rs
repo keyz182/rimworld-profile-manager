@@ -1,10 +1,10 @@
-//! Fetching the missing mods of a modpack through the `rwpm-steam` helper (T83b).
+//! Fetching the missing mods of a modpack through the `rwpm-steam` helper.
 //!
 //! The helper is a separate program that asks the running Steam client to download, subscribe
 //! to or unsubscribe from Workshop mods and prints one line per event. This module starts it,
 //! reads the lines, can stop it at once, and then checks what Steam delivered. A pack is made
 //! by a stranger, so its mod names mean nothing: each fetched folder must hold the package id
-//! the pack promised, or the mod is not kept (H2 of the T83 review).
+//! the pack promised, or the mod is not kept.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader};
@@ -31,7 +31,7 @@ pub const BATCH: usize = 200;
 
 /// No line from the helper for this long means it is stuck.
 pub const QUIET: Duration = Duration::from_secs(120);
-/// Workshop copies of a package id that also exists locally carry this suffix (R1).
+/// Workshop copies of a package id that also exists locally carry this suffix.
 const STEAM_POSTFIX: &str = "_steam";
 const POLL: Duration = Duration::from_millis(100);
 
@@ -175,8 +175,8 @@ fn spawn(helper: &Path, op: &str, args: &[String]) -> Result<Child, String> {
 
 /// Starts a console program without a console window. The app has no console of its own, so
 /// without this Windows opens a window for every helper and steamcmd run, and Windows Terminal
-/// keeps it open afterwards when the exit code is not 0 (found in the real Windows window,
-/// T82). A no-op elsewhere.
+/// keeps it open afterwards when the exit code is not 0 (found in the real Windows window).
+/// A no-op elsewhere.
 #[cfg(windows)]
 pub(crate) fn no_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
@@ -305,7 +305,7 @@ pub fn fetch(
     let mut sizes: BTreeMap<u64, (u64, u64)> = BTreeMap::new();
     let mut fatal: Option<String> = None;
     // A pack can name any number of mods, and the helper takes a limited number of ids per
-    // run (T82 review H2), so they go in batches. A batch that was cancelled or went silent
+    // run, so they go in batches. A batch that was cancelled or went silent
     // ends the run: the mods after it are reported with that reason.
     let mut ended = Ok(());
     for batch in ids.chunks(BATCH) {

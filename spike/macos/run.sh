@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2015 # pass() always returns 0, so `cond && pass || fail` is a safe if/else.
-# macOS e2e harness (T37 spike). Mirrors spike/linux (T2, removed at tag v1.0.0, kept in
-# git history). Launches RimWorld via spike/macos/launch.sh and checks §V behaviour on
+# macOS e2e harness (spike). Mirrors spike/linux (removed at tag v1.0.0, kept in
+# git history). Launches RimWorld via spike/macos/launch.sh and checks behaviour on
 # this Mac, against the real Steam install and the real workshop mod set.
 # usage: run.sh <scenario|all>
 # exit: 0 pass, 1 fail, 2 inconclusive
@@ -12,7 +12,7 @@ GAME="${RWPM_GAME_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/
 WORKSHOP="${RWPM_WORKSHOP_DIR:-$HOME/Library/Application Support/Steam/steamapps/workshop/content/294100}"
 BUNDLE="$GAME/RimWorldMac.app"
 GAME_SAVE_DIR="$HOME/Library/Application Support/RimWorld"
-# R29 correction (found live by sc_live_baseline): Unity's macOS default Player.log location
+# Correction (found live by sc_live_baseline): Unity's macOS default Player.log location
 # is ~/Library/Logs/<Company>/<Product>/, NOT under the save dir and NOT Application Support.
 GAME_LOG_DIR="$HOME/Library/Logs/Ludeon Studios/RimWorld by Ludeon Studios"
 OUT="$ROOT/target/spike-mac"
@@ -38,7 +38,7 @@ inconclusive() {
   [[ $RESULT -eq 1 ]] || RESULT=2
 }
 
-# C2 analogue: always undo an interrupted V24 rename first, whatever scenario runs.
+# Always undo an interrupted appid rename first, whatever scenario runs.
 restore_appid() {
   if [[ -f "$APPID_MARKER" ]]; then
     if [[ -f "$APPID_FILE.rwpm-spike" && ! -f "$APPID_FILE" ]]; then

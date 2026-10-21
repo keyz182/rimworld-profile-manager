@@ -13,13 +13,13 @@ use crate::profile::running::RunningProbe;
 const SAVE_DATA: &str = "SaveData";
 const MODS: &str = "Mods";
 const PLAYER_LOG: &str = "Player.log";
-/// R41: Waylith's `FileLog` writes `<dir>/Logs/Player.log`.
+/// Waylith's `FileLog` writes `<dir>/Logs/Player.log`.
 const WAYLITH_LOG_DIR: &str = "Logs";
 const DEFAULT_NAME: &str = "Default";
 const MAX_SUFFIX: u32 = 999;
 /// Top-level files in the game's own save dir that a clone of Default leaves behind:
 /// Unity logs, and Steam Cloud's marker (the clone is not cloud-synced).
-/// V71: logs and the cloud marker are not save data. `Logs`: the 1.7 log folder (R41).
+/// Logs and the cloud marker are not save data. `Logs`: the 1.7 log folder.
 const DEFAULT_CLONE_SKIP: [&str; 4] = [
     "Player.log",
     "Player-prev.log",
@@ -42,7 +42,7 @@ impl Trash for OsTrash {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Location {
-    /// Built-in: the game's own save dir, launched without `-savedatafolder` (V10).
+    /// Built-in: the game's own save dir, launched without `-savedatafolder`.
     Default {
         save_dir: PathBuf,
     },
@@ -57,7 +57,7 @@ pub struct Profile {
     pub name: String,
     pub mode: Mode,
     /// Key of the stored game build this profile is pinned to; `None` = the Steam
-    /// install. Default is never pinned (V54).
+    /// install. Default is never pinned.
     pub game_build: Option<String>,
     pub location: Location,
 }
@@ -74,7 +74,7 @@ impl Profile {
         }
     }
 
-    /// `None` for Default (V10); otherwise one argv token without a trailing separator (V4).
+    /// `None` for Default; otherwise one argv token without a trailing separator.
     pub fn savedatafolder_arg(&self) -> Option<OsString> {
         self.stored_dir()
             .map(|dir| savedatafolder_arg(&dir.join(SAVE_DATA)))
@@ -84,16 +84,16 @@ impl Profile {
         self.stored_dir().map(|dir| dir.join(MODS))
     }
 
-    /// The `-logFile` launch argument (V15); `None` for Default, which is launched without it.
+    /// The `-logFile` launch argument; `None` for Default, which is launched without it.
     pub fn log_file(&self) -> Option<PathBuf> {
         self.stored_dir().map(|dir| dir.join(PLAYER_LOG))
     }
 
-    /// Where the game's log for this profile is, per engine (V67).
+    /// Where the game's log for this profile is, per engine.
     /// Unity: ours (`-logFile`) for stored profiles, Unity's own default
-    /// (`<game save dir>/Player.log`) for Default (V15).
+    /// (`<game save dir>/Player.log`) for Default.
     /// Waylith: `<folder>/Logs/Player.log`, the folder being the profile's (startup hook,
-    /// `RWPM_LOG_DIR`) or Default's save dir (the engine's own default, R41).
+    /// `RWPM_LOG_DIR`) or Default's save dir (the engine's own default).
     pub fn log_path(&self, engine: Engine) -> PathBuf {
         let dir = match &self.location {
             Location::Default { save_dir } => save_dir,
@@ -137,7 +137,7 @@ pub struct ProfileStore<T: Trash> {
 }
 
 impl<T: Trash> ProfileStore<T> {
-    /// Root must be absolute, UTF-8 and free of `=` (V4). Created if missing.
+    /// Root must be absolute, UTF-8 and free of `=`. Created if missing.
     pub fn open(root: PathBuf, game_save_dir: PathBuf, trash: T) -> Result<Self, ProfileError> {
         if !root.is_absolute() {
             return Err(ProfileError::RootNotAbsolute(root));
@@ -227,7 +227,7 @@ impl<T: Trash> ProfileStore<T> {
         Ok(Self::profile(id, dir, file))
     }
 
-    /// Copies `source` (SaveData, and Mods with folder names kept, V12) into a new profile
+    /// Copies `source` (SaveData, and Mods with folder names kept) into a new profile
     /// called `name`. Refused while any RimWorld runs: a save mid-write would copy torn.
     /// `profile.toml` is written last, so a partial clone is never listed.
     pub fn clone_profile(
@@ -282,7 +282,7 @@ impl<T: Trash> ProfileStore<T> {
         }
     }
 
-    /// Changes the display name only; id and dir stay (V19).
+    /// Changes the display name only; id and dir stay.
     pub fn rename(&self, id: &ProfileId, new_name: &str) -> Result<Profile, ProfileError> {
         if id.is_default() {
             return Err(ProfileError::DefaultImmutable("renamed"));
@@ -303,9 +303,9 @@ impl<T: Trash> ProfileStore<T> {
         Ok(Self::profile(id.clone(), dir, file))
     }
 
-    /// Pins the profile to a stored game build, or clears the pin with `None` (§I.file).
+    /// Pins the profile to a stored game build, or clears the pin with `None`.
     /// `key` must be a build key; anything else is refused before the file is touched.
-    /// V54: Default cannot be pinned — it has no `profile.toml` to hold the key, and it
+    /// Default cannot be pinned — it has no `profile.toml` to hold the key, and it
     /// shares the game's own save folder.
     pub fn set_pin(&self, id: &ProfileId, key: Option<&str>) -> Result<Profile, ProfileError> {
         if id.is_default() {
@@ -326,7 +326,7 @@ impl<T: Trash> ProfileStore<T> {
         Ok(Self::profile(id.clone(), dir, file))
     }
 
-    /// Moves the profile dir to the recycle bin. Refuses Default (V10) and running profiles (V27).
+    /// Moves the profile dir to the recycle bin. Refuses Default and running profiles.
     pub fn delete(&self, id: &ProfileId, probe: &dyn RunningProbe) -> Result<(), ProfileError> {
         if id.is_default() {
             return Err(ProfileError::DefaultImmutable("deleted"));
@@ -357,7 +357,7 @@ impl<T: Trash> ProfileStore<T> {
     pub(crate) fn claim(&self, base: &str) -> Result<(ProfileId, PathBuf), ProfileError> {
         for n in 1..=MAX_SUFFIX {
             let id = ProfileId::candidate(base, n);
-            // `default` is the built-in profile; `builds` is the game-build store (V56).
+            // `default` is the built-in profile; `builds` is the game-build store.
             if id.is_default() || id.is_builds() {
                 continue;
             }
@@ -392,7 +392,7 @@ impl<T: Trash> ProfileStore<T> {
             id: ProfileId::default_id(),
             name: DEFAULT_NAME.to_owned(),
             mode: Mode::Live,
-            // V54: Default shares the game's own save folder and cannot be pinned.
+            // Default shares the game's own save folder and cannot be pinned.
             game_build: None,
             location: Location::Default {
                 save_dir: self.game_save_dir.clone(),
@@ -464,7 +464,7 @@ mod tests {
         p
     }
 
-    /// §I.cmd: `builds` is reserved for the game-build store, so no new profile takes it.
+    /// `builds` is reserved for the game-build store, so no new profile takes it.
     #[test]
     fn a_profile_named_builds_gets_the_next_free_id() {
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -488,7 +488,7 @@ mod tests {
         assert_eq!(c.id.as_str(), "copy");
         let read = |rel: &str| std::fs::read_to_string(dir.join(rel)).expect(rel);
         assert_eq!(read("SaveData/Saves/colony.rws"), "save");
-        // V12: same folder name as the source copy.
+        // Same folder name as the source copy.
         assert_eq!(read("Mods/2009463077/About/About.xml"), "about");
         assert!(!dir.join("Player.log").exists() && !dir.join("payload.log").exists());
     }
@@ -539,7 +539,7 @@ mod tests {
         for kept in ["Config/Prefs.xml", "Saves/a.rws", "prefs"] {
             assert!(save.join(kept).is_file(), "{kept}");
         }
-        // V71: `Logs/` is the 1.7 game log of Default (R41), not save data.
+        // `Logs/` is the 1.7 game log of Default, not save data.
         for gone in [
             "Player.log",
             "Player-prev.log",
@@ -797,7 +797,7 @@ mod tests {
         assert_eq!(listing.unreadable[0].0, bad.id);
     }
 
-    /// §I.file: only a build key can be pinned; a refused pin leaves the file as it was.
+    /// Only a build key can be pinned; a refused pin leaves the file as it was.
     #[test]
     fn set_pin_refuses_a_value_that_is_not_a_build_key() {
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -807,7 +807,7 @@ mod tests {
         let path = s.root().join(p.id.as_str()).join(FILE_NAME);
         let before = std::fs::read(&path).expect("read");
         for bad in ["../x", "", "1.6 rev598", "UPPER"] {
-            // #14 F2: says the name is wrong, not that the version is missing.
+            // Says the name is wrong, not that the version is missing.
             assert!(
                 matches!(s.set_pin(&p.id, Some(bad)), Err(ProfileError::InvalidBuildKey(k)) if k == bad),
                 "{bad:?} was pinned or gave the wrong error"
@@ -833,7 +833,7 @@ mod tests {
     }
 
     #[test]
-    fn v67_log_path_per_engine() {
+    fn log_path_per_engine() {
         let dir = PathBuf::from("/profiles/p");
         let save = PathBuf::from("/home/u/.config/unity3d/x");
         let stored = Profile {

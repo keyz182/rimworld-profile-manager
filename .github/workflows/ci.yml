@@ -49,7 +49,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo clippy --workspace --all-targets --locked --target x86_64-pc-windows-gnu -- -D warnings
       - run: cargo test --workspace --locked
-      # T64: the 1.7 startup hook against stand-in game assemblies. FakeHelper is net8,
+      # The 1.7 startup hook against stand-in game assemblies. FakeHelper is net8,
       # the stand-in game is net10 (the 1.7 runtime).
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
@@ -58,7 +58,7 @@ jobs:
             10.0.x
       - run: scripts/test-hook.sh
 
-  # T47: macOS can't be cross-compiled from Linux (codesign, dyld semantics — T46) so it
+  # MacOS can't be cross-compiled from Linux (codesign, dyld semantics) so it
   # gets its own real Mac runner here, full fmt+clippy+test, same as the Linux job above,
   # not just a cross-check like the Windows clippy line.
   test-macos:

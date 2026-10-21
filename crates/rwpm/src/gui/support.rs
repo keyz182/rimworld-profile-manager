@@ -31,7 +31,7 @@ pub fn support_text(profile: &Profile, game: Option<&GameInstall>) -> String {
     out
 }
 
-/// The engine whose log path applies (V67): the found game's, else Unity's.
+/// The engine whose log path applies: the found game's, else Unity's.
 pub fn engine(game: Option<&GameInstall>) -> Engine {
     game.map_or(Engine::Unity, GameInstall::engine)
 }
@@ -56,7 +56,7 @@ pub fn open_path(path: &Path) -> std::io::Result<()> {
 }
 
 /// The only addresses the window opens by itself. They are Steam Workshop pages, built from
-/// a number; an address from someone else's file is shown as text and never opened (H1).
+/// a number; an address from someone else's file is shown as text and never opened.
 const STEAM_PAGES: &str = "https://steamcommunity.com/";
 
 /// Opens a Steam page in the system browser. Refuses any other address.

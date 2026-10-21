@@ -1,4 +1,4 @@
-//! Rules for archive entry names (C.58b). A pack is a short allowlist: `rimpack.toml`, then
+//! Rules for archive entry names. A pack is a short allowlist: `rimpack.toml`, then
 //! plain files below `SaveData/`. Restore never joins an unchecked name onto a path, and
 //! the same rules decide what a pack may hold when it is made.
 

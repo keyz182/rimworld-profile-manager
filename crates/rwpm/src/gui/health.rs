@@ -1,4 +1,4 @@
-//! The Health section (T30): the selected profile's problems in plain words, each with
+//! The Health section: the selected profile's problems in plain words, each with
 //! one fix. Checked off the window's thread when the selection or the profiles change.
 
 use iced::widget::{Column, button, column, row, text};

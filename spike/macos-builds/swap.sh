@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# T52 spike: Steam launch-option stand-in for the planned `rwpm run` target swap (macOS).
+# Spike: Steam launch-option stand-in for the planned `rwpm run` target swap (macOS).
 # Steam launch options:
 #   RWPM_SPIKE_BUILD=<build dir> RWPM_SPIKE_PROFILE=<id> <this> %command%
 #
-# macOS %command% has no wrapper chain and no start_RimWorld.sh. R33: it is a literal argv
+# macOS %command% has no wrapper chain and no start_RimWorld.sh. It is a literal argv
 # list naming the .app BUNDLE DIRECTORY, e.g.
 #   /…/common/RimWorld/RimWorldMac.app -disable-compute-shaders
 # so the swap replaces that bundle token and hands the whole line to `rwpm run`, which
-# then resolves CFBundleExecutable and execs the inner Mach-O (V41/V49, launch.rs).
+# then resolves CFBundleExecutable and execs the inner Mach-O (launch.rs).
 #
-# MATCH RULE (settled for T52; the Linux script has only rule 1's equivalent):
+# MATCH RULE (the Linux script has only rule 1's equivalent):
 #   rule 1  first token whose basename is RimWorldMac.app      -> <build>'s own bundle
 #   rule 2  else first token lying under the Steam install dir -> <build>'s own bundle
 #   else    exit 2
@@ -21,7 +21,7 @@
 # Both rules resolve to the build's OWN entry point rather than rewriting the path prefix.
 # A prefix rewrite (`<src>/X` -> `<build>/X`) looks right and is wrong across engines: it
 # would turn `<src>/RimWorld.app` into `<build>/RimWorld.app`, which does not exist in a
-# 1.6 build. The target swap has to resolve what the build actually contains. T55 needs
+# 1.6 build. The target swap has to resolve what the build actually contains. The pinned launch needs
 # the same rule, not a prefix substitution.
 set -euo pipefail
 

@@ -1,4 +1,4 @@
-//! `<profile>/last-run.toml` (I.file, V32): what happened the last time `rwpm run` was
+//! `<profile>/last-run.toml`: what happened the last time `rwpm run` was
 //! asked to start a profile, and who asked. Default has no folder, so its record lives in
 //! `<profiles root>/default/`, a folder the profile list skips.
 
@@ -96,7 +96,7 @@ impl LastRun {
     }
 }
 
-/// Who started `rwpm run` (I.file rule). Decided once, before `rwpm run` changes its own
+/// Who started `rwpm run`. Decided once, before `rwpm run` changes its own
 /// environment (it sets `SteamAppId` for the game). The first match wins.
 pub fn started_by(var: &dyn Fn(&str) -> Option<OsString>, from: Option<&str>) -> StartedBy {
     if var(STARTED_BY_ENV).is_some_and(|v| v == "app") {

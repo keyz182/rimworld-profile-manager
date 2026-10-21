@@ -1,4 +1,4 @@
-// T63 spike: does RimWorld 1.7 (Waylith, CoreCLR) run DOTNET_STARTUP_HOOKS early enough to
+// Spike: does RimWorld 1.7 (Waylith, CoreCLR) run DOTNET_STARTUP_HOOKS early enough to
 // redirect the mods folder? Same redirect as the Doorstop payload: set the private static
 // Verse.GenFilePaths.modsFolderPath when Assembly-CSharp loads (any load context).
 // Channel: RWPM_MODS_DIR (absent -> no-op), RWPM_PAYLOAD_LOG (log file).

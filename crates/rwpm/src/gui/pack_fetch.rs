@@ -1,6 +1,6 @@
-//! Modpacks (T83c): getting the missing mods through the Steam helper. "Restore and subscribe…"
+//! Modpacks: getting the missing mods through the Steam helper. "Restore and subscribe…"
 //! makes the profile and subscribes to the mods; "Remove subscriptions from the pack" undoes
-//! exactly those. The core starts the helper and checks what it delivers (T83b); this file
+//! exactly those. The core starts the helper and checks what it delivers; this file
 //! asks, shows progress with a Cancel button, and reports. A pack is written by a stranger, so
 //! the confirm lists the mod names with a warning, and a mod that is not the one the pack named
 //! is never kept.
@@ -31,7 +31,7 @@ use super::{App, Ctx, Notice, text as t, theme};
 
 /// Names drawn in the confirm; the rest is "and N more".
 const MAX_NAMES: usize = 200;
-/// The part of the confirm that scrolls (smallest window, V33).
+/// The part of the confirm that scrolls (smallest window).
 const NAMES_HEIGHT: f32 = 240.0;
 /// The progress bar counts to this. The restore takes the first fifth, the fetch the rest.
 const TOTAL: u64 = 1_000;
@@ -92,7 +92,7 @@ impl fmt::Debug for Fetcher {
 }
 
 /// How the app installs and runs steamcmd. Tests swap in fakes, so none of them starts a
-/// process or touches the network (T82c).
+/// process or touches the network.
 pub type InstallFn = dyn Fn(&Layout, &Consent, Option<&str>) -> Result<Option<String>, steamcmd::Error>
     + Send
     + Sync;
@@ -174,7 +174,7 @@ fn summarise(outcomes: &[Fetched], names: &BTreeMap<u64, String>) -> Summary {
 }
 
 /// Makes the new profile OFFLINE, but only when every mod arrived and passed the identity
-/// check; otherwise it stays as restored (LIVE), and the line says why and what failed (M3).
+/// check; otherwise it stays as restored (LIVE), and the line says why and what failed.
 fn offline_line(
     ctx: &Ctx,
     game: Option<&GameInstall>,
@@ -247,7 +247,7 @@ impl App {
     }
 
     /// "Restore and download…" with steamcmd: the first time, explain what will be downloaded
-    /// and run; after that, go straight to the list of mods (T82c).
+    /// and run; after that, go straight to the list of mods.
     fn ask_steamcmd(&mut self) {
         let Some(Dialog::OpenPack(mut preview)) = self.dialog.take() else {
             return;
@@ -330,7 +330,7 @@ impl App {
             .collect();
         let still_to_find = preview.manual.len();
         // OFFLINE downloads private copies and never subscribes; LIVE needs the subscription
-        // because the game only loads Workshop mods that Steam says are subscribed (R56).
+        // because the game only loads Workshop mods that Steam says are subscribed.
         let offline = preview.offline;
         let op = if offline { Op::Download } else { Op::Subscribe };
         let game = self.game.as_ref().ok().cloned();
@@ -394,8 +394,8 @@ impl App {
         })
     }
 
-    /// Restore the pack as an OFFLINE profile with its missing mods downloaded by steamcmd
-    /// (T82c). steamcmd is installed first, so a changed Valve file stops everything before a
+    /// Restore the pack as an OFFLINE profile with its missing mods downloaded by steamcmd.
+    /// steamcmd is installed first, so a changed Valve file stops everything before a
     /// profile is made; its folder is emptied by the download and again afterwards.
     pub(super) fn steamcmd_job(&mut self, preview: PackPreview) -> Task<Message> {
         let (ctx, runner) = (self.ctx.clone(), self.cmd.clone());
@@ -451,7 +451,7 @@ impl App {
                 Some(&content),
             );
             // Whatever the result, the profile holds its own copies now, or the download
-            // failed: either way steamcmd's copies are not kept (T82 review M2).
+            // failed: either way steamcmd's copies are not kept.
             let _ = layout.clear_content();
             Ok(Outcome::Restored {
                 line,

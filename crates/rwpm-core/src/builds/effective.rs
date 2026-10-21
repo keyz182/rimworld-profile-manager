@@ -1,4 +1,4 @@
-//! The effective game of a profile (§C, V55): the stored build it is pinned to, else the
+//! The effective game of a profile: the stored build it is pinned to, else the
 //! Steam install. Every per-profile game lookup goes through `effective_game`.
 //!
 //! The consumers (go OFFLINE / Refresh, mod list, guard, health, RimSort export) take an
@@ -58,7 +58,7 @@ impl Deref for EffectiveGame {
 
 /// The game `profile` plays.
 ///
-/// - Unpinned (Default is never pinned, V54): `live`, the Steam install; none → `NoGame`.
+/// - Unpinned (Default is never pinned): `live`, the Steam install; none → `NoGame`.
 /// - Pinned, build stored: the build's own folder (exe, engine, version, layout), with
 ///   the workshop of `live` — or, without one, of the install the build was captured
 ///   from. Workshop items stay in Steam's library; the copy sits outside it.

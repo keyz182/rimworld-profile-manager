@@ -66,7 +66,7 @@ fn copy_link(from: &Path, to: &Path) -> io::Result<()> {
     }
 }
 
-/// V14, V60: `b` holds the same entries, kinds, link targets and bytes as `a`. `skip` gets
+/// `b` holds the same entries, kinds, link targets and bytes as `a`. `skip` gets
 /// each path relative to the roots, exactly as `copy_tree` does, so a file left out of the
 /// copy is left out of the check too.
 pub(crate) fn same_tree(

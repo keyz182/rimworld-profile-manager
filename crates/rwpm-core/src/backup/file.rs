@@ -1,4 +1,4 @@
-//! `rimrim.toml`, the first entry of a `.rimrim` backup (§I file `.rimrim`).
+//! `rimrim.toml`, the first entry of a `.rimrim` backup.
 
 use std::path::Path;
 
@@ -35,11 +35,11 @@ pub struct Manifest {
     /// Raw `Version.txt` of that build, for the restore preview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_version: Option<String>,
-    /// `std::env::consts::OS` / `ARCH` of the machine that made the backup (V78).
+    /// `std::env::consts::OS` / `ARCH` of the machine that made the backup.
     pub os: String,
     pub arch: String,
     /// Total bytes of every regular file after `rimrim.toml`, and the number of entries
-    /// after it: the limits restore enforces while it streams (V75).
+    /// after it: the limits restore enforces while it streams.
     pub uncompressed_bytes: u64,
     pub entry_count: u64,
     pub includes: Includes,

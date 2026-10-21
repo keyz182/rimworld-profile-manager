@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The .rimrim backup and .rimpack modpack types (V83, T81). Installed beside the desktop
+<!-- The .rimrim backup and .rimpack modpack types. Installed beside the desktop
      entry; matched by name only, since the zstd bytes inside look like any other zstd file. -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-rimrim">

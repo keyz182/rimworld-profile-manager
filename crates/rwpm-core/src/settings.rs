@@ -1,4 +1,4 @@
-//! `<app data>/settings.toml` (§I): app-wide settings: folders and first-run state.
+//! `<app data>/settings.toml`: app-wide settings: folders and first-run state.
 
 use std::path::{Path, PathBuf};
 
@@ -27,8 +27,8 @@ pub struct AppSettings {
     /// First-run setup is finished (or was not needed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub setup_done: bool,
-    /// SHA-256 (lower-case hex) of the steamcmd archive the first time it was downloaded
-    /// (T82). Later downloads must match it. Kept here, not beside the unpacked files, so
+    /// SHA-256 (lower-case hex) of the steamcmd archive the first time it was downloaded.
+    /// Later downloads must match it. Kept here, not beside the unpacked files, so
     /// that deleting those does not forget it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steamcmd_sha256: Option<String>,

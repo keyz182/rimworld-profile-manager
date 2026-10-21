@@ -1,4 +1,4 @@
-//! T82: the whole steamcmd route against Valve, on whichever system this runs on. Needs the
+//! The whole steamcmd route against Valve, on whichever system this runs on. Needs the
 //! network and about two minutes (steamcmd updates itself on first run), so it is ignored:
 //! `cargo test -p rwpm-core --test steamcmd_live -- --ignored --nocapture`.
 

@@ -1,12 +1,12 @@
-//! Stored game builds: `<profiles root>/builds/<key>/` (§C, §I.file).
+//! Stored game builds: `<profiles root>/builds/<key>/`.
 //!
 //! A build is a copy of a RimWorld install that a profile can pin, so a player can keep
 //! 1.6 and 1.7 side by side without making Steam re-download either. The folder IS the
 //! game directory, with `build.toml` beside the game files.
 //!
 //! `<key>` is a slug of the trimmed `Version.txt` text, but the build's *identity* is the
-//! Steam app manifest `buildid` (V63): `Version.txt` lags the binary (R35), so a hotfix
-//! can keep the same version text and still be a different build (B8).
+//! Steam app manifest `buildid`: `Version.txt` lags the binary, so a hotfix
+//! can keep the same version text and still be a different build.
 
 pub mod acf;
 pub mod capture;
@@ -88,7 +88,7 @@ impl fmt::Display for BuildKey {
 pub struct Build {
     pub key: BuildKey,
     /// The build's game directory. Nothing writes in here after capture, except `Mods/`
-    /// and a consented `winhttp.dll` (V54).
+    /// and a consented `winhttp.dll`.
     pub dir: PathBuf,
     pub file: BuildFile,
 }
@@ -178,9 +178,9 @@ impl BuildStore {
         })
     }
 
-    /// V54: refused while a profile pins the build, or might (its `profile.toml` cannot be
-    /// read at all). V59: refused while the game runs. Needs only the build's folder, not a
-    /// readable `build.toml`, so a broken build can still be removed (T56 D28).
+    /// Refused while a profile pins the build, or might (its `profile.toml` cannot be
+    /// read at all). Also refused while the game runs. Needs only the build's folder, not a
+    /// readable `build.toml`, so a broken build can still be removed.
     pub fn delete<T: Trash>(
         &self,
         profiles: &ProfileStore<T>,
@@ -238,7 +238,7 @@ impl BuildStore {
                     // The swap finished; only the clean-up did not.
                     let _ = std::fs::remove_dir_all(entry.path());
                 } else {
-                    // The swap was cut in half. Put the old build back (V60).
+                    // The swap was cut in half. Put the old build back.
                     std::fs::rename(entry.path(), &live)
                         .map_err(ProfileError::io("restore", &live))?;
                 }
@@ -248,13 +248,13 @@ impl BuildStore {
     }
 }
 
-/// Who uses a build (V54).
+/// Who uses a build.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PinnedBy {
     /// Display names of the profiles pinned to it.
     pub profiles: Vec<String>,
     /// Ids of profiles whose `profile.toml` cannot be read at all (permissions, I/O), so
-    /// nobody can tell whether they pin it. They block Delete too (T56 D27).
+    /// nobody can tell whether they pin it. They block Delete too.
     pub unchecked: Vec<String>,
 }
 
@@ -264,7 +264,7 @@ impl PinnedBy {
     }
 }
 
-/// The profiles pinned to `key` (V54). A `profile.toml` that fails to load (unknown
+/// The profiles pinned to `key`. A `profile.toml` that fails to load (unknown
 /// field, newer schema, bad value) is still read as plain TOML: if its `game_build` names
 /// this build, it blocks too. A file that reads as text but is not TOML cannot name a build
 /// and is passed over. A file that cannot be read as text at all (permissions, I/O, not
@@ -306,7 +306,7 @@ pub fn pinned_by<T: Trash>(
 }
 
 /// Pins profile `id` to the stored build `key`, or back to the Steam install with `None`.
-/// Takes `run.lock`, so it never races Delete build or a capture (V59), and refuses while
+/// Takes `run.lock`, so it never races Delete build or a capture, and refuses while
 /// a game runs. A key that is not a build key, or names no stored build, is refused
 /// before `profile.toml` is touched.
 pub fn pin<T: Trash>(

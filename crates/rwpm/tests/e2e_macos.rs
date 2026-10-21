@@ -1,7 +1,7 @@
-//! T48 macOS e2e: exercises the real product code paths (ProfileStore, discovery,
+//! MacOS e2e: exercises the real product code paths (ProfileStore, discovery,
 //! launch::build, the packaged bundle from `scripts/package.sh macos`) against this
 //! machine's actual Steam + RimWorld install — not the spike's throwaway harness
-//! (spike/macos/), and not a fake-binary fixture like `tests/run.rs` (Linux only, T43).
+//! (spike/macos/), and not a fake-binary fixture like `tests/run.rs` (Linux only).
 //!
 //! Ignored: launches the real game. Run after `scripts/package.sh macos`:
 //!   cargo test -p rwpm --test e2e_macos -- --ignored --nocapture
@@ -59,7 +59,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
     }
     let profile = store.create(PROFILE_NAME).expect("create profile");
 
-    // V36: no mod list yet on a brand-new profile → nothing to freeze, trivial OFFLINE.
+    // No mod list yet on a brand-new profile → nothing to freeze, trivial OFFLINE.
     let app_dir = paths::app_data_dir().expect("app data dir");
     let effective =
         rwpm_core::builds::effective_game(&profile, Some(&game), store.root(), &app_dir)
@@ -75,7 +75,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
         trampoline: None,
         chain_target: None,
     };
-    // Steam's %command% names the GAME bundle directory itself (R33, T37) — this is the
+    // Steam's %command% names the GAME bundle directory itself — this is the
     // exact shape `rwpm run` sees from a real Steam launch, not a pre-resolved inner
     // binary. `game.exe` is the real RimWorldMac.app, discovered live; our OWN packaged
     // `bundle` only supplies the payload/doorstop files, via `payload` below.
@@ -97,7 +97,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
         game.exe
             .join("Contents/MacOS")
             .join(exe_name.expect("plist read")),
-        "V41: %command% naming the game bundle resolved to its inner Mach-O"
+        "%command% naming the game bundle resolved to its inner Mach-O"
     );
     let mods_dir = profile.mods_dir().expect("OFFLINE profile has a Mods dir");
     assert_eq!(
@@ -131,7 +131,7 @@ fn real_offline_launch_through_the_packaged_bundle() {
         std::thread::sleep(Duration::from_millis(500));
     }
 
-    // V15: a stored (non-Default) profile's log sits beside SaveData, not inside it.
+    // A stored (non-Default) profile's log sits beside SaveData, not inside it.
     let player_log = profile.log_path(rwpm_core::discovery::Engine::Unity);
     assert!(
         player_log.is_file(),

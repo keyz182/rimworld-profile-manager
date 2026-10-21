@@ -1,4 +1,4 @@
-//! Backups (T74): "Back up…" and "Restore backup…". The core does the work (lock, size
+//! Backups: "Back up…" and "Restore backup…". The core does the work (lock, size
 //! limits, staging, safety checks on every entry); this file asks, shows progress, reports.
 
 use std::path::{Path, PathBuf};
@@ -49,7 +49,7 @@ impl Draft {
     }
 }
 
-/// Only a name is needed: the core already refused a backup that cannot fit (V75).
+/// Only a name is needed: the core already refused a backup that cannot fit.
 pub fn restore_ok(plan: &RestorePlan) -> bool {
     !plan.name.trim().is_empty()
 }

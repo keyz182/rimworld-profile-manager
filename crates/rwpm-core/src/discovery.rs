@@ -1,5 +1,5 @@
 //! Finds the RimWorld install, its Steam library and the workshop content dir.
-//! Read-only: never writes inside any Steam folder (V6).
+//! Read-only: never writes inside any Steam folder.
 
 use std::path::{Path, PathBuf};
 
@@ -7,8 +7,8 @@ pub const RIMWORLD_APP_ID: u32 = 294100;
 
 #[cfg(windows)]
 pub const GAME_EXE: &str = "RimWorldWin64.exe";
-/// R29: the bundle DIRECTORY, not the inner Mach-O — matches R33 (Steam's own
-/// `%command%` names the bundle too); `launch::resolve_macos_bundle` resolves it to the
+/// The bundle DIRECTORY, not the inner Mach-O — matches Steam's own
+/// `%command%`, which names the bundle too; `launch::resolve_macos_bundle` resolves it to the
 /// actual binary at launch time, not here.
 #[cfg(target_os = "macos")]
 pub const GAME_EXE: &str = "RimWorldMac.app";
@@ -16,11 +16,11 @@ pub const GAME_EXE: &str = "RimWorldMac.app";
 pub const GAME_EXE: &str = "RimWorldLinux";
 
 const VERSION_FILE: &str = "Version.txt";
-/// R37: RimWorld 1.7+ runs on Waylith (CoreCLR); its engine assembly sits beside the exe.
+/// RimWorld 1.7+ runs on Waylith (CoreCLR); its engine assembly sits beside the exe.
 const WAYLITH_MARKER: &str = "Waylith.dll";
-/// The Waylith exe: Linux `RimWorld` (no `RimWorldLinux`, no start script, R37), Windows
-/// `RimWorld.exe` (no `RimWorldWin64.exe`, R44), macOS the bundle DIRECTORY `RimWorld.app`
-/// — the same R29 convention `GAME_EXE` uses, resolved to `Contents/MacOS/RimWorld` by
+/// The Waylith exe: Linux `RimWorld` (no `RimWorldLinux`, no start script), Windows
+/// `RimWorld.exe` (no `RimWorldWin64.exe`), macOS the bundle DIRECTORY `RimWorld.app`
+/// — the same convention `GAME_EXE` uses, resolved to `Contents/MacOS/RimWorld` by
 /// `launch::resolve_macos_bundle` at launch time.
 #[cfg(windows)]
 pub const WAYLITH_EXE: &str = "RimWorld.exe";
@@ -33,14 +33,14 @@ const BUNDLE_EXT: &str = "app";
 const INFO_PLIST: &str = "Contents/Info.plist";
 const BUNDLE_BIN_DIR: &str = "Contents/MacOS";
 
-/// The game engine of an install: Unity/Mono (≤ 1.6) or Waylith/CoreCLR (1.7+, R37).
+/// The game engine of an install: Unity/Mono (≤ 1.6) or Waylith/CoreCLR (1.7+).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Engine {
     Unity,
     Waylith,
 }
 
-/// V69: `Waylith.dll` beside the game marks a Waylith install, on any OS. `dir` is the
+/// `Waylith.dll` beside the game marks a Waylith install, on any OS. `dir` is the
 /// folder holding the exe — or, on macOS, the `.app` bundle itself, where the engine
 /// assemblies sit in `Contents/MacOS/` (live-confirmed on the 1.7 macOS depot).
 pub fn engine_of(dir: &Path) -> Engine {
@@ -112,7 +112,7 @@ impl GameInstall {
         self.engine
     }
 
-    /// Is `exe` a macOS `.app` bundle (R29), rather than a flat Linux/Windows binary?
+    /// Is `exe` a macOS `.app` bundle, rather than a flat Linux/Windows binary?
     fn is_macos_bundle(&self) -> bool {
         is_bundle_path(&self.exe)
     }
@@ -126,9 +126,9 @@ impl GameInstall {
         self.is_macos_bundle() && self.engine == Engine::Unity
     }
 
-    /// The game's own read-only content dir (R1 mod discovery, Managed assemblies).
+    /// The game's own read-only content dir (mod discovery, Managed assemblies).
     /// Linux/Windows: `<game_dir>/Data`, a flat sibling of the exe. macOS: `exe` IS the
-    /// bundle (`<game_dir>/RimWorldMac.app`, R29) and `Data` lives inside it, at
+    /// bundle (`<game_dir>/RimWorldMac.app`) and `Data` lives inside it, at
     /// `Contents/Resources/Data` (GenFilePaths' `UnityData.dataPath`, live-confirmed).
     pub fn data_dir(&self) -> PathBuf {
         if self.is_unity_bundle() {
@@ -138,9 +138,9 @@ impl GameInstall {
         }
     }
 
-    /// The game's own install Mods dir (LIVE source; V12/V20 install-Mods checks).
+    /// The game's own install Mods dir (LIVE source; install-Mods checks).
     /// Linux/Windows: `<game_dir>/Mods`. macOS: `<bundle>/Mods` — GenFilePaths walks up
-    /// from `UnityData.dataPath` to the bundle's parent, i.e. the bundle itself (R29).
+    /// from `UnityData.dataPath` to the bundle's parent, i.e. the bundle itself.
     pub fn mods_dir(&self) -> PathBuf {
         if self.is_unity_bundle() {
             self.exe.join("Mods")
@@ -166,10 +166,10 @@ impl GameInstall {
         }
     }
 
-    /// RimSort's `game_folder` field (T45). Linux/Windows: `game_dir`, the flat install
+    /// RimSort's `game_folder` field. Linux/Windows: `game_dir`, the flat install
     /// root. macOS: the `.app` bundle itself — confirmed live against this machine's real
     /// `~/Library/Application Support/RimSort/settings.json`, which names the bundle
-    /// path, not its parent (R29 addendum).
+    /// path, not its parent.
     pub fn rimsort_game_folder(&self) -> &Path {
         if self.is_unity_bundle() {
             &self.exe
@@ -228,7 +228,7 @@ pub fn discover(steam_override: Option<&Path>) -> Result<GameInstall, DiscoveryE
     Err(DiscoveryError::GameNotInstalled)
 }
 
-/// Which Steam installs (native or Flatpak) have RimWorld (V31). Errors count as "no".
+/// Which Steam installs (native or Flatpak) have RimWorld. Errors count as "no".
 pub fn steams_with_game() -> crate::paths::GameIn {
     let mut found = crate::paths::GameIn::default();
     let flatpak_home = dirs::home_dir().map(|h| crate::flatpak::steam_home(&h));
@@ -256,7 +256,7 @@ pub fn from_game_dir(dir: &Path) -> Result<GameInstall, DiscoveryError> {
     Ok(install)
 }
 
-/// A stored build's game folder (§C "effective game"). The copy sits outside
+/// A stored build's game folder (the "effective game"). The copy sits outside
 /// `steamapps`, so its Steam library comes from `source_dir`, the install it was
 /// captured from: workshop items stay in that library.
 pub fn from_build_dir(dir: &Path, source_dir: &Path) -> Result<GameInstall, DiscoveryError> {
@@ -266,7 +266,7 @@ pub fn from_build_dir(dir: &Path, source_dir: &Path) -> Result<GameInstall, Disc
 }
 
 /// The game's exe in `dir`, by name. Precedence is fixed: the Unity exe first, the
-/// Waylith exe second (V69 / B12 / B13). A folder can hold both — Steam leaves the old
+/// Waylith exe second. A folder can hold both — Steam leaves the old
 /// bundle behind as a husk when it switches version — so "the first one that is actually
 /// usable" decides, never the order the filesystem happens to answer in.
 ///
@@ -367,8 +367,8 @@ mod tests {
         );
     }
 
-    /// T45, live-confirmed against this machine's real RimSort settings.json: macOS
-    /// `game_folder` names the bundle, not its parent (R29 addendum).
+    /// Live-confirmed against this machine's real RimSort settings.json: macOS
+    /// `game_folder` names the bundle, not its parent.
     #[test]
     fn rimsort_game_folder_flat_vs_bundle() {
         assert_eq!(
@@ -386,7 +386,7 @@ mod tests {
     }
 
     /// Writes `GAME_EXE` under `dir` as whatever `read_game_dir` expects to find for this
-    /// host OS — a plain file on Linux/Windows, a bundle DIRECTORY on macOS (R29).
+    /// host OS — a plain file on Linux/Windows, a bundle DIRECTORY on macOS.
     fn write_game_exe(dir: &Path) {
         let exe = dir.join(GAME_EXE);
         if cfg!(target_os = "macos") {
@@ -435,7 +435,7 @@ mod tests {
             let game = lib.join("steamapps/common").join(INSTALL_DIR);
             std::fs::create_dir_all(&game).expect("game dir");
             write_game_exe(&game);
-            // T52: on macOS `Version.txt` lives INSIDE the bundle; there is none at the
+            // On macOS `Version.txt` lives INSIDE the bundle; there is none at the
             // install root. CRLF on every platform.
             let version_dir = if cfg!(target_os = "macos") {
                 game.join(GAME_EXE)
@@ -481,7 +481,7 @@ mod tests {
         ));
     }
 
-    /// R29 + T52: the bundle holds `Version.txt`; a flat install holds it at the root.
+    /// The bundle holds `Version.txt`; a flat install holds it at the root.
     #[test]
     fn version_file_sits_inside_a_macos_bundle() {
         let flat = GameInstall {
@@ -543,7 +543,7 @@ mod tests {
         ));
     }
 
-    /// V6: discovery must succeed on a read-only Steam tree and leave it untouched.
+    /// Discovery must succeed on a read-only Steam tree and leave it untouched.
     #[cfg(unix)]
     #[test]
     fn discovery_works_on_read_only_steam_tree() {
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn v69_unity_dir_is_unity() {
+    fn unity_dir_is_unity() {
         let tmp = tempfile::tempdir().expect("tempdir");
         write_game_exe(tmp.path());
         let gi = from_game_dir(tmp.path()).expect("game dir");
@@ -613,7 +613,7 @@ mod tests {
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn v69_discovery_accepts_waylith_dir() {
+    fn discovery_accepts_waylith_dir() {
         let tmp = tempfile::tempdir().expect("tempdir");
         std::fs::write(tmp.path().join(WAYLITH_EXE), b"").expect("exe");
         std::fs::write(tmp.path().join(WAYLITH_MARKER), b"").expect("marker");
@@ -626,15 +626,15 @@ mod tests {
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn v69_rimworld_file_without_waylith_is_not_a_game_dir() {
+    fn rimworld_file_without_waylith_is_not_a_game_dir() {
         let tmp = tempfile::tempdir().expect("tempdir");
         std::fs::write(tmp.path().join(WAYLITH_EXE), b"").expect("exe");
         assert!(from_game_dir(tmp.path()).is_err());
     }
 
-    /// B13: the Windows 1.7 exe is `RimWorld.exe`; checked on every host through the helpers.
+    /// The Windows 1.7 exe is `RimWorld.exe`; checked on every host through the helpers.
     #[test]
-    fn v69_windows_waylith_exe_name() {
+    fn windows_waylith_exe_name() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let exe = tmp.path().join("RimWorld.exe");
         std::fs::write(&exe, b"").expect("exe");

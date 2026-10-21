@@ -1,4 +1,4 @@
-//! Watches for a running RimWorld, so actions that clash with it are disabled (V33).
+//! Watches for a running RimWorld, so actions that clash with it are disabled.
 //! A thread checks every 2 s and reports changes only.
 
 use iced::futures::Stream;

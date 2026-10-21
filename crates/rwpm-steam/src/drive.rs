@@ -14,7 +14,7 @@ use crate::event::{Event, Fresh};
 pub const STALL: Duration = Duration::from_secs(60);
 /// Wait this long before the first subscribe or unsubscribe call. To Steam, starting this
 /// program starts the game, and Steam then fetches the account's subscription list; a call
-/// that lands before that list arrives can be undone by it (SPEC T82, stall trials). The list
+/// that lands before that list arrives can be undone by it (stall trials). The list
 /// came within about 1 s in about 10 runs, so this is an ESTIMATE with some margin.
 pub const SETTLE: Duration = Duration::from_secs(3);
 /// No answer to a call for this long: ask once more. An ESTIMATE: calls that worked took
@@ -150,7 +150,7 @@ fn wait_answer(
 ) -> Result<(), String> {
     match answer {
         // After a second call, an error may belong to the lost first one, and a second call to
-        // what Steam already holds may answer with one (T82 review M4, M5): Steam's own state
+        // what Steam already holds may answer with one: Steam's own state
         // and the stall limit decide instead.
         Some(Err(_)) if p.resent => {}
         Some(Err(reason)) => return Err(reason.clone()),
@@ -180,7 +180,7 @@ fn wait_answer(
 
 /// One step of waiting for Steam's state after the call was answered. Steam can answer and then
 /// undo the change: the subscription list it fetches when this program starts can arrive after
-/// the call and put the old state back (SPEC, stall trials). The call is made once more when the
+/// the call and put the old state back. The call is made once more when the
 /// state showed the change and then went back, or when nothing changed for [`RESEND_AFTER`];
 /// the id then waits for an answer again. `Err` fails the id.
 fn watch_change(

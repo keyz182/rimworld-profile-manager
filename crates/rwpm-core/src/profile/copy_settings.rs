@@ -1,4 +1,4 @@
-//! Copy game and mod settings from one profile to another, by group (T33, V37).
+//! Copy game and mod settings from one profile to another, by group.
 //! Never `Saves/` (Copy profile does that) and never into Default (the game's own
 //! folder). Everything is staged first, so a failure leaves the target as it was; only
 //! then are same-name entries sent to the recycle bin and the staged ones moved in.
@@ -103,7 +103,7 @@ pub fn entries(src: &Path, groups: &[Group]) -> Vec<PathBuf> {
     out
 }
 
-/// Bytes each group would copy from `src`, for the dialog (review M1).
+/// Bytes each group would copy from `src`, for the dialog.
 pub fn group_sizes(src: &Path) -> Vec<(Group, u64)> {
     Group::ALL
         .iter()
@@ -122,7 +122,7 @@ fn file_size(path: &Path) -> u64 {
 }
 
 impl<T: Trash> ProfileStore<T> {
-    /// Copies the chosen groups from `from` into `to` (V37). → how many entries were copied.
+    /// Copies the chosen groups from `from` into `to`. → how many entries were copied.
     pub fn copy_settings(
         &self,
         from: &Profile,
@@ -143,7 +143,7 @@ impl<T: Trash> ProfileStore<T> {
         }
         let staging = dst.join(STAGING);
         if staging.exists() {
-            self.trash_path(&staging)?; // left by a crash (review M2)
+            self.trash_path(&staging)?; // left by a crash
         }
         let chosen = entries(&src, groups);
         if let Err(e) = stage(&src, &staging, &chosen, progress) {

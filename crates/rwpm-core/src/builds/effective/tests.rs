@@ -130,7 +130,7 @@ fn build_without_its_game_is_missing() {
     ));
 }
 
-/// Review H1: a pre-v1.4 profile at `<root>/builds` makes the build store refuse to
+/// A pre-v1.4 profile at `<root>/builds` makes the build store refuse to
 /// open. Unpinned profiles must not notice.
 #[test]
 fn unpinned_profile_ignores_a_legacy_profile_in_the_builds_folder() {
@@ -141,7 +141,7 @@ fn unpinned_profile_ignores_a_legacy_profile_in_the_builds_folder() {
     assert_eq!(g.source(), &GameSource::Steam);
 }
 
-/// Review F2: the build was captured from another library than the one Steam uses now.
+/// The build was captured from another library than the one Steam uses now.
 /// The workshop follows the Steam install; the capture source is only the fallback.
 #[test]
 fn pinned_build_takes_the_steam_installs_workshop_over_its_capture_source() {
@@ -162,7 +162,7 @@ fn pinned_build_takes_the_steam_installs_workshop_over_its_capture_source() {
     );
 }
 
-/// Review F4: a key that is not a build key (only reachable by building a `Profile`
+/// A key that is not a build key (only reachable by building a `Profile`
 /// directly — `profile.toml` refuses it on read) is `BuildNotFound`, never the Steam install.
 #[test]
 fn invalid_build_key_is_build_not_found() {

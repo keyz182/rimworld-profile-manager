@@ -1,4 +1,4 @@
-//! Recorded consent for writes outside the tool's own folders (V7).
+//! Recorded consent for writes outside the tool's own folders.
 //!
 //! A `Consent` can only come from this store, so core code that writes elsewhere takes
 //! one as proof the player agreed to that exact change. Kept in `<app data>/consent.toml`.
@@ -15,9 +15,9 @@ const FILE: &str = "consent.toml";
 pub enum Scope {
     /// Add or update instances in RimSort's `settings.json`.
     RimsortSettings,
-    /// Put our `winhttp.dll` beside `RimWorldWin64.exe` (Windows OFFLINE, V6).
+    /// Put our `winhttp.dll` beside `RimWorldWin64.exe` (Windows OFFLINE).
     WinhttpDll,
-    /// Download steamcmd from Valve into this app's own `steamcmd` folder and run it (T82).
+    /// Download steamcmd from Valve into this app's own `steamcmd` folder and run it.
     Steamcmd,
 }
 

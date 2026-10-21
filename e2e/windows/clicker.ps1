@@ -1,4 +1,4 @@
-# T21: stands in for the player. Runs in the desktop session (started by launch.ps1),
+# Stands in for the player. Runs in the desktop session (started by launch.ps1),
 # waits for the guard dialog (a "RimWorld Profile Manager" window owned by powershell.exe),
 # clicks the button labelled -Label, and writes what it did to -Out.
 param([Parameter(Mandatory = $true)][string]$Label, [Parameter(Mandatory = $true)][string]$Out)

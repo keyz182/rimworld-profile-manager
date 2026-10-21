@@ -1,4 +1,4 @@
-//! V61: changing a profile's game version warns before a downgrade that may break saves.
+//! Changing a profile's game version warns before a downgrade that may break saves.
 
 use std::path::Path;
 
@@ -13,7 +13,7 @@ fn numeric(version: &str) -> Option<(u32, u32, u32)> {
 
 /// Does moving a profile from `old` to `new` (both `Version.txt` texts; `None` = not
 /// known) need the player's OK first? Yes iff the profile has saves and the new version is
-/// older, or either version cannot be read (V61, §C pin downgrade).
+/// older, or either version cannot be read.
 pub fn pin_warns(old: Option<&str>, new: Option<&str>, saves: &Path) -> bool {
     let has_saves = std::fs::read_dir(saves).is_ok_and(|mut d| d.next().is_some());
     if !has_saves {
@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn v61_warns_only_on_a_downgrade_with_saves() {
+    fn warns_only_on_a_downgrade_with_saves() {
         let saves = with_saves();
         let s = saves.path();
         assert!(pin_warns(
@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn v61_unreadable_version_warns() {
+    fn unreadable_version_warns() {
         let saves = with_saves();
         assert!(pin_warns(None, Some("1.6.4871 rev598"), saves.path()));
         assert!(pin_warns(
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn v61_no_saves_never_warns() {
+    fn no_saves_never_warns() {
         let tmp = tempfile::tempdir().expect("tempdir");
         assert!(!pin_warns(
             Some("1.7.4976 rev1"),

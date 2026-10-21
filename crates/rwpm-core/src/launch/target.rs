@@ -1,4 +1,4 @@
-//! T55: the target swap for a pinned profile (V51, V57). `rwpm run` is handed Steam's
+//! The target swap for a pinned profile. `rwpm run` is handed Steam's
 //! `%command%`, which names the Steam install's game. For a pinned profile that one entry
 //! is replaced with the stored build's own, before anything else reads the command: the
 //! guard, the engine check, the Windows loader, the macOS bundle and the restart env then
@@ -27,7 +27,7 @@ const GAME_ENTRIES: [&str; 7] = [
 ];
 
 /// The index of the game's own entry in `command`, found by file name only. The Steam
-/// install it names may be another version, a husk (B18) or gone, so the disk is not read.
+/// install it names may be another version, a husk or gone, so the disk is not read.
 ///
 /// Flags (`-x`) and `key=value` tokens are never the entry, though they can end in a game
 /// name (`-savedatafolder=/x/RimWorld`). More than one match is refused: swapping the wrong
@@ -59,7 +59,7 @@ pub fn swap_target(
 
 /// The swap for one install. A Linux 1.6 build launches the way Steam launches 1.6: its
 /// start script, unless the incoming entry was the ELF itself (app Play), which stays an
-/// ELF. That keeps the script's cwd and `LC_ALL` on LIVE and the wrapped path (V29) on
+/// ELF. That keeps the script's cwd and `LC_ALL` on LIVE and the wrapped path on
 /// OFFLINE. Every other case takes the build's exe.
 pub(crate) fn swap_for(
     command: &[OsString],

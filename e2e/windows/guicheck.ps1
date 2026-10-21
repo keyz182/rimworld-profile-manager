@@ -1,4 +1,4 @@
-# T18 gui_smoke helper. Runs inside the user's desktop session (scheduled task): only
+# The gui_smoke helper. Runs inside the user's desktop session (scheduled task): only
 # there are the app's windows visible. Starts rwpm.exe as a double-click would, then
 # writes what it saw to <Out>: one "title:<text>" line per visible window, and
 # "consoles:<n>" for console hosts attached to rwpm.

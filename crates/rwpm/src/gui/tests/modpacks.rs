@@ -1,4 +1,4 @@
-//! T81: "Share as modpack…". The core's own tests cover the format, the checks on every
+//! "Share as modpack…". The core's own tests cover the format, the checks on every
 //! string and every refusal; these cover what the window adds: who is offered what, the
 //! defaults and notices, the form's limits, and one real share through the job thread.
 
@@ -63,7 +63,7 @@ fn share_is_in_the_menu_of_every_profile() {
     }
 }
 
-/// Where `label` lies in a window of the smallest size the layout is designed for (V33):
+/// Where `label` lies in a window of the smallest size the layout is designed for:
 /// 960 × 600. When a dialog is too tall the layout squeezes the content to no height instead
 /// of pushing it off screen, so a test must check the height, not only the position.
 pub(super) fn smallest_window_bounds(app: &App, label: &str) -> iced::Rectangle {
@@ -133,7 +133,7 @@ fn the_share_dialog_keeps_its_title_and_button_on_screen_at_the_smallest_window(
     }
 }
 
-/// V34 style budget: from the list to a saved pack in ≤ 4 steps (select, More, Share as
+/// Step budget: from the list to a saved pack in ≤ 4 steps (select, More, Share as
 /// modpack…, Share). The last step opens the system's file dialog, which is not driven here:
 /// the check is that the button is there and asks for it.
 #[test]

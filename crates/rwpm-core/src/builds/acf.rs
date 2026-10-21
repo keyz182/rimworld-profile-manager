@@ -3,8 +3,8 @@
 //! Valve's KeyValues text format. Only three values matter here, so this reads the file
 //! with a brace-depth walk rather than pulling in a general VDF parser:
 //!
-//! - `buildid` — the build identity (V63: `Version.txt` lags the binary, B8);
-//! - `StateFlags` — must be exactly 4 to capture (V58, R36);
+//! - `buildid` — the build identity (`Version.txt` lags the binary);
+//! - `StateFlags` — must be exactly 4 to capture;
 //! - `BetaKey` — the Steam branch, `""` for the default one.
 //!
 //! `BetaKey` appears twice: once under `UserConfig` (the branch the player has *selected*)
@@ -37,8 +37,8 @@ pub struct AppManifest {
 }
 
 impl AppManifest {
-    /// V58: 4 exactly. 1030 (mid-update) and 36 (pre-launch) both carry bit 4, so a mask
-    /// test would let a half-downloaded install through (R36).
+    /// 4 exactly. 1030 (mid-update) and 36 (pre-launch) both carry bit 4, so a mask
+    /// test would let a half-downloaded install through.
     pub fn fully_installed(&self) -> bool {
         self.state_flags == 4
     }
@@ -218,7 +218,7 @@ mod tests {
         assert!(m.fully_installed());
     }
 
-    /// V58/R36: 1030 and 36 both carry bit 4 but are not a finished install.
+    /// 1030 and 36 both carry bit 4 but are not a finished install.
     #[test]
     fn only_state_flags_four_counts_as_installed() {
         for state in ["0", "1030", "36", "6", "516"] {

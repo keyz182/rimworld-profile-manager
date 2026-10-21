@@ -14,11 +14,11 @@ ManifestDPIAware true
 
 !define APP "RimWorld Profile Manager"
 !define EXE "rwpm.exe"
-; T83e: the Steam helper and Valve's library sit beside rwpm.exe (modpack mod fetching).
+; The Steam helper and Valve's library sit beside rwpm.exe (modpack mod fetching).
 !define STEAM_EXE "rwpm-steam.exe"
 !define STEAM_DLL "steam_api64.dll"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\rwpm"
-; V83: `.rimrim` backups and `.rimpack` modpacks open in this app. Per user (HKCU), like the
+; `.rimrim` backups and `.rimpack` modpacks open in this app. Per user (HKCU), like the
 ; rest of the install.
 !define CLASSES "Software\Classes"
 !define BACKUP_CLASS "rwpm.backup"

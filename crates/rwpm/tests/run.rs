@@ -1,6 +1,6 @@
-//! `rwpm run` contract (I.cmd, V11, V17) against a fake game. Linux only — the fixtures
+//! `rwpm run` contract against a fake game. Linux only — the fixtures
 //! below are Linux-specific throughout (`RimWorldLinux`, `start_RimWorld.sh`, `LD_PRELOAD`).
-//! T43: real macOS launch coverage is T48's e2e, against the actual Steam install, not a
+//! Real macOS launch coverage is the macOS e2e test, against the actual Steam install, not a
 //! fake-binary port of this harness.
 //!
 //! The process-scan scenarios share global state (any `RimWorldLinux` or `RimWorld` process
@@ -69,7 +69,7 @@ impl Sandbox {
         c
     }
 
-    /// The profile's `last-run.toml` (V32).
+    /// The profile's `last-run.toml`.
     fn last_run(&self, id: &str) -> LastRun {
         let path = self
             .app_dir()
@@ -292,7 +292,7 @@ fn waits_for_restart_child() {
     );
 }
 
-/// V68 / R40: on 1.7 the in-game Restart starts a detached replacement (`setsid`, same exe,
+/// On 1.7 the in-game Restart starts a detached replacement (`setsid`, same exe,
 /// `-WaitForExitingPid=<old pid>`), then the first process exits 0. `rwpm run` must keep
 /// `run.lock` and hold back last-run's `exit` until the replacement is gone too.
 fn waits_for_waylith_restart_replacement() {
@@ -567,7 +567,7 @@ fn guard_clear_profile_launches_without_asking() {
     assert!(run.log().is_empty(), "{}", run.log());
 }
 
-/// V29 / B3: Steam Linux Runtime (Flatpak Steam) runs `%command%` through `/bin/sh`
+/// Steam Linux Runtime (Flatpak Steam) runs `%command%` through `/bin/sh`
 /// wrappers. They must see no Doorstop env (their `$(…)` would break); rwpm takes the
 /// start script's place and adds Doorstop for the game alone.
 fn wrapped_launch_runs_rwpm_inside_wrapper() {
@@ -675,7 +675,7 @@ fn staged_rwpm(sb: &Sandbox) -> PathBuf {
     app.join("rwpm")
 }
 
-/// V28: the in-game Restart runs `rwpm <game args>` with the game's env, where the
+/// The in-game Restart runs `rwpm <game args>` with the game's env, where the
 /// payload has turned Doorstop off. rwpm must turn it back on and exec the game.
 #[test]
 fn restart_mode_rebuilds_launch_and_execs() {
@@ -744,7 +744,7 @@ fn restart_env_ignored_for_subcommands() {
     assert_eq!(usage.status.code(), Some(EX_USAGE));
 }
 
-/// V29: the inner-launch marker without its env is refused, never the GUI.
+/// The inner-launch marker without its env is refused, never the GUI.
 #[test]
 fn inner_marker_without_restart_env_is_refused() {
     let sb = Sandbox::new();
@@ -758,7 +758,7 @@ fn inner_marker_without_restart_env_is_refused() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("unknown command"));
 }
 
-/// T14: after a Move, settings.toml names the profiles folder; rwpm run must use it.
+/// After a Move, settings.toml names the profiles folder; rwpm run must use it.
 /// A full launch: it scans for running games, so it runs inside the serial test.
 fn run_uses_moved_root() {
     let sb = Sandbox::new();
@@ -869,7 +869,7 @@ impl Sandbox {
     }
 }
 
-/// V50/V51 (T55): Steam names its own install; a pinned profile starts the build.
+/// Steam names its own install; a pinned profile starts the build.
 fn pinned_launch_runs_the_build() {
     let sb = Sandbox::new();
     let (steam, build) = sb.steam_and_build();
@@ -889,7 +889,7 @@ fn pinned_launch_runs_the_build() {
     assert!(build.join("RimWorldLinux").is_file());
 }
 
-/// V29 + V57 (T55): behind Steam's wrappers, rwpm goes between for the BUILD's script, and
+/// Behind Steam's wrappers, rwpm goes between for the BUILD's script, and
 /// an in-game Restart (`RWPM_GAME_EXE`) would re-run the build.
 fn pinned_wrapped_offline_runs_the_build_inside_the_wrapper() {
     let sb = Sandbox::new();
@@ -936,8 +936,8 @@ fn pinned_wrapped_offline_runs_the_build_inside_the_wrapper() {
     );
 }
 
-/// T55: a pinned build that is gone → refused in plain words, Steam's game never runs,
-/// recorded and logged (V32). Started by Steam, which would show a dialog: the guard
+/// A pinned build that is gone → refused in plain words, Steam's game never runs,
+/// recorded and logged. Started by Steam, which would show a dialog: the guard
 /// override keeps the test headless.
 #[test]
 fn pinned_missing_build_is_refused() {
@@ -978,7 +978,7 @@ fn pinned_missing_build_is_refused() {
     );
 }
 
-/// T55 decision 2: no part of the command is the game → refused, never guessed.
+/// No part of the command is the game → refused, never guessed.
 #[test]
 fn pinned_command_without_a_game_is_refused() {
     let sb = Sandbox::new();
@@ -1006,7 +1006,7 @@ fn pinned_command_without_a_game_is_refused() {
     );
 }
 
-/// T55 M3: the guard takes Steam's live install from the command AS GIVEN, so a pinned
+/// The guard takes Steam's live install from the command AS GIVEN, so a pinned
 /// profile still sees the workshop when the build was captured from a library that has
 /// since moved. A swapped command would hide it: Harmony would read as "not installed"
 /// and the game would start without asking.
@@ -1041,7 +1041,7 @@ fn pinned_guard_sees_the_live_workshop() {
     );
 }
 
-/// T55 F1: the same, shaped as app Play, which names the BUILD's exe (decision 1). That
+/// The same, shaped as app Play, which names the BUILD's exe (decision 1). That
 /// folder sits in no Steam library, so the guard must ask Steam where its library is.
 fn pinned_guard_from_app_play_sees_the_live_workshop() {
     let sb = Sandbox::new();
@@ -1098,7 +1098,7 @@ impl Sandbox {
     }
 }
 
-/// T55 N1: with two Steams holding RimWorld (Flatpak, found first, and native), the
+/// With two Steams holding RimWorld (Flatpak, found first, and native), the
 /// guard reads the workshop of the one chosen in Settings, not the first one found.
 fn pinned_guard_uses_the_steam_chosen_in_settings() {
     let sb = Sandbox::new();

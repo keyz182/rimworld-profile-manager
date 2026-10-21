@@ -1,7 +1,7 @@
-//! Modpacks (T81b): "Open modpack…". The core reads the manifest and restores the profile
+//! Modpacks: "Open modpack…". The core reads the manifest and restores the profile
 //! (every entry is checked); this file checks the mod list against what is installed, asks,
 //! shows progress, reports. A pack's own links are shown as text. Only a Steam page built
-//! from a Workshop id becomes a button (H1).
+//! from a Workshop id becomes a button.
 
 use std::path::{Path, PathBuf};
 
@@ -24,7 +24,7 @@ use super::{App, Notice, support, text as t, theme};
 /// Rows drawn per list; the rest is "and N more", so a huge pack cannot slow the window.
 const MAX_ROWS: usize = 200;
 const STEAM_PAGE: &str = "https://steamcommunity.com/sharedfiles/filedetails/?id=";
-/// The part of the Open dialog that scrolls. In the smallest window (600 px high, V33) the
+/// The part of the Open dialog that scrolls. In the smallest window (600 px high) the
 /// title, the name field, the notice and the buttons need about 340 px of it.
 const DETAILS_HEIGHT: f32 = 240.0;
 
@@ -65,13 +65,13 @@ pub struct PackPreview {
     pub game_note: Option<String>,
     /// False when no game was found: nothing could be checked.
     pub checked: bool,
-    /// Set when the Steam helper is there and Steam can be reached (T83c).
+    /// Set when the Steam helper is there and Steam can be reached.
     pub steam: Option<SteamRoute>,
     /// Why Steam cannot be used, when a helper is there but Steam is not reachable.
     pub steam_note: Option<String>,
-    /// The player ticked "Make it an OFFLINE profile": download copies, never subscribe (T83d).
+    /// The player ticked "Make it an OFFLINE profile": download copies, never subscribe.
     pub offline: bool,
-    /// Steam cannot be used but Valve's steamcmd can fetch the mods (T82c).
+    /// Steam cannot be used but Valve's steamcmd can fetch the mods.
     pub cmd: bool,
     /// The player chose the steamcmd route.
     pub via_cmd: bool,
@@ -261,7 +261,7 @@ pub fn pack_dialog(preview: &PackPreview) -> Element<'_, Message> {
         details = details.push(text(t::PACK_HINT).size(13));
     }
     let ok = preview.ready().then_some(Message::Confirm);
-    // The title, the name and the buttons stay on screen; the notes and lists scroll (V33).
+    // The title, the name and the buttons stay on screen; the notes and lists scroll.
     column![
         heading(t::OPEN_PACK_TITLE),
         text(t::pack_about(&m.name, m.mods.len(), &m.description)),
@@ -289,7 +289,7 @@ fn cmd_applies(preview: &PackPreview) -> bool {
     preview.cmd && preview.steam.is_none() && !preview.missing.is_empty()
 }
 
-/// "Make it an OFFLINE profile": download private copies instead of subscribing (T83d).
+/// "Make it an OFFLINE profile": download private copies instead of subscribing.
 fn offline_choice(preview: &PackPreview) -> Element<'_, Message> {
     if !steam_applies(preview) {
         return Column::new().into();

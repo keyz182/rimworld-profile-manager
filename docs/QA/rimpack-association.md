@@ -1,16 +1,16 @@
-# T81 QA runbook: open `.rimpack` files from the file manager
+# QA runbook: open `.rimpack` files from the file manager
 
-Check that a double-click on a `.rimpack` file opens this app on the "Open a modpack" question, and that uninstalling removes the link. This is the same check as the T75 runbook, for the second file type.
+Check that a double-click on a `.rimpack` file opens this app on the "Open a modpack" question, and that uninstalling removes the link. This is the same check as the `.rimrim` association runbook (`rimrim-association.md`), for the second file type.
 
-- **Platform:** Windows 10 or 11 (installer), and Linux (tar.gz and AppImage). macOS is out of scope (T76).
+- **Platform:** Windows 10 or 11 (installer), and Linux (tar.gz and AppImage). macOS is out of scope.
 - **Time:** about 20 minutes.
-- **Needs:** one `.rimpack` file made with "Share as modpack…" (see the T81 runbook).
+- **Needs:** one `.rimpack` file made with "Share as modpack…" (see `rimpack.md`).
 - **Not covered by the automated tests:** the Windows steps and every double-click. The tests check the files the installers write, run the Linux script against a scratch home folder, and check that a `.rimpack` argument reaches the Open dialog. The tests do not compile the Windows installer. CI does, and it was also compiled once by hand with warnings as errors.
 
 ## What this does to your computer
 
 - Windows: the installer writes more keys under `HKCU\Software\Classes` (`.rimpack` and `rwpm.modpack`). It does not need admin rights.
-- Linux tar.gz: the script writes the same files as for T75. The type file now holds both types.
+- Linux tar.gz: the script writes the same files as for the `.rimrim` association. The type file now holds both types.
 - Rollback is in the last section.
 
 ## Windows (installer)

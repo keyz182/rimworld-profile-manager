@@ -567,15 +567,15 @@ fn real_settings_copy_export() {
     std::mem::forget(tmp); // keep the copy for the Python type check
 }
 
-/// Manual setup for the T57 e2e (docs/QA/T57-rimsort-pinned-export.md): stores a build
+/// Manual setup for the pinned-export e2e (docs/QA/rimsort-pinned-export.md): stores a build
 /// of this machine's Steam RimWorld with the real capture code, then makes a profile
-/// "T57 Pinned" pinned to it. Refuses when that game version is already stored, so it
+/// "Pinned" pinned to it. Refuses when that game version is already stored, so it
 /// only ever pins a build it made. Writes to the REAL app data: the build is a full copy of
 /// the game. Runs only with `RWPM_T57_E2E=1`, so a plain `--ignored` run cannot fill the
 /// disk.
 #[test]
 #[ignore = "copies the real game into the real profiles folder"]
-fn t57_e2e_capture_and_pin() {
+fn e2e_capture_and_pin() {
     use crate::builds::BuildStore;
     use crate::builds::capture::{apply_capture, plan_capture};
     use crate::profile::{OsTrash, ProcessProbe, ProfileStore};
@@ -613,7 +613,7 @@ fn t57_e2e_capture_and_pin() {
     println!("BUILD_DIR={}", builds.dir_of(&plan.key).display());
     let save = crate::paths::default_game_save_dir().expect("save dir");
     let store = ProfileStore::open(root, save, OsTrash).expect("profile store");
-    let profile = store.create("T57 Pinned").expect("create T57 Pinned");
+    let profile = store.create("Pinned").expect("create Pinned");
     let profile = store
         .set_pin(&profile.id, Some(plan.key.as_str()))
         .expect("pin");
@@ -635,10 +635,10 @@ fn runs_profile_knows_every_form_this_tool_wrote() {
     assert!(!runs_profile("'/r/rwpm' run beta -- %command% -x", "beta"));
 }
 
-/// V55 (+ T57): a pinned profile's instance names the build — its game folder and, LIVE,
+/// A pinned profile's instance names the build — its game folder and, LIVE,
 /// its `Mods` — while the workshop stays Steam's.
 #[test]
-fn v55_pinned_export_points_at_the_build() {
+fn pinned_export_points_at_the_build() {
     use crate::builds::effective::test_support::Games;
     use crate::builds::effective_game;
     let f = Fixture::new();

@@ -1,10 +1,10 @@
-//! Flatpak Steam (V31, R23). Steam's sandbox sees the host home only below
+//! Flatpak Steam. Steam's sandbox sees the host home only below
 //! `~/.var/app/com.valvesoftware.Steam`, at the same absolute paths. So with Flatpak Steam
 //! this app keeps its data there, Steam launches a copy of rwpm kept there, and the
 //! app's own Play goes through `flatpak run` so the game can reach Steam.
 //!
-//! `sync_launcher` is also reused outside Flatpak: by an AppImage mount (V38) and by a
-//! macOS `.app` bundle (V46/R30) — both need a stable on-disk copy of the binary for the
+//! `sync_launcher` is also reused outside Flatpak: by an AppImage mount and by a
+//! macOS `.app` bundle — both need a stable on-disk copy of the binary for the
 //! same underlying reason (a transient or translocated run location Steam/RimSort can't
 //! keep naming).
 
@@ -15,8 +15,8 @@ use std::process::Command;
 pub const STEAM_APP: &str = "com.valvesoftware.Steam";
 
 /// Files rwpm needs beside it: both payloads and Doorstop (`payload_files` in `rwpm run`).
-/// `Rwpm.Payload.Hook.dll` is the RimWorld 1.7 startup hook (V64).
-/// macOS's loader is `libdoorstop.dylib`, not `.so` (R26).
+/// `Rwpm.Payload.Hook.dll` is the RimWorld 1.7 startup hook.
+/// macOS's loader is `libdoorstop.dylib`, not `.so`.
 fn launcher_files() -> [&'static str; 4] {
     [
         "rwpm",
@@ -41,7 +41,7 @@ pub fn in_sandbox() -> bool {
 }
 
 /// The Steam helper and Valve's library. The app looks for the helper beside its own
-/// executable (`fetch::helper_beside`), so a copied launcher needs both beside it (V86).
+/// executable (`fetch::helper_beside`), so a copied launcher needs both beside it.
 fn steam_files() -> [&'static str; 2] {
     [
         crate::fetch::HELPER,

@@ -1,4 +1,4 @@
-//! Export a profile as a RimSort instance (I.file, V9, V21).
+//! Export a profile as a RimSort instance.
 //!
 //! RimSort keeps instances in `<data-local>/RimSort/settings.json` and converts each one
 //! with `msgspec.convert(dict, Instance)` (RimSort d2454505 settings.py:582), so every
@@ -125,7 +125,7 @@ pub fn plan_export(
     })
 }
 
-/// Writes the plan into RimSort's settings (V9): refuses while RimSort runs or if the file
+/// Writes the plan into RimSort's settings: refuses while RimSort runs or if the file
 /// changed since `plan_export`, backs the file up into `backup_dir` first, then replaces
 /// it atomically. Returns the backup's path.
 pub fn apply_export(
@@ -173,7 +173,7 @@ struct Fields<'a> {
 }
 
 impl Fields<'_> {
-    /// All 13 `Instance` fields with RimSort's types (V21). On update, fields the player
+    /// All 13 `Instance` fields with RimSort's types. On update, fields the player
     /// may have changed in RimSort (steamcmd_*, instance_folder_override, initial_setup)
     /// are kept; new instances get RimSort's own defaults for them.
     fn build(&self, mut map: Map<String, Value>) -> Result<Map<String, Value>, RimSortError> {
@@ -201,7 +201,7 @@ impl Fields<'_> {
         keep("steamcmd_install_path", text(&self.instance_dir)?.into());
         keep("steamcmd_ignore", false.into());
         map.insert("steam_client_integration".into(), integration.into());
-        // RimSort ignores run_args when launching through the Steam protocol (R17).
+        // RimSort ignores run_args when launching through the Steam protocol.
         map.insert("launch_via_steam_protocol".into(), false.into());
         map.entry("instance_folder_override").or_insert("".into());
         map.entry("initial_setup").or_insert(false.into());
@@ -218,7 +218,7 @@ pub fn launch_options(rwpm: &Path, id: &str, windows: bool) -> Result<String, Ri
 }
 
 /// RimSort's `run_args`: the launch line plus `--from rimsort`, so the run is recorded as
-/// started by RimSort (I.file last-run).
+/// started by RimSort.
 pub fn rimsort_run_args(rwpm: &Path, id: &str, windows: bool) -> Result<String, RimSortError> {
     let from = crate::profile::last_run::FROM_RIMSORT;
     command_line(
@@ -229,7 +229,7 @@ pub fn rimsort_run_args(rwpm: &Path, id: &str, windows: bool) -> Result<String, 
 }
 
 /// RimSort's `local_folder` for `profile` playing `game`: its own `Mods` when OFFLINE, else
-/// the game's (V55). One rule for export and for the stale check.
+/// the game's. One rule for export and for the stale check.
 pub fn local_folder(profile: &Profile, game: &EffectiveGame) -> PathBuf {
     match (profile.mode, profile.mods_dir()) {
         (Mode::Offline, Some(dir)) => dir,
@@ -272,7 +272,7 @@ pub fn entry_for(settings: &Path, id: &str) -> Option<Entry> {
 }
 
 /// Is `run_args` one of ours for profile `id`? Matches every form this tool has written,
-/// with or without `--from rimsort` (B5: one check for export and Move).
+/// with or without `--from rimsort` (one check for export and Move).
 pub fn runs_profile(run_args: &str, id: &str) -> bool {
     run_args.ends_with(&format!(" {id} -- %command%"))
         && (run_args.contains(" run --from ") || run_args.contains(&format!(" run {id} -- ")))
@@ -291,7 +291,7 @@ fn command_line(rwpm: &Path, args: &str, windows: bool) -> Result<String, RimSor
 const MAX_SLUG_LEN: usize = 40;
 
 /// Each run of characters outside `[A-Za-z0-9]` becomes one `_`; no `_` at either end. The
-/// result is one plain path component, so a pack's name (V9, F7) cannot steer the folder.
+/// result is one plain path component, so a pack's name cannot steer the folder.
 /// Empty when nothing alphanumeric is left.
 fn slugify(name: &str) -> String {
     let mut slug = String::with_capacity(name.len());

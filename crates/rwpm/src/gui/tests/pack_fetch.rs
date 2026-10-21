@@ -1,4 +1,4 @@
-//! T83c: "Restore and subscribe…", the Cancel button and "Remove subscriptions from the pack".
+//! "Restore and subscribe…", the Cancel button and "Remove subscriptions from the pack".
 //! The core's own tests cover the helper runner and the identity check; these cover what the
 //! window adds: when the buttons are there, what the confirm says, the record of what a pack
 //! subscribed to, and Cancel. The helper is replaced by a fake, so no test starts a process.

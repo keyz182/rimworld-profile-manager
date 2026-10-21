@@ -242,7 +242,7 @@ fn stale_rimsort_instances_flagged() {
     let json = serde_json::json!({"instances": {
         "Default": inst("", "/cfg"),
         "Beta": inst("'/rwpm' run beta -- %command%", &format!("{}/beta/SaveData/Config", old.display())),
-        // Exported since v1.1, with the RimSort marker (B5).
+        // Exported since v1.1, with the RimSort marker.
         "Alpha": inst("'/rwpm' run --from rimsort alpha -- %command%", &format!("{}/alpha/SaveData/Config", old.display())),
         "Elsewhere": inst("'/rwpm' run alpha -- %command%", "/new/alpha/SaveData/Config"),
         "Foreign": inst("gamemoderun %command%", &format!("{}/beta/SaveData/Config", old.display())),
@@ -261,7 +261,7 @@ fn stale_rimsort_instances_flagged() {
     assert_eq!(std::fs::read(&settings).expect("r"), before, "read only");
 }
 
-/// V56: the build store moves with the profiles, is verified like them, and is not
+/// The build store moves with the profiles, is verified like them, and is not
 /// carried as a `ProfileId`.
 #[test]
 fn move_carries_and_verifies_the_build_store() {

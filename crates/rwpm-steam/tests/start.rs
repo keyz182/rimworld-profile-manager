@@ -1,4 +1,4 @@
-//! H1 of the T83 review: the helper must start from a folder of its own with Valve's library
+//! The helper must start from a folder of its own with Valve's library
 //! beside it and no library path set, the way it sits in a release bundle. It does not need
 //! Steam to be running for this: `check` then says so in a line of its own.
 

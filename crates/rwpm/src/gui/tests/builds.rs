@@ -1,4 +1,4 @@
-//! T56 PR B: the Game versions screen. Jobs are run by feeding their messages by hand,
+//! The Game versions screen. Jobs are run by feeding their messages by hand,
 //! except where a test needs the real copy (the job thread starts when the task is made).
 
 use rwpm_core::builds::capture::{CaptureKind, plan_capture};
@@ -26,7 +26,7 @@ impl rwpm_core::profile::RunningProbe for NoGameRunning {
 }
 
 impl Sandbox {
-    /// Makes the sandbox game a Steam install Capture accepts (V58: `StateFlags` 4).
+    /// Makes the sandbox game a Steam install Capture accepts (`StateFlags` 4).
     pub(super) fn steam_install(&self, buildid: &str) {
         self.steam_install_as(buildid, VERSION);
     }
@@ -336,7 +336,7 @@ fn capture_without_a_game_says_why() {
     assert!(app.job.is_none());
 }
 
-/// Review F1: Enter sends Confirm for any dialog; a copy that will not fit must stay
+/// Enter sends Confirm for any dialog; a copy that will not fit must stay
 /// refused, like the disabled "Store it" button.
 #[test]
 fn enter_cannot_store_a_copy_that_will_not_fit() {
@@ -355,7 +355,7 @@ fn enter_cannot_store_a_copy_that_will_not_fit() {
     assert!(app.job.is_none(), "nothing started");
 }
 
-/// Review F2: a failed job re-reads the open list; a first read that fails shows why
+/// A failed job re-reads the open list; a first read that fails shows why
 /// instead of "Reading…" for ever.
 #[test]
 fn failures_do_not_leave_the_list_stale_or_reading() {
@@ -374,7 +374,7 @@ fn failures_do_not_leave_the_list_stale_or_reading() {
     assert!(!found(&app, text::GV_READING));
 }
 
-/// Review F6: a stored, deleted or updated version re-reads the list.
+/// A stored, deleted or updated version re-reads the list.
 #[test]
 fn a_finished_capture_or_delete_reads_the_list_again() {
     let sb = Sandbox::new();
@@ -386,7 +386,7 @@ fn a_finished_capture_or_delete_reads_the_list_again() {
     assert_eq!(changed, other + 1);
 }
 
-/// Review F6: Confirm on the new dialogs waits for a running job or game, like the rest.
+/// Confirm on the new dialogs waits for a running job or game, like the rest.
 #[test]
 fn confirm_on_capture_and_delete_dialogs_waits_for_a_job_or_game() {
     let sb = Sandbox::new();

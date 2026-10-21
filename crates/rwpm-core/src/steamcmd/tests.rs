@@ -261,7 +261,7 @@ fn real_valve_bootstrap_downloads_and_unpacks() {
     assert!(tmp.path().join(program).is_file(), "no {program}");
 }
 
-/// Valve's macOS archive holds symbolic links, the only one that does (R52). Point
+/// Valve's macOS archive holds symbolic links, the only one that does. Point
 /// `RWPM_TEST_OSX_ARCHIVE` at a copy of `steamcmd_osx.tar.gz` to check it passes.
 #[cfg(unix)]
 #[test]

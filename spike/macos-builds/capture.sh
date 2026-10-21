@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# T52 spike: capture the Steam RimWorld install as a stored build (macOS).
+# Spike: capture the Steam RimWorld install as a stored build (macOS).
 # Usage: capture.sh <steam install dir> <builds dir> [--pristine] [--ditto]
 #
-# Differences from the Linux T50 capture, all forced by the platform:
+# Differences from the Linux capture, all forced by the platform:
 #   * Version.txt lives INSIDE the bundle (<install>/RimWorldMac.app/Version.txt), not at
 #     the install root. There is no such file at the install root at all.
 #   * The copy is an APFS clone (`cp -cR`), the macOS analogue of --reflink=always.
@@ -10,7 +10,7 @@
 #     documented to preserve xattrs and resource forks (scripts/package.sh relies on that
 #     for the release zip).
 #   * The "already captured" test keys on the appmanifest buildid, NOT on the version
-#     string: V63 makes buildid the build identity, and requires that the same Version.txt
+#     string: buildid is the build identity, and requires that the same Version.txt
 #     with a new buildid is offered as an update rather than silently skipped.
 set -euo pipefail
 
@@ -33,7 +33,7 @@ done
 app=$src/RimWorldMac.app
 acf="$(dirname "$(dirname "$src")")/appmanifest_294100.acf"
 
-# R35/T52: Version.txt is CRLF, so strip \r as well as \n.
+# Version.txt is CRLF, so strip \r as well as \n.
 version=$(tr -d '\r\n' <"$app/Version.txt")
 buildid=$(sed -nE 's/^[[:space:]]*"buildid"[[:space:]]*"([0-9]+)".*/\1/p' "$acf")
 state=$(sed -nE 's/^[[:space:]]*"StateFlags"[[:space:]]*"([0-9]+)".*/\1/p' "$acf")
@@ -46,20 +46,20 @@ dest="$builds/$slug"
 
 echo "version='$version' buildid=$buildid StateFlags=$state BetaKey='${beta:-<none>}' mode=$mode pristine=$pristine"
 
-# V58 / R36: bit 4 stays set during an update, so only == 4 means idle.
+# Bit 4 stays set during an update, so only == 4 means idle.
 if [ "$state" != 4 ]; then
   echo "refuse: StateFlags=$state (not fully installed)" >&2
   exit 3
 fi
 
-# V63: identity is the buildid. Same version + new buildid is an update, not a no-op.
+# Identity is the buildid. Same version + new buildid is an update, not a no-op.
 if [ -e "$dest" ]; then
   have=$(sed -nE 's/^buildid = "([0-9]+)"$/\1/p' "$dest/build.spike.toml" 2>/dev/null || true)
   if [ "$have" = "$buildid" ]; then
     echo "exists: $dest buildid=$have (no-op)"
     exit 0
   fi
-  echo "exists: $dest but buildid $have -> $buildid (V63: an update, not a no-op)" >&2
+  echo "exists: $dest but buildid $have -> $buildid (an update, not a no-op)" >&2
   exit 4
 fi
 
@@ -75,7 +75,7 @@ ditto) ditto "$src" "$staging" ;;
 esac
 end=$(date +%s)
 
-# Not part of the game. steam_appid.txt sits in three places on macOS; V52 has to be
+# Not part of the game. steam_appid.txt sits in three places on macOS; it has to be
 # proved with the SteamAppId env var alone, so every copy of it goes.
 rm -f "$staging/steam_appid.txt" \
   "$staging/RimWorldMac.app/steam_appid.txt" \
@@ -91,7 +91,7 @@ fi
 free_after=$(df -k "$builds" | awk 'NR==2{print $4}')
 mv "$staging" "$dest"
 
-# V43/R29: Data lives inside the bundle. §I build.toml wants the DLC FOLDER names, so
+# Data lives inside the bundle. build.toml wants the DLC FOLDER names, so
 # "Place official expansions here.txt" must not appear in the list.
 dlc=$(find "$dest/RimWorldMac.app/Data" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | paste -sd, -)
 

@@ -56,7 +56,7 @@ namespace Doorstop
         }
 
         /// <summary>
-        /// T12: our launch arguments replace a reused foreign Doorstop's target assembly
+        /// Our launch arguments replace a reused foreign Doorstop's target assembly
         /// (e.g. pardeike's Doorstop.dll), so start that one too. A failure only loses
         /// the other tool's features; the mods redirect stays, so log and carry on.
         /// </summary>
@@ -85,7 +85,7 @@ namespace Doorstop
             }
         }
 
-        /// <summary>V1: let an in-game restart child re-run Doorstop.</summary>
+        /// <summary>Let an in-game restart child re-run Doorstop.</summary>
         static void ClearDoorstopGuards()
         {
 #if RWPM_SPIKE
@@ -101,10 +101,10 @@ namespace Doorstop
         }
 
         /// <summary>
-        /// V28 (Linux): with DOORSTOP_ENABLED set, Doorstop hooks dup2 in every process the
+        /// Linux: with DOORSTOP_ENABLED set, Doorstop hooks dup2 in every process the
         /// game starts (xdg-open for "Open folder"), breaking their shell redirects. Only when
         /// rwpm's restart trampoline is in place (RWPM_RESTART) is it safe to drop: the
-        /// in-game Restart then re-enters through rwpm, which sets it again (V1).
+        /// in-game Restart then re-enters through rwpm, which sets it again.
         /// </summary>
         static void DisableDoorstopForHelpers()
         {
@@ -136,7 +136,7 @@ namespace Doorstop
         [DllImport("libc", EntryPoint = "unsetenv")]
         static extern int unsetenv(string name);
 
-        /// <summary>V16: a preset path skips the game's own folder creation.</summary>
+        /// <summary>A preset path skips the game's own folder creation.</summary>
         static void EnsureModsDir()
         {
 #if RWPM_SPIKE
@@ -164,7 +164,7 @@ namespace Doorstop
             }
         }
 
-        /// <summary>V2: patch every copy of GenFilePaths, incl. Prepatcher's in-process reload.</summary>
+        /// <summary>Patch every copy of GenFilePaths, incl. Prepatcher's in-process reload.</summary>
         static void TryPatch(Assembly asm)
         {
             if (!ModsRedirect.HoldsTarget(asm))

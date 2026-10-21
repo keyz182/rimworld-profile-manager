@@ -1,4 +1,4 @@
-//! Restore: a `.rimpack` → a NEW profile (C.58b).
+//! Restore: a `.rimpack` → a NEW profile.
 //!
 //! The archive is untrusted. Every entry name, kind and size is checked against the
 //! manifest before anything is written, files are created new (a repeated name fails), and

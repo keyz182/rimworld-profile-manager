@@ -1,4 +1,4 @@
-# T18: runs inside the user's interactive session (scheduled task) so the game gets a desktop.
+# Runs inside the user's interactive session (scheduled task) so the game gets a desktop.
 # Reads <Config>.json {rwpm, id, exe, env{}, out, click?} and runs `rwpm run <id> -- <exe>`.
 # Writes <out>\exit.txt (rwpm's exit code) and <out>\procs-at-exit.txt (game processes
 # still alive when rwpm returned: must be 0, rwpm waits through the in-game Restart).
@@ -15,7 +15,7 @@ foreach ($p in $cfg.env.PSObject.Properties) {
 New-Item -ItemType Directory -Force $cfg.out | Out-Null
 $empty = Join-Path $cfg.out 'stdin.txt'
 New-Item -ItemType File -Force $empty | Out-Null
-# T21: optionally play the player's part in the guard dialog.
+# Optionally play the player's part in the guard dialog.
 if ($cfg.click) {
     $clicker = Join-Path (Split-Path $PSCommandPath) 'clicker.ps1'
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass',

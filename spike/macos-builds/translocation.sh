@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T52 spike (R30 / V46): does a quarantined stored build get app-translocated?
+# Spike: does a quarantined stored build get app-translocated?
 # Usage: translocation.sh <build dir> <profile id>
 #
 # WARNING, read before re-running: route b puts a Gatekeeper dialog in the user's face
@@ -10,7 +10,7 @@
 # route rwpm actually uses would produce a non-finding that reads as a finding. Both
 # routes are run against the SAME quarantined bundle and the running process path is
 # recorded for each:
-#   route a  rwpm run … -- <build>/RimWorldMac.app     (execve on the inner Mach-O, V41)
+#   route a  rwpm run … -- <build>/RimWorldMac.app     (execve on the inner Mach-O)
 #   route b  open <build>/RimWorldMac.app              (LaunchServices)
 # Only route b can produce a /private/var/folders/… path.
 set -uo pipefail

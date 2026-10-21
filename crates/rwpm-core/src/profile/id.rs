@@ -1,4 +1,4 @@
-//! Stable profile ids (V19): slug of the first name, `[a-z0-9-]`, never `=` or whitespace.
+//! Stable profile ids: slug of the first name, `[a-z0-9-]`, never `=` or whitespace.
 
 use std::fmt;
 
@@ -6,7 +6,7 @@ use crate::error::ProfileError;
 
 /// Reserved id of the built-in Default profile.
 pub const DEFAULT_ID: &str = "default";
-/// Reserved name of the game-build store under the profiles root (SPEC §I.cmd, §C).
+/// Reserved name of the game-build store under the profiles root.
 /// `parse` still accepts it: a profile created before v1.4 may already sit there, and it
 /// has to stay listable so the player can rename it. Nothing new may claim it, and the
 /// build store refuses to open over it.
@@ -42,7 +42,7 @@ impl ProfileId {
         self.0 == DEFAULT_ID
     }
 
-    /// Names the build store, so no new profile may take it (V56, §I.cmd).
+    /// Names the build store, so no new profile may take it.
     pub fn is_builds(&self) -> bool {
         self.0 == BUILDS_DIR
     }

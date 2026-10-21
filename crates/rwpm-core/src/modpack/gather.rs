@@ -1,4 +1,4 @@
-//! The `[[mods]]` list of a pack, gathered from a real profile (T80b, C.58b).
+//! The `[[mods]]` list of a pack, gathered from a real profile.
 //!
 //! Active ids come from the profile's `ModsConfig.xml` in load order and are resolved the
 //! way the game resolves them. Everything read from About.xml is checked against the
@@ -105,7 +105,7 @@ fn entry_for(
     frozen: &HashMap<String, ModSource>,
     times: &BTreeMap<u64, u64>,
 ) -> ModEntry {
-    // A frozen copy keeps the Workshop id as its folder name (C.18).
+    // A frozen copy keeps the Workshop id as its folder name.
     let from_workshop = match found.origin {
         Origin::Workshop => true,
         Origin::Local => offline && frozen.get(&found.folder) == Some(&ModSource::Workshop),

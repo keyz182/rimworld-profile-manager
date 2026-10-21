@@ -4,9 +4,9 @@ using Rwpm.Shared;
 
 /// <summary>
 /// Startup hook for RimWorld 1.7 (Waylith, CoreCLR). The runtime calls Initialize before the
-/// game's Main (R39). Two independent jobs, each only when its variable is set:
-/// RWPM_MODS_DIR redirects the mods folder (OFFLINE, V64, fails closed) and RWPM_LOG_DIR
-/// moves the game log (every stored profile, V67). The runtime looks the type up by this
+/// game's Main. Two independent jobs, each only when its variable is set:
+/// RWPM_MODS_DIR redirects the mods folder (OFFLINE, fails closed) and RWPM_LOG_DIR
+/// moves the game log (every stored profile). The runtime looks the type up by this
 /// exact name, so it stays in the global namespace.
 /// </summary>
 internal static class StartupHook
@@ -24,7 +24,7 @@ internal static class StartupHook
         string entry = Assembly.GetEntryAssembly()?.GetName().Name ?? "<none>";
         Log("hook start pid=" + Environment.ProcessId + " entry=" + entry);
 
-        // V65: every .NET process the game starts inherits the env; only the game is ours.
+        // Every .NET process the game starts inherits the env; only the game is ours.
         if (entry != GameEntryAssembly)
         {
             Log("not RimWorld; nothing to do");
@@ -69,7 +69,7 @@ internal static class StartupHook
     }
 
     /// <summary>
-    /// V67: Waylith's FileLog keeps the first SetDirectory call (R41). Calling it before Main
+    /// Waylith's FileLog keeps the first SetDirectory call. Calling it before Main
     /// puts Logs/Player.log in the profile folder instead of the Default save dir. A failure
     /// here leaves mods isolation intact, so it only logs.
     /// </summary>
@@ -111,7 +111,7 @@ internal static class StartupHook
         Log("patched " + ModsRedirect.Describe(asm) + " -> " + modsDir);
     }
 
-    /// <summary>V26: the game must not start on the install's Mods folder.</summary>
+    /// <summary>The game must not start on the install's Mods folder.</summary>
     static void Fail(string what, Exception ex)
     {
         Log("FATAL " + what + ": " + ex);

@@ -12,7 +12,7 @@ fn version_prints_crate_version() {
     assert_eq!(stdout.trim(), format!("rwpm {}", env!("CARGO_PKG_VERSION")));
 }
 
-/// V83: a word that is not an existing `.rimrim` or `.rimpack` file is still an unknown
+/// A word that is not an existing `.rimrim` or `.rimpack` file is still an unknown
 /// command, so a typo never opens the window.
 #[test]
 fn a_missing_backup_or_pack_or_other_file_is_an_unknown_command() {

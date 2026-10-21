@@ -19,7 +19,7 @@ use super::{App, text as t, theme};
 
 const GAP: u32 = 10;
 
-/// The part of the Share dialog that scrolls. In the smallest window (600 px high, V33) the
+/// The part of the Share dialog that scrolls. In the smallest window (600 px high) the
 /// title, the padding and the buttons need about 150 px of it.
 const SHARE_FORM_HEIGHT: f32 = 400.0;
 
@@ -105,8 +105,8 @@ fn help_list_height(window_height: f32) -> f32 {
 }
 
 /// The Help sections scroll; the title and OK stay put, so OK is always on screen even in
-/// the smallest window (V33). The list takes only as much height as its text needs, up to
-/// what the window leaves. T59: the sections once filled 600 px on their own.
+/// the smallest window. The list takes only as much height as its text needs, up to
+/// what the window leaves. The sections once filled 600 px on their own.
 fn help_dialog(list_height: f32) -> Element<'static, Message> {
     let mut sections = Column::new()
         .spacing(12)
@@ -286,7 +286,7 @@ fn settings_dialog<'a>(
         ]
         .spacing(4)
     };
-    // M8: say at once whether the typed folder has RimWorld in it.
+    // Say at once whether the typed folder has RimWorld in it.
     let check: Element<'a, Message> = match game_check {
         None => text(t::FOUND_THROUGH_STEAM)
             .size(13)
@@ -334,7 +334,7 @@ fn move_dialog(plan: &MovePlan) -> Element<'_, Message> {
     )
 }
 
-/// V58/§C: size and free space before a copy starts; Store is off when it cannot fit.
+/// Size and free space before a copy starts; Store is off when it cannot fit.
 fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
     let (words, label) = match &plan.kind {
         CaptureKind::Update { reason, .. } => (
@@ -361,7 +361,7 @@ fn capture_dialog(plan: &CapturePlan) -> Element<'_, Message> {
         .into()
 }
 
-/// V80: the mods notice always; the game notice when the game files are ticked.
+/// The mods notice always; the game notice when the game files are ticked.
 fn backup_dialog(draft: &Draft) -> Element<'_, Message> {
     let tick = |label: String, on: bool, which: Tick| {
         checkbox(on)
@@ -404,7 +404,7 @@ fn backup_dialog(draft: &Draft) -> Element<'_, Message> {
         .into()
 }
 
-/// V80: both notices that apply, and the plain-words notes (missing game version and so on)
+/// Both notices that apply, and the plain-words notes (missing game version and so on)
 /// before the player agrees.
 fn restore_dialog(plan: &RestorePlan) -> Element<'_, Message> {
     let m = &plan.manifest;
@@ -507,7 +507,7 @@ fn share_dialog(draft: &ShareDraft) -> Element<'_, Message> {
             body = body.push(text(words).size(13).style(theme::error));
         }
     }
-    // The title and the buttons stay on screen; the form scrolls (V33).
+    // The title and the buttons stay on screen; the form scrolls.
     column![
         heading(t::SHARE_TITLE),
         container(scrollable(body.push(text(t::SHARE_NOTICE).size(13))))

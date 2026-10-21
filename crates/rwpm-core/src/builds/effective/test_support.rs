@@ -1,5 +1,5 @@
 //! A Steam library on one game version and a stored build of another, for the tests of
-//! every effective-game consumer (V55).
+//! every effective-game consumer.
 
 use std::path::{Path, PathBuf};
 

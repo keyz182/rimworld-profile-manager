@@ -1,4 +1,4 @@
-//! First-run setup (T27): find RimWorld, then make the first profile, LIVE or OFFLINE
+//! First-run setup: find RimWorld, then make the first profile, LIVE or OFFLINE
 //! explained in plain words. Shown while `setup_done` is false on a fresh install;
 //! installs that already have profiles or a chosen game folder skip it.
 
@@ -145,7 +145,7 @@ impl App {
         match created {
             Ok(p) => {
                 self.reload();
-                // T33: the first profile starts from the game's own settings and mod list.
+                // The first profile starts from the game's own settings and mod list.
                 self.seed_from_default(&p);
                 self.reload();
                 self.selected = p.id;

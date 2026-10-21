@@ -1,6 +1,6 @@
-//! T81b: "Open modpack…". The core's own tests cover the file and every refusal; these cover
-//! the preview (what is present, to get, to find, changed), the links (H1), the limit on what
-//! is drawn (M2), and one real restore through the job thread.
+//! "Open modpack…". The core's own tests cover the file and every refusal; these cover
+//! the preview (what is present, to get, to find, changed), the links, the limit on what
+//! is drawn, and one real restore through the job thread.
 
 use rwpm_core::modpack::{self, Includes, ModEntry, PackSpec};
 

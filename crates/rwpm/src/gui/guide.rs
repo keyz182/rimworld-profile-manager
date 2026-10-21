@@ -1,5 +1,5 @@
-//! The Steam launch guide (T28): a drill-in that shows the launch line, where to paste it,
-//! and whether Steam has started this profile yet, read from `last-run.toml` (V32).
+//! The Steam launch guide: a drill-in that shows the launch line, where to paste it,
+//! and whether Steam has started this profile yet, read from `last-run.toml`.
 
 use iced::widget::{button, column, container, row, scrollable, text};
 use iced::{Alignment, Element, Length};
@@ -28,7 +28,7 @@ impl App {
         .padding([6, 12])
         .style(theme::primary)
         .on_press(Message::CopyLaunchOptions);
-        // V38: no working launcher → no line to show or copy, only why.
+        // No working launcher → no line to show or copy, only why.
         let first: Element<'a, Message> = if self.ctx.launcher_failed {
             text(t::NO_LAUNCHER).style(theme::error).into()
         } else {

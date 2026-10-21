@@ -1,4 +1,4 @@
-//! A profile's health check (T30): problems in plain words, each with the fix the app
+//! A profile's health check: problems in plain words, each with the fix the app
 //! offers. Read only: fixes go through the existing actions, which keep the consent
 //! pattern for anything outside this tool's folders.
 
@@ -14,19 +14,19 @@ use crate::{rimsort, winhttp};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {
     /// Only the game's own content (Core, DLCs) is turned on here, while Default has other
-    /// mods: usually a profile made empty. Fix: copy settings from Default (T33).
+    /// mods: usually a profile made empty. Fix: copy settings from Default.
     OnlyGameContent,
-    /// OFFLINE, but these turned-on mods would load from Steam (V5). Fix: freeze them.
+    /// OFFLINE, but these turned-on mods would load from Steam. Fix: freeze them.
     NotFrozen(Vec<String>),
     /// Turned on but installed nowhere; the game turns them off. Fix: none (look at the list).
     NotInstalled(Vec<String>),
-    /// Windows OFFLINE needs the loader in the game folder (T12). Fix: install it (consent).
+    /// Windows OFFLINE needs the loader in the game folder. Fix: install it (consent).
     LoaderMissing,
-    /// Another tool's `winhttp.dll` is there and cannot be used (V8). No fix here.
+    /// Another tool's `winhttp.dll` is there and cannot be used. No fix here.
     LoaderForeign,
     /// RimSort's entry points at this profile's old folder (after a Move). Fix: add again.
     RimSortStale(String),
-    /// Pinned to a stored game version that is gone or cannot be read (V55). Every game
+    /// Pinned to a stored game version that is gone or cannot be read. Every game
     /// action refuses until the profile is pinned again. No fix here.
     BuildMissing(String),
 }
@@ -42,7 +42,7 @@ fn has_own_mods(profile: &Profile) -> bool {
         .is_ok_and(|ids| ids.iter().any(|id| !id.starts_with("ludeon.rimworld")))
 }
 
-/// Checks `profile` against its effective game (V55). A pinned build that cannot be used
+/// Checks `profile` against its effective game. A pinned build that cannot be used
 /// (gone, unreadable, store not readable) is the one problem reported; an unpinned profile
 /// with no game at all has nothing to check.
 pub fn check_profile<T: Trash>(
@@ -65,7 +65,7 @@ pub fn check_profile<T: Trash>(
 }
 
 /// Does RimSort's entry point somewhere other than where `profile` plays now: its config
-/// folder (after a Move) or its game and mod folders (after a game version change, V55)?
+/// folder (after a Move) or its game and mod folders (after a game version change)?
 /// A field the entry does not have is not compared.
 fn rimsort_entry_is_stale(entry: &rimsort::Entry, profile: &Profile, game: &EffectiveGame) -> bool {
     let differs = |found: &str, ours: &Path| Path::new(found) != ours;
@@ -293,7 +293,7 @@ mod tests {
         assert!(problems.is_empty());
     }
 
-    /// T56 H1: the player changes a profile's game version after exporting it. RimSort's
+    /// The player changes a profile's game version after exporting it. RimSort's
     /// `game_folder` / `local_folder` still name the old game, so health says so; a
     /// current entry, or one without those fields, is fine.
     #[test]
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn v70_waylith_offline_windows_no_loader_problem() {
+    fn waylith_offline_windows_no_loader_problem() {
         let w = World::new();
         let p = w.offline(&[]);
         // The engine is resolved when the install is read, so a 1.7 install is a

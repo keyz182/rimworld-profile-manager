@@ -1,4 +1,4 @@
-//! Rules for archive entry names and manifest strings (V73, V74). Restore never joins an
+//! Rules for archive entry names and manifest strings. Restore never joins an
 //! unchecked name onto a path: every name goes through here first.
 
 use std::path::{Component, Path, PathBuf};
@@ -19,7 +19,7 @@ pub enum Place {
     Build { key: BuildKey, rel: PathBuf },
 }
 
-/// Sorts an entry name into its place, or says why it is refused (V73): only plain
+/// Sorts an entry name into its place, or says why it is refused: only plain
 /// relative names that start in `rimrim.toml`, `profile/` or `build/<key>/`.
 pub fn classify(name: &Path) -> Result<Place, String> {
     let mut parts = Vec::new();
@@ -60,7 +60,7 @@ pub fn classify(name: &Path) -> Result<Place, String> {
 }
 
 /// Regular files and folders may go anywhere a backup writes. A symlink may sit only below
-/// `build/<key>/` (V73: real game builds hold them), and its target goes through
+/// `build/<key>/` (real game builds hold them), and its target goes through
 /// [`check_link_target`]. Hardlinks and special files are refused: a link written early
 /// could redirect a later entry out of the profile.
 pub fn check_kind(kind: tar::EntryType, name: &Path, place: &Place) -> Result<(), String> {
@@ -76,7 +76,7 @@ pub fn check_kind(kind: tar::EntryType, name: &Path, place: &Place) -> Result<()
     }
 }
 
-/// A build symlink's target (V73): `../` repeated at most as deep as the link's own folder,
+/// A build symlink's target: `../` repeated at most as deep as the link's own folder,
 /// then plain names, with at least one name. `link_rel` is the link's path below the build
 /// folder. Nothing may step up after a name, so a later link that passes through this one
 /// cannot climb out of the build; absolute targets (host paths) never pass.
@@ -114,7 +114,7 @@ pub fn check_link_target(link_rel: &Path, target: &Path) -> Result<(), String> {
     if named { Ok(()) } else { bad("names nothing") }
 }
 
-/// A mod folder name from a restored `profile.toml` (V74): one plain path component.
+/// A mod folder name from a restored `profile.toml`: one plain path component.
 /// Refresh joins it onto paths, so a separator, `..` or drive prefix would leave the profile.
 pub fn check_folder(folder: &str) -> Result<(), String> {
     let bad = |why: &str| Err(format!("the mod folder name `{folder}` {why}"));

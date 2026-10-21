@@ -1,4 +1,4 @@
-//! `rwpm` front end. No arguments → GUI (T15); `rwpm run <profile-id> -- <game exe> [args…]` → launch wrapper.
+//! `rwpm` front end. No arguments → GUI; `rwpm run <profile-id> -- <game exe> [args…]` → launch wrapper.
 //!
 //! On Windows this is a GUI program, so double-clicking it opens no console window (one
 //! would also close the app when closed). `rwpm run` is started by Steam or RimSort and
@@ -18,7 +18,7 @@ use std::process::ExitCode;
 const EXIT_UNIMPLEMENTED: u8 = 2;
 
 /// `rwpm <file>.rimrim` or `<file>.rimpack`: how the OS hands over a backup or a modpack
-/// that was opened (V83, T75, T81). Only an existing file counts; any other word is still
+/// that was opened. Only an existing file counts; any other word is still
 /// an unknown command.
 fn file_arg(args: &[OsString]) -> Option<gui::OpenFile> {
     let path = Path::new(args.first()?);

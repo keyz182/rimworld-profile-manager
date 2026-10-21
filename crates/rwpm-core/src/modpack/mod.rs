@@ -1,4 +1,4 @@
-//! `.rimpack` modpacks (§I file `.rimpack`, C.58b): a zstd-compressed tar whose first entry
+//! `.rimpack` modpacks: a zstd-compressed tar whose first entry
 //! is `rimpack.toml`. A pack holds no mod files and no game files, only the load order
 //! (`ModsConfig.xml`), the chosen settings, creations and saves, and the list of mods.
 //!

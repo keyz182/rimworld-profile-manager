@@ -1,10 +1,10 @@
-# T74 QA runbook: back up and restore an OFFLINE profile
+# QA runbook: back up and restore an OFFLINE profile
 
 Check that a `.rimrim` backup restores into a new profile, and that bad files are refused.
 
 - **Platform:** Linux or Windows. On macOS use "Restore backup…" (opening from Finder comes later).
 - **Time:** about 30 minutes, plus the copy time.
-- **Scope:** the Back up and Restore dialogs and the files they make. The file association is checked in the T75 runbook.
+- **Scope:** the Back up and Restore dialogs and the files they make. The file association is checked in `rimrim-association.md`.
 
 ## What this does to your disk
 

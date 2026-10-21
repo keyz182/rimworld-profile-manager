@@ -1,4 +1,4 @@
-//! Modpacks (T81): "Share as modpack…". The core gathers the mod list and writes the file
+//! Modpacks: "Share as modpack…". The core gathers the mod list and writes the file
 //! (limits, the allowlist, the checks on every string); this file asks, shows progress,
 //! reports. A pack holds no mod files and no game files.
 

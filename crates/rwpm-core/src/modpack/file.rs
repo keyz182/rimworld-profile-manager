@@ -1,4 +1,4 @@
-//! `rimpack.toml`, the first entry of a `.rimpack` (§I file `.rimpack`, C.58b).
+//! `rimpack.toml`, the first entry of a `.rimpack`.
 //!
 //! A pack holds no mod files and no game files. `[[mods]]` is the preview and fetch list;
 //! the load order itself is the archived `ModsConfig.xml`. Every string in here is checked

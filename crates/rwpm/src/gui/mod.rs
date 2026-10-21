@@ -1,4 +1,4 @@
-//! The desktop app (I.gui): profile list, actions, progress. iced, Elm-style: all state
+//! The desktop app: profile list, actions, progress. iced, Elm-style: all state
 //! changes go through `update`, so they are tested without a window.
 
 mod backup;
@@ -42,13 +42,13 @@ pub struct Ctx {
     pub app_dir: PathBuf,
     pub game_save_dir: PathBuf,
     /// `rwpm` itself, for launching (`rwpm run`) and RimSort's run_args. With Flatpak
-    /// Steam: the copy in `<app data>/bin`, which Steam's sandbox can see (V31). From an
+    /// Steam: the copy in `<app data>/bin`, which Steam's sandbox can see. From an
     /// AppImage: the same copy, since the AppImage's own folder goes when it exits.
     pub exe: PathBuf,
     /// With Flatpak Steam: the `flatpak` program; Play then runs rwpm in Steam's sandbox.
     pub flatpak: Option<PathBuf>,
     /// The launcher copy failed: `exe` is a path Steam cannot use (Flatpak) or that goes
-    /// when this app exits (AppImage), so nothing may save it (V38).
+    /// when this app exits (AppImage), so nothing may save it.
     pub launcher_failed: bool,
 }
 
@@ -84,7 +84,7 @@ impl Ctx {
                 }
             }
         } else if cfg!(target_os = "macos") {
-            // V46/R30: Gatekeeper app translocation makes a bundle's own run location
+            // Gatekeeper app translocation makes a bundle's own run location
             // unstable for an un-notarised .app, same class of problem as the AppImage
             // mount path above — always sync a copy to a location that stays put.
             let install = ctx.exe.parent().ok_or("cannot find this app's folder")?;
@@ -108,7 +108,7 @@ impl Ctx {
         ProfileStore::open(root, self.game_save_dir.clone(), OsTrash)
     }
 
-    /// The game `profile` plays (V55): its stored build when pinned, else `live`, the
+    /// The game `profile` plays: its stored build when pinned, else `live`, the
     /// Steam install. A pinned profile whose build is gone or cannot be used (broken
     /// `build.toml`, store folder taken) reads as "build missing" in every action, like
     /// health and `rwpm run`; only a bad settings file keeps its own reason (#15 N1).
@@ -157,7 +157,7 @@ pub struct Job {
     pub label: String,
     pub done: u64,
     pub total: u64,
-    /// `done` and `total` are steps, not bytes: shown as a percentage (T82 click-through).
+    /// `done` and `total` are steps, not bytes: shown as a percentage.
     pub percent: bool,
 }
 
@@ -177,11 +177,11 @@ pub struct App {
     pub selected: ProfileId,
     pub dialog: Option<Dialog>,
     pub job: Option<Job>,
-    /// Set by the Cancel button of a job that can be stopped (T83c). Cleared when it ends.
+    /// Set by the Cancel button of a job that can be stopped. Cleared when it ends.
     pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// How the Steam helper is run; tests replace it so none of them starts a process.
     pub fetcher: pack_fetch::Fetcher,
-    /// How steamcmd is installed and run; tests replace it too (T82c).
+    /// How steamcmd is installed and run; tests replace it too.
     pub cmd: pack_fetch::CmdRunner,
     pub notice: Option<Notice>,
     /// The OS asks for dark colours.
@@ -189,24 +189,24 @@ pub struct App {
     /// Profile search text.
     pub search: String,
     pub menu_open: bool,
-    /// Some RimWorld is running: actions that clash with it wait (V33).
+    /// Some RimWorld is running: actions that clash with it wait.
     pub game_running: bool,
     /// Turned-on mods per profile; absent when the mod list cannot be read.
     pub mod_counts: HashMap<ProfileId, usize>,
-    /// Each profile's last `rwpm run` attempt (V32), if any.
+    /// Each profile's last `rwpm run` attempt, if any.
     pub last_runs: HashMap<ProfileId, LastRun>,
-    /// First-run setup, while it is shown (T27).
+    /// First-run setup, while it is shown.
     pub setup: Option<setup::Setup>,
     /// The drill-in shown instead of the detail sections, if any.
     pub drill: Option<message::Drill>,
-    /// The last mod list read (T29) and its search text.
+    /// The last mod list read and its search text.
     pub mods: Option<mods::ModList>,
     pub mod_search: String,
-    /// Health problems per profile, for the profiles checked so far (T30).
+    /// Health problems per profile, for the profiles checked so far.
     pub health: HashMap<ProfileId, Vec<rwpm_core::profile::health::Problem>>,
-    /// The other layout's profiles folder, when it has profiles this app ignores (V31).
+    /// The other layout's profiles folder, when it has profiles this app ignores.
     pub other_profiles: Option<PathBuf>,
-    /// The stored game versions, once read (T56).
+    /// The stored game versions, once read.
     pub builds: Option<builds::BuildsView>,
     /// Why the stored game versions could not be read, if they could not.
     pub builds_error: Option<String>,
@@ -243,7 +243,7 @@ impl App {
         };
         app.reload();
         app.decide_setup();
-        // B2: the last played profile is ready to Play with one click.
+        // The last played profile is ready to Play with one click.
         if let Some(id) = app.last_played() {
             app.selected = id;
         }
@@ -327,13 +327,13 @@ impl App {
         }
     }
 
-    /// The selected profile's game (V55). Every per-profile game action goes through it.
+    /// The selected profile's game. Every per-profile game action goes through it.
     pub fn effective_game(&self) -> Result<EffectiveGame, GameError> {
         let profile = self.current().ok_or(GameError::NoGame)?;
         self.ctx.effective_game(profile, self.game.as_ref().ok())
     }
 
-    /// The game whose log Open log / Copy log read (V55, V67). A pinned profile whose
+    /// The game whose log Open log / Copy log read. A pinned profile whose
     /// build cannot be used refuses; an unpinned one with no game found gets `None`
     /// (Unity's log path). Other errors keep their own reason (#15 N1).
     pub fn log_game(&self) -> Result<Option<EffectiveGame>, GameError> {
@@ -346,7 +346,7 @@ impl App {
 
     /// Why `p` cannot play right now, without touching the disk (the view calls it each
     /// frame). An unpinned profile needs the Steam install; a pinned one needs only its
-    /// build, which health checks off the window thread (T56, deferred from T55/T60).
+    /// build, which health checks off the window thread.
     pub fn game_problem(&self, p: &Profile) -> Option<String> {
         match p.game_build.as_deref() {
             None => self
@@ -392,9 +392,9 @@ impl App {
 }
 
 /// Opens the window; returns when it closes. `backup` is a `.rimrim` file the OS opened:
-/// the Restore dialog starts on it (T74). First-run setup comes first and takes it over,
+/// the Restore dialog starts on it. First-run setup comes first and takes it over,
 /// so the player restores from "Restore backup…" once setup is done.
-/// A file the OS handed over when it was opened with rwpm (V83): what the window opens at
+/// A file the OS handed over when it was opened with rwpm: what the window opens at
 /// start-up.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenFile {
@@ -443,7 +443,7 @@ pub fn run_with(open: Option<OpenFile>) -> iced::Result {
         .default_font(icon::UI)
         .window(iced::window::Settings {
             size: iced::Size::new(960.0, 640.0),
-            // V33: the smallest window the layout is designed and tested for.
+            // The smallest window the layout is designed and tested for.
             min_size: Some(iced::Size::new(960.0, 600.0)),
             icon: icon::window_icon(),
             #[cfg(target_os = "linux")]

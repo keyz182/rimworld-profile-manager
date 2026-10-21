@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# T64: checks the Waylith startup-hook payload against stand-in game assemblies
-# (payload/tests). Covers V64 (mods redirect), V16 (Mods dir created), V67 (log dir),
-# V65 (helpers and LIVE runs untouched) and V26 (fail closed). Needs the .NET 8 and 10
+# Checks the Waylith startup-hook payload against stand-in game assemblies
+# (payload/tests). Covers the mods redirect, the Mods dir being created, the log dir,
+# helpers and LIVE runs left untouched, and failing closed. Needs the .NET 8 and 10
 # runtimes and an SDK that builds net6.0.
 set -euo pipefail
 
@@ -56,20 +56,20 @@ start() {
 }
 done_case() { [[ $case_failed -eq 1 ]] || echo "PASS $case"; }
 
-start V64_redirect
+start mods_redirect
 run offline "$OUT/game/RimWorld.dll"
 [[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
 has "$out" "mods=$p/Mods" || fail "game saw: $out"
-[[ -d "$p/Mods" ]] || fail "Mods dir not created (V16)"
+[[ -d "$p/Mods" ]] || fail "Mods dir not created"
 grep -qE "patched Assembly-CSharp#[0-9]+ -> $p/Mods\$" "$log" || fail "no patched line in log"
 done_case
 
-start V67_log_dir # same run as V64
+start log_dir # same run as the redirect
 has "$out" "logdir=$p" || fail "game log dir: $out"
 grep -qF "log directory -> $p" "$log" || fail "no log directory line"
 done_case
 
-start V65_helper
+start helper_untouched
 run offline "$OUT/helper/FakeHelper.dll"
 [[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
 has "$out" "helper ok" || fail "helper output: $out"
@@ -78,7 +78,7 @@ grep -qF "not RimWorld; nothing to do" "$log" || fail "no guard line in log"
 [[ ! -e "$p/Mods" ]] || fail "helper created a Mods dir"
 done_case
 
-start V67_live_log_only
+start live_log_only
 run livelog "$OUT/game/RimWorld.dll"
 [[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
 has "$out" "logdir=$p" || fail "LIVE log not moved: $out"
@@ -87,7 +87,7 @@ has "$out" "mods=$OUT/game/Mods" || fail "LIVE run redirected mods: $out"
 ! grep -qF "patched" "$log" || fail "LIVE run patched GenFilePaths"
 done_case
 
-start V65_no_env_noop
+start no_env_noop
 run none "$OUT/game/RimWorld.dll"
 [[ $code -eq 0 ]] || fail "exit $code: $(cat "$p/stderr")"
 has "$out" "mods=$OUT/game/Mods" || fail "run redirected mods: $out"
@@ -95,7 +95,7 @@ has "$out" "logdir=$OUT/game/default-logs" || fail "run moved the log: $out"
 grep -qF "no RWPM_MODS_DIR or RWPM_LOG_DIR; nothing to do" "$log" || fail "no no-op line in log"
 done_case
 
-start V26_fail_closed
+start fail_closed
 run offline "$OUT/game-nofield/RimWorld.dll"
 [[ $code -ne 0 ]] || fail "game started without the redirect"
 ! has "$out" "mods=" || fail "game reached Main: $out"

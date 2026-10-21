@@ -1,6 +1,6 @@
 //! go OFFLINE / Refresh / go LIVE. Two phases: `plan_offline` reads only (sizes, free
 //! space, conflicts to ask about); `apply_offline` copies and swaps the profile's `Mods`.
-//! Sources are only read (V6); copies keep their source folder name (V12).
+//! Sources are only read; copies keep their source folder name.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -31,7 +31,7 @@ pub struct PlannedCopy {
     pub bytes: u64,
 }
 
-/// One packageId with more than one candidate folder: the player picks one (V20).
+/// One packageId with more than one candidate folder: the player picks one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Conflict {
     pub package_id: String,
@@ -64,7 +64,7 @@ pub fn plan_offline<T: Trash>(
 }
 
 /// `plan_offline`, also looking for mods in `extra_workshop`: a folder of `<id>/About/…`
-/// mods outside Steam's own, such as the steamcmd route's downloads (T82c). They count as
+/// mods outside Steam's own, such as the steamcmd route's downloads. They count as
 /// Workshop mods.
 pub fn plan_offline_with<T: Trash>(
     store: &ProfileStore<T>,
@@ -90,7 +90,7 @@ pub fn plan_offline_with<T: Trash>(
         return Ok(plan);
     }
     let config = dir.join(MODS_CONFIG);
-    // V36: no mod list yet (a new profile) → nothing to freeze; the launch guard (V5)
+    // No mod list yet (a new profile) → nothing to freeze; the launch guard
     // offers to freeze whatever the player turns on later.
     let active = if config.is_file() {
         read_active_mods(&config).map_err(mods_error)?
@@ -284,7 +284,7 @@ fn hand_added(mods: &Path, file: &ProfileFile) -> Vec<String> {
     names
 }
 
-/// V12: folder names are never changed, so two mods may not share one.
+/// Folder names are never changed, so two mods may not share one.
 fn check_folders(new_mods: &NewMods) -> Result<(), ProfileError> {
     let mut seen = HashSet::new();
     let names = new_mods

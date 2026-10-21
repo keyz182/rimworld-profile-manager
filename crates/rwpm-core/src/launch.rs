@@ -1,5 +1,5 @@
 //! Launch builder: profile + `%command%` + OS → exact program, args, cwd and env.
-//! Pure: spawning lives in `rwpm run` (T10). Recipes verified live in T2/T3 (R20, R21).
+//! Pure: spawning lives in `rwpm run`. Recipes verified live.
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -14,16 +14,16 @@ pub use target::{game_target, swap_target};
 pub const STEAM_APP_ID: &str = "294100";
 pub const ENV_MODS_DIR: &str = "RWPM_MODS_DIR";
 pub const ENV_PAYLOAD_LOG: &str = "RWPM_PAYLOAD_LOG";
-/// V28: set on Linux OFFLINE games; the in-game Restart re-runs rwpm, which reads these.
+/// Set on Linux OFFLINE games; the in-game Restart re-runs rwpm, which reads these.
 pub const ENV_RESTART: &str = "RWPM_RESTART";
 pub const ENV_GAME_EXE: &str = "RWPM_GAME_EXE";
 /// A foreign Doorstop's own target assembly, started by our payload after the redirect.
-/// .NET's startup-hook list; the Waylith payload goes first (V64).
+/// .NET's startup-hook list; the Waylith payload goes first.
 pub const ENV_STARTUP_HOOKS: &str = "DOTNET_STARTUP_HOOKS";
-/// Where the Waylith hook moves the game log: the profile folder (V67).
+/// Where the Waylith hook moves the game log: the profile folder.
 pub const ENV_LOG_DIR: &str = "RWPM_LOG_DIR";
 pub const ENV_CHAIN_TARGET: &str = "RWPM_CHAIN_TARGET";
-/// V29: first arg of the inner rwpm that takes the start script's place behind wrappers.
+/// First arg of the inner rwpm that takes the start script's place behind wrappers.
 pub const ARG_INNER: &str = "--rwpm-inner";
 const LINUX_START_SCRIPT: &str = "start_RimWorld.sh";
 const LINUX_ELF: &str = "RimWorldLinux";
@@ -56,15 +56,15 @@ impl Os {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadFiles {
     pub dll: PathBuf,
-    /// The Waylith (1.7) startup hook, `Rwpm.Payload.Hook.dll` (V64).
+    /// The Waylith (1.7) startup hook, `Rwpm.Payload.Hook.dll`.
     pub hook: PathBuf,
-    /// Linux: dir holding `libdoorstop.so`. macOS: dir holding `libdoorstop.dylib` (R26).
-    /// Windows: unused (winhttp.dll lives in the game dir, T12).
+    /// Linux: dir holding `libdoorstop.so`. macOS: dir holding `libdoorstop.dylib`.
+    /// Windows: unused (winhttp.dll lives in the game dir).
     pub doorstop_dir: PathBuf,
     /// Linux: the `rwpm` binary, given to the game as argv[0] so an in-game Restart
-    /// re-enters rwpm (V28). `None`: no trampoline, Doorstop stays on for helpers.
+    /// re-enters rwpm. `None`: no trampoline, Doorstop stays on for helpers.
     pub trampoline: Option<PathBuf>,
-    /// Windows: the assembly a reused foreign Doorstop would have loaded (T12).
+    /// Windows: the assembly a reused foreign Doorstop would have loaded.
     pub chain_target: Option<PathBuf>,
 }
 
@@ -86,7 +86,7 @@ pub struct LaunchPlan {
     pub program: PathBuf,
     pub args: Vec<OsString>,
     pub cwd: Option<PathBuf>,
-    /// argv[0] for the game, when it differs from `program` (V28 trampoline).
+    /// argv[0] for the game, when it differs from `program` (restart trampoline).
     pub arg0: Option<OsString>,
     pub env_set: Vec<(OsString, OsString)>,
     pub env_remove: Vec<OsString>,
@@ -122,7 +122,7 @@ pub enum LaunchError {
     AmbiguousGameInCommand,
 }
 
-/// Builds the launch for `profile`. `env` reads the inherited environment (for V18 prepends).
+/// Builds the launch for `profile`. `env` reads the inherited environment (for env prepends).
 pub fn build(
     profile: &Profile,
     command: &[OsString],
@@ -131,7 +131,7 @@ pub fn build(
     env: &dyn Fn(&str) -> Option<OsString>,
 ) -> Result<LaunchPlan, LaunchError> {
     let (program, rest) = command.split_first().ok_or(LaunchError::NoCommand)?;
-    // V62: the engine decides the launch shape; Waylith never gets Doorstop.
+    // The engine decides the launch shape; Waylith never gets Doorstop.
     if let Some(target) = waylith_program(command) {
         // The macOS 1.7 depot is Waylith too, but its launch has never been proven: no
         // spike has run the startup hook against it, and `build_waylith` was written and
@@ -155,21 +155,21 @@ pub fn build(
         replaced,
         ..LaunchPlan::default()
     };
-    // V41/R33: Steam's %command% on macOS names the .app bundle DIRECTORY, not the inner
+    // Steam's %command% on macOS names the .app bundle DIRECTORY, not the inner
     // Mach-O, in every mode (live-confirmed, not Offline-only) — resolve it up front,
     // before any Doorstop/env work, so nothing downstream ever sees the bundle path.
     if os == Os::MacOs {
         plan.program = resolve_macos_bundle(&plan.program)?;
     }
-    // V24: Steam app id via env, independent of steam_appid.txt (R17, R20, R21).
+    // Steam app id via env, independent of steam_appid.txt.
     set(&mut plan, "SteamAppId", STEAM_APP_ID);
     if profile.mode == Mode::Offline {
         add_offline(&mut plan, profile, payload, os, env)?;
     }
     plan.args.extend(game_args);
-    // V4 / V10: one token, only for stored profiles.
+    // One token, only for stored profiles.
     plan.args.extend(profile.savedatafolder_arg());
-    // V15
+    // Log file, when the profile sets one.
     if let Some(log) = profile.log_file() {
         plan.args.push("-logFile".into());
         plan.args.push(log.into_os_string());
@@ -181,14 +181,14 @@ fn is_start_script(arg: &OsString) -> bool {
     Path::new(arg).file_name() == Some(OsStr::new(LINUX_START_SCRIPT))
 }
 
-/// V70: the game-folder loader (`winhttp.dll`, T12) is for Windows OFFLINE on Unity only;
+/// The game-folder loader (`winhttp.dll`) is for Windows OFFLINE on Unity only;
 /// 1.7 (Waylith) takes the startup hook instead and must never get it.
 pub fn needs_game_folder_loader(mode: Mode, os: Os, engine: Engine) -> bool {
     mode == Mode::Offline && os == Os::Windows && engine == Engine::Unity
 }
 
 /// The game's own program in `%command%`: the start script or the Waylith exe behind any
-/// wrappers (V69), else the first.
+/// wrappers, else the first.
 pub fn game_program(command: &[OsString]) -> Option<&OsString> {
     command
         .iter()
@@ -197,7 +197,7 @@ pub fn game_program(command: &[OsString]) -> Option<&OsString> {
         .or_else(|| command.first())
 }
 
-/// V69: the entry of `%command%` that is the game's Waylith exe (RimWorld 1.7+) — a file
+/// The entry of `%command%` that is the game's Waylith exe (RimWorld 1.7+) — a file
 /// beside `Waylith.dll`, or a macOS `.app` bundle carrying the engine assemblies inside it.
 fn waylith_program(command: &[OsString]) -> Option<&OsString> {
     command.iter().find(|a| {
@@ -212,9 +212,9 @@ fn waylith_program(command: &[OsString]) -> Option<&OsString> {
     })
 }
 
-/// RimWorld 1.7 (Waylith, R37). Steam's wrapper chain stays as given: the env reaches the
-/// game through it (R39). No Doorstop, no restart trampoline, no `-logFile` (the engine
-/// ignores it, V67); stored profiles add the startup hook (V64, V67).
+/// RimWorld 1.7 (Waylith). Steam's wrapper chain stays as given: the env reaches the
+/// game through it. No Doorstop, no restart trampoline, no `-logFile` (the engine
+/// ignores it); stored profiles add the startup hook.
 fn build_waylith(
     profile: &Profile,
     command: &[OsString],
@@ -239,8 +239,8 @@ fn build_waylith(
 }
 
 /// The startup hook for a stored profile. OFFLINE: mods redirect + log dir, and no launch
-/// without the hook (V62, V64). LIVE: log dir only (V67); without a usable hook the game
-/// still starts, and its log then lands in Default's folder (R41).
+/// without the hook. LIVE: log dir only; without a usable hook the game
+/// still starts, and its log then lands in Default's folder.
 fn add_waylith_hook(
     plan: &mut LaunchPlan,
     profile: &Profile,
@@ -273,8 +273,8 @@ fn add_waylith_hook(
     Ok(())
 }
 
-/// V29 / B3: wrappers before the start script (Steam Linux Runtime, gamemoderun) are
-/// `/bin/sh` scripts that Doorstop would break (R22). They get no Doorstop env; rwpm takes
+/// Wrappers before the start script (Steam Linux Runtime, gamemoderun) are
+/// `/bin/sh` scripts that Doorstop would break. They get no Doorstop env; rwpm takes
 /// the script's place and, inside them, adds Doorstop and execs the game (restart mode).
 fn build_wrapped(
     profile: &Profile,
@@ -336,7 +336,7 @@ fn add_offline(
         .mods_dir()
         .ok_or_else(|| LaunchError::NoModsDir(profile.id.to_string()))?;
     require(&payload.dll)?;
-    // V3: a stale guard from a parent Doorstop process would make ours skip injection.
+    // A stale guard from a parent Doorstop process would make ours skip injection.
     plan.env_remove = DOORSTOP_GUARDS.iter().map(OsString::from).collect();
     set(plan, ENV_PAYLOAD_LOG, mods.with_file_name(PAYLOAD_LOG));
     set(plan, ENV_MODS_DIR, mods);
@@ -346,7 +346,7 @@ fn add_offline(
     match os {
         Os::Linux => {
             add_nix_doorstop(plan, payload, env, &LINUX_NIX)?;
-            // V25 / R19: never preload into the bash start script; run the ELF as the
+            // Never preload into the bash start script; run the ELF as the
             // script would.
             if plan.program.file_name() == Some(OsStr::new(LINUX_START_SCRIPT)) {
                 let dir = plan
@@ -359,7 +359,7 @@ fn add_offline(
                 set(plan, "LC_ALL", "C");
             }
             if let Some(rwpm) = &payload.trampoline {
-                // V28: GenCommandLine.Restart re-runs argv[0]; rwpm then re-adds Doorstop.
+                // GenCommandLine.Restart re-runs argv[0]; rwpm then re-adds Doorstop.
                 plan.arg0 = Some(rwpm.clone().into_os_string());
                 set(plan, ENV_RESTART, profile.id.as_str());
                 let exe = plan.program.clone();
@@ -368,19 +368,18 @@ fn add_offline(
             Ok(())
         }
         Os::MacOs => {
-            // V41/R33: `plan.program` is already the resolved inner Mach-O (build()
+            // `plan.program` is already the resolved inner Mach-O (build()
             // resolved the bundle up front) — no shell/start-script substitution exists
             // or is needed here, unlike Linux.
             //
-            // T42/V48: no restart trampoline, deliberately — never set `arg0`/
+            // No restart trampoline, deliberately — never set `arg0`/
             // `ENV_RESTART` here even if `payload.trampoline` is populated. The payload's
             // `DisableDoorstopForHelpers()` only disables Doorstop for helper processes
-            // when `RWPM_RESTART` is set, specifically to work around Linux's B1/B2/B3
+            // when `RWPM_RESTART` is set, specifically to work around Linux's
             // shell-hook breakage (dup2/fclose). That breakage does not reproduce on
-            // macOS (R28, sc_shellhook) — Doorstop simply stays enabled across an
-            // in-game Restart with no intervention needed, confirmed live (R31,
-            // sc_restart: redirect held on the restarted process with no trampoline at
-            // all). Adding one here would cost real complexity for zero benefit.
+            // macOS — Doorstop simply stays enabled across an
+            // in-game Restart with no intervention needed, confirmed live (the
+            // redirect held on the restarted process with no trampoline at all). Adding one here would cost real complexity for zero benefit.
             add_nix_doorstop(plan, payload, env, &MACOS_NIX)?;
             Ok(())
         }
@@ -397,15 +396,15 @@ fn add_offline(
 
 /// A "nix" (Doorstop's own term, src/nix/) Unix-like loader: Linux's `LD_PRELOAD` /
 /// `LD_LIBRARY_PATH` and macOS's `DYLD_INSERT_LIBRARIES` / `DYLD_LIBRARY_PATH` share the
-/// same `DOORSTOP_ENABLED`/`DOORSTOP_TARGET_ASSEMBLY` contract (R26) and only differ in
+/// same `DOORSTOP_ENABLED`/`DOORSTOP_TARGET_ASSEMBLY` contract and only differ in
 /// variable names and in whether the inserted entry is a bare leaf name or an absolute path.
 struct NixDoorstop {
     loader_env: &'static str,
     path_env: &'static str,
     lib_name: &'static str,
-    /// macOS (V40): insert the absolute dylib path rather than relying on leaf-name
+    /// macOS: insert the absolute dylib path rather than relying on leaf-name
     /// resolution through `DYLD_LIBRARY_PATH` — sidesteps a dyld4 behaviour the spike
-    /// didn't need to pin down (plan decision). Linux keeps preload-by-name (R20).
+    /// didn't need to pin down (plan decision). Linux keeps preload-by-name.
     absolute_loader_entry: bool,
 }
 
@@ -435,7 +434,7 @@ fn add_nix_doorstop(
     }
     set(plan, "DOORSTOP_ENABLED", "1");
     set(plan, "DOORSTOP_TARGET_ASSEMBLY", payload.dll.clone());
-    // V18/V40: prepend, never replace.
+    // Prepend, never replace.
     let lib_path = prepend(payload.doorstop_dir.as_os_str(), env(vars.path_env));
     set(plan, vars.path_env, lib_path);
     let entry: OsString = if vars.absolute_loader_entry {
@@ -451,10 +450,10 @@ fn add_nix_doorstop(
     Ok(())
 }
 
-/// V41/R33: resolves a `%command%` entry naming a macOS `.app` bundle DIRECTORY to the
+/// Resolves a `%command%` entry naming a macOS `.app` bundle DIRECTORY to the
 /// actual Mach-O binary inside it, by reading `CFBundleExecutable` out of its
-/// `Contents/Info.plist` — never by spawning a shell (R27: SIP purges `DYLD_*` across a
-/// shell exec, R30: app translocation makes a bundle-relative path unsafe to trust
+/// `Contents/Info.plist` — never by spawning a shell (SIP purges `DYLD_*` across a
+/// shell exec, and app translocation makes a bundle-relative path unsafe to trust
 /// anyway). Anything not ending in `.app` passes through unchanged, so this is safe to
 /// call on every macOS launch, live or stored.
 fn resolve_macos_bundle(path: &Path) -> Result<PathBuf, LaunchError> {
@@ -470,7 +469,7 @@ fn resolve_macos_bundle(path: &Path) -> Result<PathBuf, LaunchError> {
 }
 
 /// Minimal scan for one string-valued key in Apple's XML plist format — Info.plist is
-/// always the simple `<key>k</key>\n<string>v</string>` shape (R33 live-confirmed on this
+/// always the simple `<key>k</key>\n<string>v</string>` shape (live-confirmed on a
 /// Mac), so a tiny string search avoids pulling in a full plist-parsing dependency for
 /// the one field rwpm needs.
 fn extract_plist_string(xml: &str, key: &str) -> Option<String> {
@@ -921,7 +920,7 @@ mod tests {
         assert!(env_get(&live, ENV_CHAIN_TARGET).is_none());
     }
 
-    /// V23: a foreign Doorstop's target is `Doorstop.dll`; ours must not share its name.
+    /// A foreign Doorstop's target is `Doorstop.dll`; ours must not share its name.
     #[test]
     fn payload_assembly_is_not_named_doorstop() {
         let p = PayloadFiles::beside(Path::new("/app"));
@@ -1085,7 +1084,7 @@ mod tests {
         assert_eq!(plan.replaced, cmd(&["-logFile", "/stale/log"]));
     }
 
-    /// B3: the wrappers are shell scripts; Doorstop in their env breaks `$(…)` (R22).
+    /// The wrappers are shell scripts; Doorstop in their env breaks `$(…)`.
     #[test]
     fn wrapped_offline_wrappers_get_no_doorstop_env() {
         let plan = wrapped_plan();
@@ -1160,7 +1159,7 @@ mod tests {
         assert!(!has_arg(&plan, ARG_INNER));
     }
 
-    /// V40/R31: DYLD_INSERT_LIBRARIES carries the absolute dylib path (plan decision,
+    /// DYLD_INSERT_LIBRARIES carries the absolute dylib path (plan decision,
     /// unlike Linux's leaf-name LD_PRELOAD), DYLD_LIBRARY_PATH still prepends the dir.
     #[test]
     fn macos_dyld_set_when_absent() {
@@ -1217,8 +1216,8 @@ mod tests {
         std::fs::write(bundle.join("Contents").join("Info.plist"), xml).expect("Info.plist");
     }
 
-    /// V41/R33: a `%command%` naming the `.app` bundle directory resolves to the Mach-O
-    /// named by `CFBundleExecutable`, whose name may itself contain spaces (R29).
+    /// A `%command%` naming the `.app` bundle directory resolves to the Mach-O
+    /// named by `CFBundleExecutable`, whose name may itself contain spaces.
     #[test]
     fn macos_bundle_resolves_to_inner_binary() {
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -1293,7 +1292,7 @@ mod tests {
         assert!(matches!(r, Err(LaunchError::BadBundle(_))), "{r:?}");
     }
 
-    /// T42/V48: macOS never sets a restart trampoline — proven even when one is
+    /// MacOS never sets a restart trampoline — proven even when one is
     /// configured (eg a caller mistakenly reusing a Linux `PayloadFiles`), not just
     /// absent by omission. See the long comment on `Os::MacOs` in `add_offline`.
     #[test]
@@ -1328,7 +1327,7 @@ mod tests {
     }
 
     /// A 1.7 install under `tmp` (`RimWorld` + `Waylith.dll`) and Steam's Linux `%command%`
-    /// for it: launch wrapper, reaper, runtime entry point, then the game (R37, R39).
+    /// for it: launch wrapper, reaper, runtime entry point, then the game.
     fn waylith_chain(tmp: &Path, extra: &[&str]) -> (PathBuf, Vec<OsString>) {
         let game = tmp.join("game");
         std::fs::create_dir_all(&game).expect("game dir");
@@ -1352,7 +1351,7 @@ mod tests {
     }
 
     /// A 1.7 macOS install: `RimWorld.app` with the engine assemblies in
-    /// `Contents/MacOS/`, and Steam's macOS `%command%`, which names the bundle (R33).
+    /// `Contents/MacOS/`, and Steam's macOS `%command%`, which names the bundle.
     fn macos_waylith_command(tmp: &Path) -> Vec<OsString> {
         let bundle = tmp.join("game/RimWorld.app");
         let bin = bundle.join("Contents/MacOS");
@@ -1419,7 +1418,7 @@ mod tests {
     }
 
     #[test]
-    fn v62_waylith_chain_gets_no_doorstop() {
+    fn waylith_chain_gets_no_doorstop() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &["-popupwindow"]);
         let p = payload(tmp.path());
@@ -1443,7 +1442,7 @@ mod tests {
     }
 
     #[test]
-    fn v64_waylith_offline_sets_startup_hook() {
+    fn waylith_offline_sets_startup_hook() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1467,7 +1466,7 @@ mod tests {
     }
 
     #[test]
-    fn v64_waylith_hook_prepends_existing() {
+    fn waylith_hook_prepends_existing() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1493,7 +1492,7 @@ mod tests {
     }
 
     #[test]
-    fn v62_waylith_offline_missing_hook_fails_closed() {
+    fn waylith_offline_missing_hook_fails_closed() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1507,7 +1506,7 @@ mod tests {
     }
 
     #[test]
-    fn v67_waylith_never_gets_logfile() {
+    fn waylith_never_gets_logfile() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &["-logFile", "/x/Player.log"]);
         let p = payload(tmp.path());
@@ -1526,7 +1525,7 @@ mod tests {
     }
 
     #[test]
-    fn v67_waylith_log_dir_for_stored_profiles() {
+    fn waylith_log_dir_for_stored_profiles() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1539,7 +1538,7 @@ mod tests {
                 "{mode:?}"
             );
             assert_eq!(env_get(&plan, ENV_STARTUP_HOOKS), Some(&hook), "{mode:?}");
-            // LIVE: the log only, never the mods redirect (§C.16).
+            // LIVE: the log only, never the mods redirect.
             assert_eq!(
                 env_get(&plan, ENV_MODS_DIR).is_some(),
                 mode == Mode::Offline,
@@ -1549,7 +1548,7 @@ mod tests {
     }
 
     #[test]
-    fn v67_waylith_live_without_hook_still_launches() {
+    fn waylith_live_without_hook_still_launches() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1561,7 +1560,7 @@ mod tests {
     }
 
     #[test]
-    fn v67_waylith_default_gets_no_hook() {
+    fn waylith_default_gets_no_hook() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (_, command) = waylith_chain(tmp.path(), &[]);
         let p = payload(tmp.path());
@@ -1570,14 +1569,14 @@ mod tests {
     }
 
     #[test]
-    fn v69_game_program_finds_waylith_exe() {
+    fn game_program_finds_waylith_exe() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (exe, command) = waylith_chain(tmp.path(), &["-popupwindow"]);
         assert_eq!(game_program(&command), Some(&exe.into_os_string()));
     }
 
     #[test]
-    fn v70_game_folder_loader_only_for_windows_offline_unity() {
+    fn game_folder_loader_only_for_windows_offline_unity() {
         for mode in [Mode::Live, Mode::Offline] {
             for os in [Os::Linux, Os::Windows, Os::MacOs] {
                 for engine in [Engine::Unity, Engine::Waylith] {

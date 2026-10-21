@@ -56,7 +56,7 @@ impl Fixture {
         f.write_manifest(buildid, state, "");
         let game = f.game_dir();
         std::fs::create_dir_all(&game).expect("game");
-        // macOS: GAME_EXE is the bundle DIRECTORY (R29), and it only counts as the game
+        // macOS: GAME_EXE is the bundle DIRECTORY, and it only counts as the game
         // when it holds its executable — a bare dir is the husk Steam leaves behind.
         if cfg!(target_os = "macos") {
             let bundle = game.join(GAME_EXE);
@@ -123,7 +123,7 @@ impl Fixture {
             std::fs::create_dir_all(data.join(name)).expect("dlc");
             std::fs::write(data.join(name).join("About.xml"), vec![1u8; 2048]).expect("about");
         }
-        // T52: macOS keeps a plain file in `Data/` that is not an expansion.
+        // MacOS keeps a plain file in `Data/` that is not an expansion.
         std::fs::write(data.join("Place official expansions here.txt"), "x").expect("note");
     }
 
@@ -214,14 +214,14 @@ fn capture_stores_the_build_with_its_metadata() {
     assert_eq!(build.file.version, "1.6.4871 rev598");
     assert_eq!(build.file.buildid, "19234567");
     assert_eq!(build.file.beta, "");
-    // §I.file: folder names only, sorted. The stray text file is not an expansion.
+    // Folder names only, sorted. The stray text file is not an expansion.
     assert_eq!(build.file.dlc, ["Core", "Royalty"]);
     assert_eq!(build.file.source_dir, f.game_dir());
     assert!(build.file.size > 0);
     assert!(build.dir.join(GAME_EXE).exists(), "no game in the build");
 }
 
-/// V58 / R36: 1030 (mid-update) and 36 (pre-launch) both carry bit 4.
+/// 1030 (mid-update) and 36 (pre-launch) both carry bit 4.
 #[test]
 fn capture_refused_unless_state_flags_are_exactly_four() {
     for state in ["0", "6", "36", "1030", "516"] {
@@ -236,7 +236,7 @@ fn capture_refused_unless_state_flags_are_exactly_four() {
     assert!(f.plan().is_ok());
 }
 
-/// V58: Steam can start an update between the plan and the copy; the lock does not stop it.
+/// Steam can start an update between the plan and the copy; the lock does not stop it.
 #[test]
 fn capture_refused_when_steam_starts_updating_after_the_plan() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -250,7 +250,7 @@ fn capture_refused_when_steam_starts_updating_after_the_plan() {
     assert!(!f.builds().dir_of(&plan.key).exists());
 }
 
-/// V59: `run.lock` held → `GameRunning`, for both capture and delete.
+/// `run.lock` held → `GameRunning`, for both capture and delete.
 #[test]
 fn capture_refused_while_the_run_lock_is_held() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -285,7 +285,7 @@ fn delete_refused_while_the_run_lock_is_held() {
     assert!(f.builds().dir_of(&key(KEY)).exists(), "deleted anyway");
 }
 
-/// V54: Delete is refused while a profile pins the build, and says which.
+/// Delete is refused while a profile pins the build, and says which.
 #[test]
 fn delete_refused_while_a_profile_pins_the_build() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -310,7 +310,7 @@ fn delete_refused_while_a_profile_pins_the_build() {
     );
 }
 
-/// V54: a pin in a `profile.toml` that no longer parses still blocks Delete. A profile
+/// A pin in a `profile.toml` that no longer parses still blocks Delete. A profile
 /// whose own `game_build` is not a build key cannot name this build, so it does not.
 #[test]
 fn delete_refused_while_an_unreadable_profile_pins_the_build() {
@@ -347,7 +347,7 @@ fn delete_refused_while_an_unreadable_profile_pins_the_build() {
     assert!(!f.builds().dir_of(&key(KEY)).exists());
 }
 
-/// #14 F3 (B21): a newer schema blocks like an unknown field; a file that is not TOML at
+/// A newer schema blocks like an unknown field; a file that is not TOML at
 /// all cannot name a build and does not block.
 #[test]
 fn delete_raw_scan_covers_newer_schema_and_non_toml() {
@@ -373,7 +373,7 @@ fn delete_raw_scan_covers_newer_schema_and_non_toml() {
         .expect("non-TOML file pins nothing");
 }
 
-/// #14 F1, T56 D27: a `profile.toml` that cannot be read at all fails closed. Delete names
+/// A `profile.toml` that cannot be read at all fails closed. Delete names
 /// the profile as one it cannot check.
 #[cfg(unix)]
 #[test]
@@ -401,7 +401,7 @@ fn delete_refused_while_a_profile_file_cannot_be_read() {
     assert!(f.builds().dir_of(&key(KEY)).exists());
 }
 
-/// T56 D28: a build whose `build.toml` cannot be read can still be deleted; the pin guard
+/// A build whose `build.toml` cannot be read can still be deleted; the pin guard
 /// still applies.
 #[test]
 fn delete_removes_a_build_with_a_broken_build_toml() {
@@ -424,7 +424,7 @@ fn delete_removes_a_build_with_a_broken_build_toml() {
     assert!(!dir.exists());
 }
 
-/// T56 (#14 F4): pinning takes `run.lock`, so it cannot slip in between Delete's check and
+/// Pinning takes `run.lock`, so it cannot slip in between Delete's check and
 /// its move to the recycle bin; and it refuses keys that name no stored build.
 #[test]
 fn pin_is_locked_and_checks_the_build() {
@@ -486,7 +486,7 @@ fn delete_removes_an_unpinned_build() {
     assert!(f.builds().list().expect("list").builds.is_empty());
 }
 
-/// V54: Default has no `profile.toml` and shares the game's save folder.
+/// Default has no `profile.toml` and shares the game's save folder.
 #[test]
 fn the_default_profile_cannot_be_pinned() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -505,7 +505,7 @@ fn the_default_profile_cannot_be_pinned() {
     );
 }
 
-/// V63 / B8: `Version.txt` lags the binary, so the same text with a new `buildid` is an
+/// `Version.txt` lags the binary, so the same text with a new `buildid` is an
 /// update offer, never a silent no-op.
 #[test]
 fn the_same_version_with_a_new_buildid_is_an_update() {
@@ -571,7 +571,7 @@ fn the_same_version_on_another_branch_is_an_update() {
     );
 }
 
-/// V53: capture of a build already stored does nothing, even under another key.
+/// Capture of a build already stored does nothing, even under another key.
 #[test]
 fn an_already_stored_buildid_is_a_no_op() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -594,7 +594,7 @@ fn an_already_stored_buildid_is_a_no_op() {
     assert_eq!(f.builds().list().expect("list").builds.len(), 1);
 }
 
-/// V53: a second profile pinning a stored build costs no disk.
+/// A second profile pinning a stored build costs no disk.
 #[test]
 fn a_second_profile_pinning_a_build_copies_nothing() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -606,7 +606,7 @@ fn a_second_profile_pinning_a_build_copies_nothing() {
     assert_eq!(f.builds().list().expect("list").builds.len(), 1);
 }
 
-/// V60: `<build>/Mods/` comes from the OLD build, not the Steam install.
+/// `<build>/Mods/` comes from the OLD build, not the Steam install.
 #[test]
 fn an_update_carries_mods_from_the_old_build() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -617,7 +617,7 @@ fn an_update_carries_mods_from_the_old_build() {
         .strip_prefix(f.game_dir())
         .expect("rel")
         .to_path_buf();
-    // A local mod the player put in the build; V54 allows writes to `<build>/Mods/`.
+    // A local mod the player put in the build; writes to `<build>/Mods/` are allowed.
     let mine = build.dir.join(&mods_rel).join("MyLocal/About/About.xml");
     std::fs::create_dir_all(mine.parent().expect("parent")).expect("dirs");
     std::fs::write(&mine, "mine").expect("mod");
@@ -660,7 +660,7 @@ fn an_update_handles_a_missing_mods_folder_on_either_side() {
     assert_eq!(updated.file.buildid, "19300000");
 }
 
-/// V60: a failed update leaves the old build whole and launchable.
+/// A failed update leaves the old build whole and launchable.
 #[test]
 fn a_failed_update_leaves_the_old_build_intact() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -692,7 +692,7 @@ fn a_failed_capture_leaves_no_build_behind() {
     assert!(f.builds().list().expect("list").builds.is_empty());
 }
 
-/// V60: the copy is verified, so a clone that lost a block never becomes a build.
+/// The copy is verified, so a clone that lost a block never becomes a build.
 #[test]
 fn a_corrupted_copy_fails_the_check() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -717,7 +717,7 @@ fn a_corrupted_copy_fails_the_check() {
     assert!(!f.builds().dir_of(&key(KEY)).exists());
 }
 
-/// V60: a crash between the two renames leaves `.replaced-<key>`; the old build comes back.
+/// A crash between the two renames leaves `.replaced-<key>`; the old build comes back.
 #[test]
 fn an_interrupted_swap_restores_the_old_build() {
     let f = Fixture::new("19234567", "4", &["Core"]);
@@ -767,12 +767,12 @@ fn recovery_steps_aside_while_the_lock_is_held() {
     );
 }
 
-/// V6 / V54: the Steam install is read-only to rwpm, and the build drops Steam's own files.
+/// The Steam install is read-only to rwpm, and the build drops Steam's own files.
 #[test]
 fn capture_strips_steam_files_and_leaves_the_install_alone() {
     let f = Fixture::new("19234567", "4", &["Core"]);
     let install = f.install();
-    // Steam writes this at the install root, beside the bundle, and inside it (T52).
+    // Steam writes this at the install root, beside the bundle, and inside it.
     for dir in [install.game_dir.clone(), install.mods_dir()] {
         f.write_install_file(&dir.join("steam_appid.txt"), "294100");
     }
@@ -827,7 +827,7 @@ fn the_store_refuses_to_open_over_a_profile_folder() {
     );
 }
 
-/// V58 needs the app manifest, so a non-Steam install (GOG, a manual copy) cannot be
+/// Capture needs the app manifest, so a non-Steam install (GOG, a manual copy) cannot be
 /// captured: there is no `buildid` and no way to tell a finished install from a partial one.
 #[test]
 fn capture_refused_for_a_non_steam_install() {

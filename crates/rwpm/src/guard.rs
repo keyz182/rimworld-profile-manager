@@ -1,4 +1,4 @@
-//! `rwpm run`'s OFFLINE guard (V5, I.cmd): asks the player what to do about active mods
+//! `rwpm run`'s OFFLINE guard: asks the player what to do about active mods
 //! that are not frozen in the profile, before the game starts.
 //!
 //! Steam shows no console, so outcomes go to `<profile>/rwpm.log`. If no dialog can be
@@ -111,7 +111,7 @@ pub fn run(
     }
 }
 
-/// The game the guard checks: the profile's effective game (V55). For an unpinned profile
+/// The game the guard checks: the profile's effective game. For an unpinned profile
 /// that is the game folder holding the launched program, else the Steam install.
 fn guard_game(
     profile: &Profile,
@@ -208,7 +208,7 @@ fn ask(text: &str) -> Result<Choice, String> {
     }
 }
 
-/// Windows (T21): a small WinForms dialog run by the Windows PowerShell every Windows 10
+/// Windows: a small WinForms dialog run by the Windows PowerShell every Windows 10
 /// and 11 has. Each button exits with its own code; closing the window is Cancel. Any
 /// other outcome (PowerShell missing, blocked by policy) means no dialog was possible.
 fn ask_windows(text: &str) -> Result<Choice, String> {
@@ -316,11 +316,11 @@ fn encode_utf16_base64(text: &str) -> String {
     out
 }
 
-/// macOS (T41, V45): `choose from list` rather than `display dialog`, which caps at 3
+/// macOS: `choose from list` rather than `display dialog`, which caps at 3
 /// buttons — this needs 4 outcomes (Add/Turn off/Launch anyway/Cancel). The script's own
 /// built-in Cancel button returns `false`, distinct from the three named items. Text
 /// travels via `system attribute`, which reads the process environment — never through
-/// `-e` string interpolation, which would make `text` (player-controlled: mod names, R33)
+/// `-e` string interpolation, which would make `text` (player-controlled: mod names)
 /// an AppleScript injection hazard. The script is piped to `osascript -`'s stdin, so
 /// nothing but Rust's own constant labels ever appears on its command line.
 fn ask_osascript(text: &str) -> Result<Choice, String> {
@@ -479,9 +479,9 @@ mod tests {
         std::fs::write(dir.join("Version.txt"), version).expect("version");
     }
 
-    /// V55: the guard of `rwpm run` checks the pinned build, whatever the command names.
+    /// The guard of `rwpm run` checks the pinned build, whatever the command names.
     #[test]
-    fn v55_run_guard_checks_the_pinned_build() {
+    fn run_guard_checks_the_pinned_build() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let (root, app) = (tmp.path().join("profiles"), tmp.path().join("app"));
         let live = tmp.path().join("steam/steamapps/common/RimWorld");

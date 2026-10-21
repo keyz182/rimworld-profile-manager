@@ -1,4 +1,4 @@
-//! T82b: running steamcmd. Every test here sets the free space wanted to 0, so none depends
+//! Running steamcmd. Every test here sets the free space wanted to 0, so none depends
 //! on the disk it runs on. Each test puts a fake `steamcmd.sh` where the real one would be, so
 //! these start processes, and so they live in their own test program (a forked child can hold
 //! another test's lock file open until it runs its program).
@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use rwpm_core::fetch::Status;
 use rwpm_core::steamcmd::run::{Layout, download_with};
 
-/// Prints coloured results with no line break between them, like the real one (R52).
+/// Prints coloured results with no line break between them, like the real one.
 /// Id 222 fails, 333 delivers another mod, 444 prints nothing, 555 needs 32-bit libraries,
 /// 666 hangs with a child, anything else delivers `Good.Mod`.
 const FAKE: &str = r#"#!/bin/sh

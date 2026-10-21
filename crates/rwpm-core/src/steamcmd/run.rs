@@ -1,9 +1,9 @@
-//! Running steamcmd to download Workshop mods into this app's own folder (T82).
+//! Running steamcmd to download Workshop mods into this app's own folder.
 //!
 //! One process takes a batch of ids. What it delivered is read from its printed results, never
-//! from its exit code (R52), and each delivered folder is then checked: its `About.xml` must
+//! from its exit code, and each delivered folder is then checked: its `About.xml` must
 //! name the package id the pack promised, or the mod is thrown away. steamcmd runs with its
-//! own `HOME`, so nothing under the player's real Steam folders is touched (R52).
+//! own `HOME`, so nothing under the player's real Steam folders is touched.
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -63,7 +63,7 @@ impl Layout {
 
     /// steamcmd's `+force_install_dir`. It must NOT be steamcmd's own folder: steamcmd then
     /// refuses it ("set the game install path to something other than the Steam install
-    /// folder") and writes under `$HOME/Steam` instead (found by the live run, T82b).
+    /// folder") and writes under `$HOME/Steam` instead (found by the live run).
     pub fn install_dir(&self) -> PathBuf {
         self.root.join("install")
     }
@@ -78,14 +78,14 @@ impl Layout {
     }
 
     /// Written last, once everything is unpacked. Without it the folder may hold half an
-    /// install (the program file comes first), so it is installed again (T82 review H1).
+    /// install (the program file comes first), so it is installed again.
     fn marker(&self) -> PathBuf {
         self.root.join(".rwpm-installed")
     }
 
     /// Empties the folder the mods are downloaded into. It is steamcmd's own copy: nothing
     /// else lives there, and what a cancelled or earlier run left must not be mistaken for
-    /// this run's delivery (T82 review M2).
+    /// this run's delivery.
     pub fn clear_content(&self) -> std::io::Result<()> {
         match std::fs::remove_dir_all(self.content_dir()) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
@@ -300,8 +300,7 @@ fn spawn(layout: &Layout, ids: &[u64]) -> Result<Child, String> {
 /// Ends steamcmd and what it started. `false` when that could not be done.
 #[cfg(unix)]
 fn stop(child: &mut Child) -> bool {
-    // The shell's own `kill`, so it works where no `kill` program is installed (T82 review
-    // M3). A negative process id names the group the child leads; the id is an argument,
+    // The shell's own `kill`, so it works where no `kill` program is installed. A negative process id names the group the child leads; the id is an argument,
     // never part of the script text.
     let signalled = Command::new("sh")
         .args([
