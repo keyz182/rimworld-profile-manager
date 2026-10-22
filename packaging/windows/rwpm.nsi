@@ -40,6 +40,9 @@ VIAddVersionKey "FileDescription" "${APP} installer"
 VIAddVersionKey "LegalCopyright" "keyz182"
 
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
+!insertmacro GetParameters
+!insertmacro GetOptions
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
 !define MUI_ABORTWARNING
@@ -71,9 +74,24 @@ VIAddVersionKey "LegalCopyright" "keyz182"
   !undef ID
 !macroend
 
-; Stops before any file is changed while rwpm or the game is running. Silent: exit code 2.
-!macro EnsureNotInUse UN
+; The in-app updater starts this installer with `/S /RELAUNCH` and then exits. With
+; /RELAUNCH, rwpm is started again when the install ends, whether or not it worked, so the
+; player is never left without the app. It sees it is still the old version and says so.
+Function RelaunchIfAsked
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RELAUNCH" $R1
+  IfErrors done
+  Exec '"$INSTDIR\${EXE}"'
+  done:
+FunctionEnd
+
+; Stops before any file is changed while rwpm or the game is running. A silent run first
+; waits up to 30 seconds, because the rwpm that started it is still closing. If the files stay
+; busy: exit code 2. GIVE_UP runs just before that exit.
+!macro EnsureNotInUse UN GIVE_UP
   Function ${UN}EnsureNotInUse
+    StrCpy $R7 0
     retry:
       StrCpy $R8 0
       !insertmacro CheckFree "$INSTDIR\${EXE}"
@@ -82,14 +100,22 @@ VIAddVersionKey "LegalCopyright" "keyz182"
       !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.dll"
       !insertmacro CheckFree "$INSTDIR\payload\Rwpm.Payload.Hook.dll"
       StrCmp $R8 0 done
-      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Close RimWorld and ${APP}, then press Retry." /SD IDCANCEL IDRETRY retry
+      IfSilent 0 ask
+        IntCmp $R7 30 give_up
+        Sleep 1000
+        IntOp $R7 $R7 + 1
+        Goto retry
+      ask:
+      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Close RimWorld and ${APP}, then press Retry." IDRETRY retry
+    give_up:
+      ${GIVE_UP}
       SetErrorLevel 2
       Quit
     done:
   FunctionEnd
 !macroend
-!insertmacro EnsureNotInUse ""
-!insertmacro EnsureNotInUse "un."
+!insertmacro EnsureNotInUse "" "Call RelaunchIfAsked"
+!insertmacro EnsureNotInUse "un." ""
 
 Section "Install"
   Call EnsureNotInUse
@@ -123,6 +149,7 @@ Section "Install"
   WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\DefaultIcon" "" "$INSTDIR\${EXE},0"
   WriteRegStr HKCU "${CLASSES}\${PACK_CLASS}\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (${SHCNE_ASSOCCHANGED}, 0, 0, 0)'
+  Call RelaunchIfAsked
 SectionEnd
 
 Section "Uninstall"
