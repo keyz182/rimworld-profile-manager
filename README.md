@@ -83,7 +83,23 @@ The app can tell you when a new version is out. This is off until you turn it on
 2. When a newer version is out, a line at the top says so. Choose "Release page" to open the download page in your browser. Choose "Dismiss" to hide the line until a newer version comes out.
 3. To check at once, choose "Check now" in "Settings".
 
-The check sends one request to GitHub. The request names this app and its version. GitHub also sees your internet address, as with any web request. The app sends nothing else about you or your computer. While the setting is "Off", the app sends nothing. The app does not download or install the update. You do that yourself.
+The check sends one request to GitHub. The request names this app and its version. GitHub also sees your internet address, as with any web request. The app sends nothing else about you or your computer. While the setting is "Off", the app sends nothing. The app installs nothing until you choose "Install update".
+
+### Install update
+
+For some installs, the line at the top also has an "Install update" button. Choose it, and the app downloads the new version. It checks the download against the checksum in the release (`SHA256SUMS`). Nothing changes yet. Then choose "Restart now". The app puts the new version in place and starts it. "Restart now" waits while RimWorld or a task of this app is running.
+
+What the button does depends on how you installed the app:
+
+| How you installed it | What happens |
+| --- | --- |
+| AUR, `.deb` or `.rpm` package | No button. The line asks you to update with your package manager. |
+| AppImage | The app replaces the `.AppImage` file. |
+| Windows installer | The app downloads the new installer and runs it. |
+| Windows `.zip` or Linux `.tar.gz` | The app replaces the files in the folder. If the folder is read-only, there is no button. |
+| macOS | No button. Use "Release page". |
+
+If an update fails, you keep the old version and the app says why. A zip or tar.gz update puts the old files back if any step fails. A release with no `SHA256SUMS` file has no button. Use "Release page" for that release.
 
 ## How it works
 
