@@ -12,7 +12,7 @@ Close RimWorld first. Start the game once with the profile, so that it has a mod
 
 1. Select a profile. Choose the "⋯" button, then "Share as modpack…". Any profile can be shared, also the Default one.
 2. Tick what goes in the modpack. See "What you can tick".
-3. Type a description, choose a cover picture and add a link to a Steam collection if you want. All three are optional. See "Description and cover".
+3. Type the creator names, a description, choose a cover picture and add a link to a Steam collection if you want. All four are optional. See "Creators" and "Description and cover".
 4. Choose "Share". Choose a name and a folder for the file.
 
 The app writes the file in the background. If something goes wrong, the app removes the half-written file.
@@ -37,6 +37,16 @@ Under "Mod settings", and under the box for the things you made, choose "Choose 
 - The list shows only files that a modpack can hold.
 - If you untick every item of a box, the app unticks the box. Tick the box again to tick all items.
 - The size of the box changes to show what is ticked, for example "3 of 12".
+
+### Creators
+
+Type the names of the people who made the pack in the "Creator(s)" box. Put a comma between the names. For example: `Ann, Bob`.
+
+- A pack can name up to 10 creators. Each name can have up to 100 characters.
+- A name cannot be empty, cannot have a comma and cannot be listed twice.
+- The app remembers the names. The next time you share a pack, the box already has them. Delete them if the pack has other creators.
+- People see the names as a line "By Ann, Bob" when they open the pack, and in the "From a modpack" part of the new profile.
+- A pack with creators opens only in rwpm 1.20 or later. An older version says that the pack is too new. A pack with no creators still opens in older versions. The dialog shows a note when the box has names.
 
 ### Description and cover
 
@@ -73,7 +83,7 @@ A file that is not plain data is not put in the modpack. A mod that the app cann
 2. Read the question. Change the name of the new profile if you want.
 3. Choose "Restore".
 
-The question shows the cover and the description of the pack, then the mods in three lists:
+The question shows the creators, the cover and the description of the pack, then the mods in three lists:
 
 | List | What it means |
 |---|---|
@@ -131,7 +141,7 @@ In both routes, a mod must name the package id that the pack promised. If it doe
 
 ## A profile made from a modpack
 
-A profile that you made from a modpack remembers it. Its page shows a part named "From a modpack" with the name, the cover and the description of the pack.
+A profile that you made from a modpack remembers it. Its page shows a part named "From a modpack" with the name, the creators, the cover and the description of the pack.
 
 The app keeps a copy of the `.rimpack` file in the profile folder. It is as big as the pack, so a pack with many saves takes that much room twice. The app checks the free space before it copies.
 

@@ -45,6 +45,7 @@ pub(super) fn make_pack(
     .expect("list");
     let spec = PackSpec {
         description: "A test pack".into(),
+        authors: Vec::new(),
         game_version: game_version.map(str::to_owned),
         dlc: dlc.iter().map(|d| (*d).to_owned()).collect(),
         includes: Includes {
@@ -398,4 +399,23 @@ fn a_cover_reaches_the_preview_and_a_long_description_keeps_the_buttons_on_scree
     let app = shown(&sb, p);
     assert_on_screen(&app, text::OPEN_PACK_TITLE);
     assert_on_screen(&app, text::OPEN_PACK_IT);
+}
+
+#[test]
+fn the_creators_show_under_the_pack_and_no_line_without_them() {
+    let sb = Sandbox::new();
+    let pack = make_pack(&sb, vec![], None, &[]);
+    let store = sb.ctx().store().expect("store");
+    let mut plan = modpack::plan_unpack(&pack, &store).expect("plan");
+    plan.manifest.authors = vec!["Ann".into(), "Bob".into()];
+    let app = shown(&sb, build_preview(plan, None));
+    assert!(found(&app, &text::pack_by(&["Ann".into(), "Bob".into()])));
+
+    let plain = plan_unpack_preview(&sb, &pack);
+    assert!(!found(&shown(&sb, plain), "By "));
+}
+
+fn plan_unpack_preview(sb: &Sandbox, pack: &Path) -> PackPreview {
+    let store = sb.ctx().store().expect("store");
+    build_preview(modpack::plan_unpack(pack, &store).expect("plan"), None)
 }

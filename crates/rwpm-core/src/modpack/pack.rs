@@ -29,6 +29,8 @@ const SAVES: &str = "Saves";
 #[derive(Debug, Clone)]
 pub struct PackSpec {
     pub description: String,
+    /// Who made the pack; makes it schema 4.
+    pub authors: Vec<String>,
     pub game_version: Option<String>,
     pub dlc: Vec<String>,
     pub includes: Includes,
@@ -78,6 +80,7 @@ pub fn plan_pack<T: Trash>(
         rwpm_version: crate::VERSION.to_owned(),
         name: profile.name.clone(),
         description: spec.description,
+        authors: spec.authors,
         game_version: spec.game_version,
         dlc: spec.dlc,
         start_save: spec.start_save,
@@ -102,15 +105,18 @@ pub fn plan_pack<T: Trash>(
     })
 }
 
-/// The totals restore holds a pack to count the cover too. A picked list makes the pack
-/// schema 3 and a cover schema 2; any other pack stays readable by builds that predate both.
+/// The totals restore holds a pack to count the cover too. Creators make the pack schema 4,
+/// a picked list schema 3 and a cover schema 2; any other pack stays readable by builds that
+/// predate all three.
 fn set_totals(manifest: &mut Manifest, inventory: &Inventory, cover: Option<&[u8]>) {
     let cover_bytes = cover.map_or(0, |c| c.len() as u64);
     manifest.uncompressed_bytes = inventory.bytes + cover_bytes;
     manifest.entry_count = inventory.items.len() as u64 + u64::from(cover.is_some());
     manifest.cover = cover.map(|_| cover::COVER_ENTRY.to_owned());
     let includes = &manifest.includes;
-    manifest.schema = if includes.mod_settings_only.is_some() || includes.creations_only.is_some() {
+    manifest.schema = if !manifest.authors.is_empty() {
+        file::SCHEMA_AUTHORS
+    } else if includes.mod_settings_only.is_some() || includes.creations_only.is_some() {
         file::SCHEMA_PICKS
     } else if cover.is_some() {
         file::SCHEMA_COVER

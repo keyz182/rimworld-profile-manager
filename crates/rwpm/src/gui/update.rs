@@ -333,6 +333,7 @@ impl App {
             (Some(Dialog::Restore(plan)), Field::Name) => plan.name = value,
             (Some(Dialog::OpenPack(preview)), Field::Name) => preview.plan.name = value,
             (Some(Dialog::Share(draft)), Field::Link) => draft.link = value,
+            (Some(Dialog::Share(draft)), Field::Authors) => draft.authors = value,
             (
                 Some(Dialog::Settings {
                     game, game_check, ..

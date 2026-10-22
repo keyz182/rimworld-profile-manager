@@ -225,6 +225,7 @@ fn a_gathered_list_goes_straight_into_a_pack() {
     let got = gather_mods(&profile, &w.game).expect("gather");
     let spec = PackSpec {
         description: String::new(),
+        authors: Vec::new(),
         game_version: None,
         dlc: got.dlc.clone(),
         includes: Includes {

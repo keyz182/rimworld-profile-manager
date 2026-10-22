@@ -50,6 +50,9 @@ impl App {
             text(t::pack_origin(&origin.name))
         ]
         .spacing(8);
+        if !origin.authors.is_empty() {
+            body = body.push(text(t::pack_by(&origin.authors)));
+        }
         if let Some(cover) = card.and_then(|c| c.cover.clone()) {
             body = body.push(image(cover).width(Length::Fixed(COVER_WIDTH)));
         }

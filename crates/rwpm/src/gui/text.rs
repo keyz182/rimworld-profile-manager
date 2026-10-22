@@ -956,6 +956,9 @@ pub const PICK_COVER_TITLE: &str = "Choose a cover picture";
 pub const COVER_FILTER: &str = "Pictures";
 pub const SHARE_LINK: &str = "Link to a Steam collection (optional)";
 pub const SHARE_LINK_BAD: &str = "That is not a web address. It must start with https://";
+pub const SHARE_AUTHORS: &str = "Creator(s) (optional)";
+pub const SHARE_AUTHORS_HINT: &str = "Separate names with commas.";
+pub const SHARE_AUTHORS_NEWER: &str = "Packs with creators need rwpm 1.20 or later.";
 pub const PICK_SHARE_SAVE_TITLE: &str = "Save the modpack";
 pub const PACK_FILTER: &str = "RimWorld Profile Manager modpack";
 pub const PACK_EXTENSION: &str = "rimpack";
@@ -993,6 +996,17 @@ pub fn share_save(name: &str, bytes: u64) -> String {
 
 pub fn share_name_long(max: usize) -> String {
     format!("The profile name is longer than {max} characters. Rename the profile to share it.")
+}
+
+pub fn share_authors_bad(max_names: usize, max_chars: usize) -> String {
+    format!(
+        "Up to {max_names} names, each up to {max_chars} characters, with no repeats or special characters."
+    )
+}
+
+/// The creators of a pack, as a line under its name.
+pub fn pack_by(authors: &[String]) -> String {
+    format!("By {}", authors.join(", "))
 }
 
 pub fn share_description_long(max: usize) -> String {

@@ -9,7 +9,9 @@ use crate::error::ProfileError;
 
 /// Highest schema this build reads. A file is written as the lowest schema that holds
 /// what it has (see `ProfileFile::to_write`), so an older rwpm can still read it.
-pub const SCHEMA: u32 = 3;
+pub const SCHEMA: u32 = 4;
+/// Schema 3 added `pack`; schema 4 added `pack.authors`.
+pub const SCHEMA_PACK: u32 = 3;
 /// Schema 2 added `game_build`.
 pub const SCHEMA_PINNED: u32 = 2;
 /// The schema a profile with no pinned game build and no pack origin is written as.
@@ -52,6 +54,9 @@ pub struct PackOrigin {
     /// Markdown source, as the pack creator wrote it.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    /// Who made the pack. Needs schema 4.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authors: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub has_cover: bool,
     pub imported_at: toml::value::Datetime,
@@ -63,7 +68,9 @@ pub struct PackOrigin {
 impl PackOrigin {
     /// The same limits a manifest holds its text to; a backup can bring in a foreign file.
     fn check(&self) -> Result<(), String> {
-        use crate::modpack::file::{MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_text};
+        use crate::modpack::file::{
+            MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_authors, check_text,
+        };
         if self.name.trim().is_empty() {
             return Err("`pack.name` is empty".into());
         }
@@ -73,7 +80,8 @@ impl PackOrigin {
             "`pack.description`",
             MAX_DESCRIPTION_CHARS,
             true,
-        )
+        )?;
+        check_authors(&self.authors)
     }
 }
 
@@ -144,13 +152,15 @@ impl ProfileFile {
         Ok(file)
     }
 
-    /// The lowest schema that holds what the file has: 3 with a pack origin, 2 with a
-    /// pinned game build, else 1. Recomputed on every write, so dropping the pin or the
+    /// The lowest schema that holds what the file has: 4 with pack creators, 3 with any
+    /// other pack origin, 2 with a pinned game build, else 1. Recomputed on every write, so dropping the pin or the
     /// origin takes the file back down instead of stranding it.
     fn to_write(&self) -> Self {
         let mut out = self.clone();
-        out.schema = if out.pack.is_some() {
+        out.schema = if out.pack.as_ref().is_some_and(|o| !o.authors.is_empty()) {
             SCHEMA
+        } else if out.pack.is_some() {
+            SCHEMA_PACK
         } else if out.game_build.is_some() {
             SCHEMA_PINNED
         } else {
@@ -201,6 +211,7 @@ mod tests {
         PackOrigin {
             name: "Ironman".into(),
             description: "# Hard mode\n\n- no saves\n- no mercy".into(),
+            authors: Vec::new(),
             has_cover: true,
             imported_at: "2026-10-21T12:00:00Z".parse().expect("datetime"),
             declined_offline: false,
@@ -221,13 +232,44 @@ mod tests {
         let path = dir.path().join(FILE_NAME);
         std::fs::write(
             &path,
-            "schema = 4\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
+            "schema = 5\nname = \"x\"\nmode = \"live\"\nfuture = true\n",
         )
         .expect("write");
         assert!(matches!(
             ProfileFile::read(&path),
-            Err(ProfileError::SchemaTooNew { found: 4, .. })
+            Err(ProfileError::SchemaTooNew { found: 5, .. })
         ));
+    }
+
+    /// 4 while the pack origin names creators, 3 for any other pack origin, and a file with
+    /// bad creators is refused.
+    #[test]
+    fn creators_raise_the_schema_and_are_checked() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(FILE_NAME);
+        let mut file = ProfileFile::new("Run");
+        let mut by = origin();
+        by.authors = vec!["Ann".into(), "Bob".into()];
+        file.pack = Some(by.clone());
+        file.write_atomic(&path).expect("write");
+        let read = ProfileFile::read(&path).expect("read");
+        assert_eq!(read.schema, 4);
+        assert_eq!(read.pack, Some(by.clone()));
+
+        file.pack = Some(origin());
+        file.write_atomic(&path).expect("write");
+        assert_eq!(ProfileFile::read(&path).expect("read").schema, 3);
+
+        for bad in [
+            vec!["Smith, J.".to_owned()],
+            vec!["Ann".into(), "Ann".into()],
+        ] {
+            let mut file = ProfileFile::new("Run");
+            by.authors = bad;
+            file.pack = Some(by.clone());
+            file.write_atomic(&path).expect("write");
+            assert!(ProfileFile::read(&path).is_err(), "{:?}", by.authors);
+        }
     }
 
     /// 3 while a pack origin is set; without one the file stays readable by older builds.

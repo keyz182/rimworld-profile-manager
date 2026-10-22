@@ -541,3 +541,61 @@ fn a_settings_file_is_named_after_its_mod_when_the_id_matches() {
         assert_eq!(label(plain, &mods), plain, "no mod, so its own name");
     }
 }
+
+#[test]
+fn the_creator_box_is_split_on_commas_and_limited() {
+    let sb = Sandbox::new();
+    let id = live_profile(&sb, "By people", &["ludeon.rimworld"]);
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    assert!(!found(&app, text::SHARE_AUTHORS_NEWER), "nothing typed yet");
+
+    let _ = app.update(Message::Input(Field::Authors, " Ann ,, Bob ".into()));
+    assert_eq!(draft(&app).author_list(), ["Ann", "Bob"]);
+    assert!(draft(&app).ready());
+    assert!(found(&app, text::SHARE_AUTHORS_NEWER));
+
+    let eleven: Vec<String> = (0..11).map(|i| format!("Creator {i}")).collect();
+    let _ = app.update(Message::Input(Field::Authors, eleven.join(", ")));
+    assert!(!draft(&app).ready());
+    assert!(found(
+        &app,
+        &text::share_authors_bad(modpack::file::MAX_AUTHORS, modpack::file::MAX_NAME_CHARS)
+    ));
+    let _ = app.update(Message::Confirm);
+    assert!(matches!(app.dialog, Some(Dialog::Share(_))), "stays open");
+    assert!(app.job.is_none());
+
+    let _ = app.update(Message::Input(Field::Authors, "Ann, ann, Ann".into()));
+    assert!(!draft(&app).ready(), "a name twice");
+}
+
+/// A real share through the job thread, like the one above: the creators reach the file,
+/// and the next Share dialog starts with them.
+#[test]
+fn shared_creators_are_in_the_pack_and_offered_again() {
+    let sb = Sandbox::new();
+    sb.steam_install("1111");
+    let id = live_profile(&sb, "Credited", &["ludeon.rimworld"]);
+    std::fs::create_dir_all(sb.path("out")).expect("out");
+
+    let mut app = selected(&sb, &id);
+    let _ = app.update(Message::Share);
+    assert_eq!(draft(&app).authors, "", "nothing remembered yet");
+    let _ = app.update(Message::Input(Field::Authors, "Ann,Bob".into()));
+    let chosen = draft(&app);
+    let _ = app.update(Message::SharePicked(chosen, Some(sb.path("out/credit"))));
+    let pack = sb.path("out/credit.rimpack");
+    wait_for("the modpack file", || pack.is_file());
+
+    let manifest = modpack::read_manifest(&pack).expect("manifest");
+    assert_eq!(manifest.authors, ["Ann", "Bob"]);
+    assert_eq!(manifest.schema, modpack::file::SCHEMA_AUTHORS);
+    wait_for("the remembered creators", || {
+        rwpm_core::share_prefs::ShareDefaults::load(&sb.path("app")).authors == ["Ann", "Bob"]
+    });
+
+    let mut again = selected(&sb, &id);
+    let _ = again.update(Message::Share);
+    assert_eq!(draft(&again).authors, "Ann, Bob");
+}

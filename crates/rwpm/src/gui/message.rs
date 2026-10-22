@@ -200,6 +200,8 @@ pub enum Field {
     MoveTo,
     /// Share dialog: the link to a Steam collection.
     Link,
+    /// Share dialog: the creator(s), names separated by commas.
+    Authors,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

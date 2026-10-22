@@ -8,11 +8,12 @@ use iced::Task;
 use iced::widget::{image, markdown, text_editor};
 use rwpm_core::ProfileError;
 use rwpm_core::modpack::file::{
-    MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_link, check_save_name,
+    MAX_DESCRIPTION_CHARS, MAX_NAME_CHARS, check_authors, check_link, check_save_name,
 };
 use rwpm_core::modpack::{self, Includes, ModEntry, PackSpec, cover};
 use rwpm_core::profile::copy_settings::{Group, entries};
 use rwpm_core::profile::{ProcessProbe, ProfileId};
+use rwpm_core::share_prefs::ShareDefaults;
 
 use super::message::{Dialog, Message, Outcome};
 use super::{App, Notice, text as t};
@@ -135,6 +136,8 @@ pub struct ShareDraft {
     pub preview: Option<Vec<markdown::Item>>,
     pub cover: Option<ShareCover>,
     pub link: String,
+    /// The creator(s) as typed: names separated by commas.
+    pub authors: String,
 }
 
 impl ShareDraft {
@@ -152,8 +155,23 @@ impl ShareDraft {
         link.is_empty() || check_link(link).is_ok()
     }
 
+    /// The names in the creator box: split on commas, trimmed, blanks dropped.
+    pub fn author_list(&self) -> Vec<String> {
+        self.authors
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// Empty is fine: creators are optional.
+    pub fn authors_ok(&self) -> bool {
+        check_authors(&self.author_list()).is_ok()
+    }
+
     pub fn ready(&self) -> bool {
-        !self.name_too_long() && !self.description_too_long() && self.link_ok()
+        !self.name_too_long() && !self.description_too_long() && self.link_ok() && self.authors_ok()
     }
 
     pub(super) fn includes(&self) -> Includes {
@@ -258,6 +276,7 @@ impl App {
             preview: None,
             cover: None,
             link: String::new(),
+            authors: ShareDefaults::load(&self.ctx.app_dir).authors.join(", "),
         };
         self.dialog = Some(Dialog::Share(Box::new(draft)));
     }
@@ -400,6 +419,7 @@ impl App {
             let link = draft.link.trim();
             let spec = PackSpec {
                 description: draft.description.trim().to_owned(),
+                authors: draft.author_list(),
                 game_version: game.version.clone(),
                 dlc: gathered.dlc,
                 includes: draft.includes(),
@@ -411,6 +431,12 @@ impl App {
             let plan = modpack::plan_pack(&store, &p.id, spec).map_err(fail)?;
             let report =
                 modpack::apply_pack(&plan, &path, &ProcessProbe, progress).map_err(fail)?;
+            // A convenience for the next pack: failing to remember never fails the share.
+            let _ = ShareDefaults {
+                authors: draft.author_list(),
+                ..ShareDefaults::default()
+            }
+            .save(&ctx.app_dir);
             Ok(Outcome::Changed(t::shared(
                 &plan.name,
                 &path.display().to_string(),

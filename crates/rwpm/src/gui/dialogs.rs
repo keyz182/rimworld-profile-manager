@@ -563,6 +563,13 @@ fn share_dialog(draft: &ShareDraft, dark: bool, room: Room) -> Element<'_, Messa
     .spacing(GAP);
     body = body.push(saves_section(draft));
     body = body
+        .push(text(t::SHARE_AUTHORS))
+        .push(
+            text_input(t::SHARE_AUTHORS_HINT, &draft.authors)
+                .padding(8)
+                .on_input(|v| Message::Input(Field::Authors, v))
+                .on_submit(Message::Confirm),
+        )
         .push(text(t::SHARE_DESCRIPTION))
         .push(description_box(draft, dark))
         .push(cover_section(draft))
@@ -573,8 +580,18 @@ fn share_dialog(draft: &ShareDraft, dark: bool, room: Room) -> Element<'_, Messa
                 .on_input(|v| Message::Input(Field::Link, v))
                 .on_submit(Message::Confirm),
         );
+    if !draft.author_list().is_empty() {
+        body = body.push(text(t::SHARE_AUTHORS_NEWER).size(13));
+    }
     let warnings = [
         (!draft.link_ok(), t::SHARE_LINK_BAD.to_owned()),
+        (
+            !draft.authors_ok(),
+            t::share_authors_bad(
+                rwpm_core::modpack::file::MAX_AUTHORS,
+                rwpm_core::modpack::file::MAX_NAME_CHARS,
+            ),
+        ),
         (
             draft.description_too_long(),
             t::share_description_long(rwpm_core::modpack::file::MAX_DESCRIPTION_CHARS),

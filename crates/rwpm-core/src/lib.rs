@@ -21,6 +21,7 @@ pub mod profile;
 pub mod rimsort;
 pub mod self_update;
 pub mod settings;
+pub mod share_prefs;
 pub mod space;
 pub mod steamcmd;
 pub mod update_check;

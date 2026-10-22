@@ -38,6 +38,7 @@ fn sample() -> Manifest {
         rwpm_version: "1.11.0".into(),
         name: "Ironman".into(),
         description: "Hard mode".into(),
+        authors: Vec::new(),
         game_version: Some("1.7.4977 rev1248".into()),
         dlc: vec!["ludeon.rimworld.royalty".into()],
         start_save: Some("Start.rws".into()),
@@ -73,10 +74,10 @@ fn manifest_refuses_unknown_fields_and_newer_schema() {
         parse(&extra),
         Err(ProfileError::BadModpack { .. })
     ));
-    let newer = text.replacen("schema = 1", "schema = 4", 1);
+    let newer = text.replacen("schema = 1", "schema = 5", 1);
     assert!(matches!(
         parse(&newer),
-        Err(ProfileError::SchemaTooNew { found: 4, .. })
+        Err(ProfileError::SchemaTooNew { found: 5, .. })
     ));
 }
 
@@ -332,6 +333,7 @@ fn fixture() -> Fx {
 fn spec(saves: &[&str]) -> PackSpec {
     PackSpec {
         description: "d".into(),
+        authors: Vec::new(),
         game_version: None,
         dlc: vec![],
         includes: includes(saves),
@@ -663,6 +665,7 @@ fn a_file_that_is_not_a_modpack_is_refused() {
     assert!(fx.leftovers().is_empty());
 }
 
+mod authors_tests;
 mod cover_tests;
 mod origin_tests;
 mod picks_tests;

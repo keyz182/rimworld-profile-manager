@@ -12,8 +12,10 @@ use crate::error::ProfileError;
 use crate::profile::copy_settings::{Group, group_of};
 
 /// Highest schema this build reads. Schema 2 added `cover`, schema 3 the picked lists in
-/// `[includes]`.
-pub const SCHEMA: u32 = 3;
+/// `[includes]`, schema 4 `authors`.
+pub const SCHEMA: u32 = 4;
+/// What a pack with creators is written as.
+pub const SCHEMA_AUTHORS: u32 = 4;
 /// What a pack with a cover is written as.
 pub const SCHEMA_COVER: u32 = 2;
 /// What a pack that lists single settings or creations is written as.
@@ -30,6 +32,8 @@ const MAX_ID: usize = 128;
 /// Text a person reads is shown in the app, so it is short (counted in characters).
 pub const MAX_NAME_CHARS: usize = 100;
 pub const MAX_DESCRIPTION_CHARS: usize = 2_000;
+/// Most creators a pack can name; each name is held to `MAX_NAME_CHARS`.
+pub const MAX_AUTHORS: usize = 10;
 const MAX_VERSION_CHARS: usize = 128;
 
 /// What the pack creator chose to put in. `ModsConfig.xml` is always in.
@@ -79,6 +83,9 @@ pub struct Manifest {
     pub name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    /// Who made the pack. Needs schema 4.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authors: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_version: Option<String>,
     /// Package ids of the expansions the pack needs.
@@ -146,6 +153,10 @@ impl Manifest {
             MAX_DESCRIPTION_CHARS,
             true,
         )?;
+        check_authors(&self.authors)?;
+        if !self.authors.is_empty() && self.schema < SCHEMA_AUTHORS {
+            return Err("it has creators but is not schema 4".into());
+        }
         if let Some(version) = &self.game_version {
             check_text(version, "the game version", MAX_VERSION_CHARS, false)?;
         }
@@ -292,6 +303,34 @@ pub(crate) fn check_text(
     let control = |c: char| c.is_control() && !(multiline && matches!(c, '\n' | '\t'));
     if text.chars().any(|c| control(c) || reorders(c)) {
         return Err(format!("{what} has a character that is not allowed"));
+    }
+    Ok(())
+}
+
+/// The creators of a pack: a few short names, each plain text with no comma (the Share box
+/// splits on commas, so a comma would read back as two people) and none listed twice.
+pub fn check_authors(authors: &[String]) -> Result<(), String> {
+    if authors.len() > MAX_AUTHORS {
+        return Err(format!("it names more than {MAX_AUTHORS} creators"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for name in authors {
+        if name.trim().is_empty() {
+            return Err("a creator name is empty".into());
+        }
+        check_text(name, "a creator name", MAX_NAME_CHARS, false)?;
+        if name.contains(',') {
+            return Err(format!(
+                "the creator name `{}` has a comma",
+                name.escape_debug()
+            ));
+        }
+        if !seen.insert(name.trim()) {
+            return Err(format!(
+                "the creator `{}` is listed twice",
+                name.escape_debug()
+            ));
+        }
     }
     Ok(())
 }

@@ -247,6 +247,9 @@ enum Row {
 pub fn pack_dialog(preview: &PackPreview, dark: bool, room: Room) -> Element<'_, Message> {
     let m = &preview.plan.manifest;
     let mut details = Column::new().spacing(10);
+    if !m.authors.is_empty() {
+        details = details.push(text(t::pack_by(&m.authors)));
+    }
     if let Some(cover) = &preview.cover {
         details = details.push(image(cover.clone()).width(Length::Fixed(COVER_WIDTH)));
     }

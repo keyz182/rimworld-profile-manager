@@ -36,7 +36,15 @@ Check that a modpack made from a real profile holds only what it should, and tha
 13. Rename a copy of any text file to `bad.rimpack`. Open it. Expected: a plain-words message. No dialog, no new profile.
 14. Open the same pack twice. Expected: two profiles with different names.
 
+## Creators
+
+15. Choose "Share as modpack…". Expected: the "Creator(s)" box is empty. Type `Ann, Bob`. Expected: the note "Packs with creators need rwpm 1.20 or later." shows. Clear the box. Expected: the note goes.
+16. Type 11 names. Expected: a warning shows and "Share" is off. Type `Ann, ann, Ann`. Expected: the same warning shows. Type ` Ann ,, Bob `. Expected: the warning goes and "Share" is on.
+17. Share the pack. Read `rimpack.toml` (see step 7). Expected: `schema = 4` and `authors = ["Ann", "Bob"]`. Share a pack with an empty box. Expected: `schema = 1` (or 2 or 3 with a cover or picked items) and no `authors` line.
+18. Choose "Share as modpack…" again. Expected: the box has `Ann, Bob`. Open the pack from step 17. Expected: the line "By Ann, Bob" shows. Restore it. Expected: the "From a modpack" part of the new profile shows the same line.
+
 ## Rollback
 
 1. Delete the new profiles that the checks made.
 2. Delete the `.rimpack` test files.
+3. Delete `share.toml` in the app data folder to forget the creators.

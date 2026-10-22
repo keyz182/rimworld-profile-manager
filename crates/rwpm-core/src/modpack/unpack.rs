@@ -284,6 +284,7 @@ impl Job<'_> {
         file.pack = Some(PackOrigin {
             name: manifest.name.clone(),
             description: manifest.description.clone(),
+            authors: manifest.authors.clone(),
             has_cover: self.cover,
             imported_at: now_datetime(),
             declined_offline: false,
