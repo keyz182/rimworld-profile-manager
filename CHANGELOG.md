@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.18.0](https://github.com/keyz182/rimworld-profile-manager/compare/05b8a1c062e75ff1e039a8eb2db32f064dde5e9d..v1.18.0) - 2026-10-22
+#### Features
+- (**core**) download, check and install a newer release - ([78fff44](https://github.com/keyz182/rimworld-profile-manager/commit/78fff44acdd301a41fbc2f904a455f3d570535bc)) - [@keyz182](https://github.com/keyz182)
+- (**gui**) Install update and Restart now in the update banner - ([2d9f25f](https://github.com/keyz182/rimworld-profile-manager/commit/2d9f25fbca112b15c65aa6b20587fff33554eeee)) - [@keyz182](https://github.com/keyz182)
+- (**installer**) wait for rwpm to close and relaunch it after an update - ([f4f8d75](https://github.com/keyz182/rimworld-profile-manager/commit/f4f8d75009bf0c0cf0385bcd57b3ccdee5a6c7fc)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- describe the in-app update and add a QA runbook - ([7feb872](https://github.com/keyz182/rimworld-profile-manager/commit/7feb872cc9eecc2dfedcbb31fbc8495a271fdc76)) - [@keyz182](https://github.com/keyz182)
+#### Continuous Integration
+- publish a SHA256SUMS file with each release - ([05b8a1c](https://github.com/keyz182/rimworld-profile-manager/commit/05b8a1c062e75ff1e039a8eb2db32f064dde5e9d)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.17.0](https://github.com/keyz182/rimworld-profile-manager/compare/5d7c8c5fd62eea952bb3d513c138e5840fb2e01e..v1.17.0) - 2026-10-21
 #### Features
 - add rwpm --help - ([b69e846](https://github.com/keyz182/rimworld-profile-manager/commit/b69e846b271483f1e2ef43058b312221b7c30b97)) - [@keyz182](https://github.com/keyz182)
