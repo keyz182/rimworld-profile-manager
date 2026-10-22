@@ -206,6 +206,13 @@ jobs:
           pattern: bundle-*
           merge-multiple: true
           path: dist
+      - name: Checksums for the in-app updater
+        run: |
+          # The window checks each download against this file before it installs it. Written
+          # outside dist first so the glob cannot pick it up, then copied in beside the files.
+          (cd dist && sha256sum -- * > ../SHA256SUMS)
+          cp SHA256SUMS dist/SHA256SUMS
+          (cd dist && sha256sum --check --strict SHA256SUMS)
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
