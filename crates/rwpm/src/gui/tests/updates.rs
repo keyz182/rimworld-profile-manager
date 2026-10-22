@@ -2,17 +2,64 @@
 //! Settings and first-run setup save. No test reaches the network: tasks are not run here,
 //! so results are fed in as messages.
 
-use rwpm_core::update_check::{FILE_NAME, Frequency, RELEASES_PREFIX, Release, UpdateState};
+use rwpm_core::install_kind::InstallKind;
+use rwpm_core::self_update::{SUMS_NAME, Staged};
+use rwpm_core::update_check::{
+    Asset, DOWNLOAD_PREFIX, FILE_NAME, Frequency, RELEASES_PREFIX, Release, UpdateState,
+};
 
 use super::builds::{clicked, found};
 use super::*;
 use crate::gui::setup::SetupMsg;
+use crate::gui::updates::InstallState;
 
 fn release(version: &str) -> Release {
     Release {
         version: version.parse().expect("version"),
         url: format!("{RELEASES_PREFIX}tag/v{version}"),
+        assets: Vec::new(),
     }
+}
+
+fn asset(version: &str, name: &str) -> Asset {
+    Asset {
+        name: name.into(),
+        url: format!("{DOWNLOAD_PREFIX}v{version}/{name}"),
+    }
+}
+
+/// A release carrying the AppImage and its checksums, which is all an AppImage install needs.
+fn installable(version: &str) -> Release {
+    Release {
+        assets: vec![
+            asset(version, SUMS_NAME),
+            asset(version, &format!("rwpm-{version}-x86_64.AppImage")),
+        ],
+        ..release(version)
+    }
+}
+
+fn x86_64() -> bool {
+    std::env::consts::ARCH == "x86_64"
+}
+
+fn appimage() -> InstallKind {
+    InstallKind::AppImage("/home/a/rwpm.AppImage".into())
+}
+
+fn announce_installable(app: &mut App, version: &str) {
+    let _ = app.update(Message::UpdateChecked {
+        manual: false,
+        result: Ok(installable(version)),
+    });
+}
+
+fn ready(app: &mut App, version: &str) {
+    let staged = Staged::for_test(
+        app.installer.kind.clone(),
+        version.parse().expect("version"),
+    );
+    let _ = app.update(Message::UpdateDownloaded(Ok(staged)));
 }
 
 fn announce(version: &str) -> Message {
@@ -326,4 +373,265 @@ fn only_this_projects_release_pages_are_opened() {
     ))));
     // A release page is not a Steam page either: links from a pack stay Steam-only.
     assert!(refused(open_url(&format!("{RELEASES_PREFIX}tag/v1.0.0"))));
+}
+
+// ---- install update ----
+
+#[test]
+fn a_package_managed_copy_is_told_to_update_that_way() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = InstallKind::Managed;
+    announce_installable(&mut app, "999.0.0");
+    assert!(found(&app, text::UPDATE_BY_PACKAGE_MANAGER));
+    assert!(!app.can_install_update(), "no install button");
+}
+
+#[test]
+fn a_copy_that_can_replace_itself_offers_install_update() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+    let messages = clicked(&app, text::INSTALL_UPDATE);
+    assert!(
+        matches!(messages.as_slice(), [Message::InstallUpdate]),
+        "{messages:?}"
+    );
+}
+
+#[test]
+fn a_release_without_checksums_or_its_file_is_a_link_only() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    for assets in [
+        Vec::new(),
+        vec![asset("999.0.0", "rwpm-999.0.0-x86_64.AppImage")],
+        vec![asset("999.0.0", SUMS_NAME)],
+    ] {
+        let _ = app.update(Message::UpdateChecked {
+            manual: false,
+            result: Ok(Release {
+                assets,
+                ..release("999.0.0")
+            }),
+        });
+        assert!(!app.can_install_update());
+        assert!(
+            app.announced_update().is_some(),
+            "the link is still offered"
+        );
+    }
+    assert!(!found(&app, text::INSTALL_UPDATE));
+}
+
+#[test]
+fn macos_gets_the_link_only() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = InstallKind::MacOs;
+    announce_installable(&mut app, "999.0.0");
+    assert!(!app.can_install_update());
+    assert!(!found(&app, text::UPDATE_BY_PACKAGE_MANAGER));
+}
+
+#[test]
+fn install_update_downloads_once_then_offers_restart() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+
+    assert_eq!(
+        app.update(Message::InstallUpdate).units(),
+        1,
+        "one download"
+    );
+    assert_eq!(app.install, InstallState::Downloading);
+    assert_eq!(
+        app.update(Message::InstallUpdate).units(),
+        0,
+        "not a second one"
+    );
+    assert!(found(&app, text::DOWNLOADING_UPDATE));
+
+    ready(&mut app, "999.0.0");
+    let messages = clicked(&app, text::RESTART_NOW);
+    assert!(
+        matches!(messages.as_slice(), [Message::RestartForUpdate]),
+        "{messages:?}"
+    );
+    assert!(app.notice.is_none(), "{:?}", app.notice);
+}
+
+#[test]
+fn a_failed_download_says_why_and_can_be_tried_again() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+    let _ = app.update(Message::InstallUpdate);
+    let _ = app.update(Message::UpdateDownloaded(Err(
+        "checksum did not match".into()
+    )));
+    assert_eq!(app.install, InstallState::Idle);
+    assert_eq!(
+        app.notice,
+        Some(Notice::Error(text::update_install_failed(
+            "checksum did not match"
+        )))
+    );
+    assert!(app.can_install_update(), "can try again");
+}
+
+#[test]
+fn restart_waits_while_a_game_or_a_job_is_running() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+    ready(&mut app, "999.0.0");
+
+    app.game_running = true;
+    assert!(clicked(&app, text::RESTART_NOW).is_empty(), "button is off");
+    assert_eq!(app.update(Message::RestartForUpdate).units(), 0);
+    assert_eq!(app.notice, Some(Notice::Info(text::GAME_RUNNING.into())));
+    assert_eq!(app.updates.pending, None, "nothing was handed over");
+    assert_eq!(saved(&sb).pending, None);
+
+    app.game_running = false;
+    assert_eq!(
+        clicked(&app, text::RESTART_NOW).len(),
+        1,
+        "back on when it closes"
+    );
+}
+
+#[test]
+fn restart_records_the_hand_over_before_the_new_version_starts() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+    ready(&mut app, "999.0.0");
+
+    assert_eq!(
+        app.update(Message::RestartForUpdate).units(),
+        1,
+        "one restart job"
+    );
+    assert_eq!(saved(&sb).pending.as_deref(), Some("999.0.0"));
+
+    // The new version could not be started: forget the hand-over and say why.
+    let _ = app.update(Message::UpdateInstalled(Err("no space left".into())));
+    assert_eq!(saved(&sb).pending, None);
+    assert_eq!(app.install, InstallState::Idle);
+    assert_eq!(
+        app.notice,
+        Some(Notice::Error(text::update_install_failed("no space left")))
+    );
+}
+
+#[test]
+fn a_started_new_version_closes_this_window() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    assert_eq!(
+        app.update(Message::UpdateInstalled(Ok(()))).units(),
+        1,
+        "exit"
+    );
+}
+
+#[test]
+fn a_newer_release_drops_the_download_of_an_older_one() {
+    if !x86_64() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    announce_installable(&mut app, "999.0.0");
+    ready(&mut app, "999.0.0");
+    announce_installable(&mut app, "999.0.0");
+    assert!(
+        matches!(app.install, InstallState::Ready(_)),
+        "same release: kept"
+    );
+    announce_installable(&mut app, "1000.0.0");
+    assert_eq!(app.install, InstallState::Idle);
+}
+
+#[test]
+fn a_hand_over_that_did_not_install_is_reported_once() {
+    let sb = Sandbox::new();
+    std::fs::write(
+        sb.path("app").join(FILE_NAME),
+        "schema = 2\npending = \"999.0.0\"\n",
+    )
+    .expect("write");
+    let app = sb.app();
+    assert_eq!(
+        app.notice,
+        Some(Notice::Error(text::update_not_installed(
+            "999.0.0",
+            rwpm_core::VERSION
+        )))
+    );
+    assert_eq!(saved(&sb).pending, None, "cleared on disk");
+    assert_eq!(sb.app().notice, None, "not repeated on the next start");
+}
+
+#[test]
+fn a_hand_over_that_installed_is_cleared_quietly() {
+    let sb = Sandbox::new();
+    std::fs::write(
+        sb.path("app").join(FILE_NAME),
+        format!("schema = 2\npending = \"{}\"\n", rwpm_core::VERSION),
+    )
+    .expect("write");
+    let app = sb.app();
+    assert_eq!(app.notice, None);
+    assert_eq!(saved(&sb).pending, None);
+}
+
+#[test]
+fn settings_say_what_install_update_does_for_this_copy() {
+    let sb = Sandbox::new();
+    let mut app = sb.app();
+    app.installer.kind = appimage();
+    let _ = app.update(Message::OpenSettings);
+    assert!(found(&app, text::update_mode(&appimage())));
+}
+
+#[test]
+fn every_kind_of_install_has_its_own_words() {
+    let kinds = [
+        InstallKind::Managed,
+        appimage(),
+        InstallKind::WindowsInstaller("/x".into()),
+        InstallKind::Portable("/x".into()),
+        InstallKind::MacOs,
+    ];
+    let words: std::collections::HashSet<_> = kinds.iter().map(text::update_mode).collect();
+    assert_eq!(words.len(), kinds.len());
 }

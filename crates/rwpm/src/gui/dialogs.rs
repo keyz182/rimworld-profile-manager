@@ -112,6 +112,7 @@ pub fn dialog_view<'a>(app: &'a App, dialog: &'a Dialog, room: Room) -> Element<
                 profiles_root: root.unwrap_or_default(),
                 updates: *updates,
                 checking: app.update_checking,
+                update_mode: t::update_mode(&app.installer.kind),
             })
         }
         Dialog::ConfirmMove(plan) => move_dialog(plan),
@@ -327,6 +328,8 @@ struct SettingsForm<'a> {
     updates: Frequency,
     /// An update check is on its way.
     checking: bool,
+    /// What Install update does for this install.
+    update_mode: &'static str,
 }
 
 fn settings_dialog<'a>(form: SettingsForm<'a>) -> Element<'a, Message> {
@@ -338,6 +341,7 @@ fn settings_dialog<'a>(form: SettingsForm<'a>) -> Element<'a, Message> {
         profiles_root,
         updates,
         checking,
+        update_mode,
     } = form;
     let field = |label: &'a str, hint: &'a str, value: &'a str, f: Field| {
         column![
@@ -396,7 +400,8 @@ fn settings_dialog<'a>(form: SettingsForm<'a>) -> Element<'a, Message> {
             ]
             .spacing(GAP)
             .align_y(Alignment::Center),
-            text(t::UPDATES_ABOUT).size(13).style(theme::muted)
+            text(t::UPDATES_ABOUT).size(13).style(theme::muted),
+            text(update_mode).size(13).style(theme::muted)
         ]
         .spacing(4),
         buttons(t::SAVE, ok.then_some(Message::Confirm), false)

@@ -8,11 +8,13 @@ use iced::widget::{
     responsive, row, rule, scrollable, space, stack, text, text_input, tooltip,
 };
 use iced::{Alignment, Element, Length};
+use rwpm_core::install_kind::InstallKind;
 use rwpm_core::launch::Os;
 use rwpm_core::profile::{LastRun, Mode, Profile, RunOutcome, StartedBy};
 
 use super::icon::{Icon, UI_BOLD, icon};
 use super::message::{Dialog, Drill, Message};
+use super::updates::InstallState;
 use super::{App, Notice, dialogs, keys, setup, text as t, theme};
 
 const GAP: u32 = 10;
@@ -93,32 +95,75 @@ impl App {
         .into()
     }
 
+    /// The banner's install step for the announced release, if this copy has one: Install
+    /// update, then Restart now. A copy a package manager owns is told to update that way.
+    fn install_control(&self) -> Option<Element<'_, Message>> {
+        match &self.install {
+            InstallState::Downloading => {
+                Some(action(Icon::Add, t::DOWNLOADING_UPDATE, None, theme::secondary).into())
+            }
+            InstallState::Ready(_) => {
+                let wait = self.blocked().is_some();
+                let words = if wait {
+                    t::RESTART_NOW_BLOCKED_TIP
+                } else {
+                    t::RESTART_NOW_TIP
+                };
+                Some(tipped(
+                    Icon::Refresh,
+                    t::RESTART_NOW,
+                    Message::RestartForUpdate,
+                    words,
+                    wait,
+                ))
+            }
+            InstallState::Idle if self.can_install_update() => Some(tip(
+                action(
+                    Icon::Add,
+                    t::INSTALL_UPDATE,
+                    Some(Message::InstallUpdate),
+                    theme::secondary,
+                ),
+                t::INSTALL_UPDATE_TIP,
+            )),
+            InstallState::Idle => (self.installer.kind == InstallKind::Managed).then(|| {
+                text(t::UPDATE_BY_PACKAGE_MANAGER)
+                    .size(13)
+                    .style(theme::muted)
+                    .into()
+            }),
+        }
+    }
+
     fn banner(&self) -> Element<'_, Message> {
         let mut lines = Column::new().spacing(4);
         if let Some(release) = self.announced_update() {
+            let mut line = row![
+                icon(Icon::Refresh).style(theme::success),
+                text(t::update_available(
+                    &release.version.to_string(),
+                    rwpm_core::VERSION
+                ))
+                .width(Length::Fill)
+            ]
+            .spacing(GAP)
+            .align_y(Alignment::Center);
+            if let Some(control) = self.install_control() {
+                line = line.push(control);
+            }
             lines = lines.push(
-                row![
-                    icon(Icon::Refresh).style(theme::success),
-                    text(t::update_available(
-                        &release.version.to_string(),
-                        rwpm_core::VERSION
-                    ))
-                    .width(Length::Fill),
-                    action(
-                        Icon::Forward,
-                        t::RELEASE_PAGE,
-                        Some(Message::OpenRelease),
-                        theme::secondary
-                    ),
-                    action(
-                        Icon::Close,
-                        t::DISMISS,
-                        Some(Message::DismissUpdate),
-                        theme::ghost
-                    )
-                ]
-                .spacing(GAP)
-                .align_y(Alignment::Center),
+                line.push(action(
+                    Icon::Forward,
+                    t::RELEASE_PAGE,
+                    Some(Message::OpenRelease),
+                    theme::secondary,
+                ))
+                .push(action(
+                    Icon::Close,
+                    t::DISMISS,
+                    Some(Message::DismissUpdate),
+                    theme::ghost,
+                )),
             );
         }
         if let Err(e) = &self.game {

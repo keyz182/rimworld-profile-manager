@@ -231,13 +231,53 @@ pub const SETTINGS_SAVED: &str = "Settings saved.";
 
 // Update check.
 pub const UPDATES_LABEL: &str = "Check for updates";
-pub const UPDATES_ABOUT: &str = "Asks GitHub now and then whether a newer version is out. It never installs anything. While this is Off, nothing is sent.";
+pub const UPDATES_ABOUT: &str = "Asks GitHub now and then whether a newer version is out. It installs nothing until you choose Install update. While this is Off, nothing is sent.";
 pub const SETUP_UPDATES_ABOUT: &str =
     "Optional. Asks GitHub whether a newer version is out. You can change this later in Settings.";
 pub const CHECK_NOW: &str = "Check now";
 pub const UP_TO_DATE: &str = "You have the latest version.";
 pub const RELEASE_PAGE: &str = "Release page";
 pub const DISMISS: &str = "Dismiss";
+pub const INSTALL_UPDATE: &str = "Install update";
+pub const INSTALL_UPDATE_TIP: &str =
+    "Downloads the new version and checks it. Nothing changes until you choose Restart now.";
+pub const DOWNLOADING_UPDATE: &str = "Downloading…";
+pub const RESTART_NOW: &str = "Restart now";
+pub const RESTART_NOW_TIP: &str =
+    "Puts the new version in place and starts it. This window closes.";
+pub const RESTART_NOW_BLOCKED_TIP: &str =
+    "Wait until RimWorld or the task that is running has finished.";
+pub const UPDATE_BY_PACKAGE_MANAGER: &str = "Update it the way you installed it.";
+
+/// What Install update does for this kind of install, shown under the update settings.
+pub fn update_mode(kind: &rwpm_core::install_kind::InstallKind) -> &'static str {
+    use rwpm_core::install_kind::InstallKind;
+    match kind {
+        InstallKind::Managed => {
+            "This copy belongs to your package manager, or its folder is read-only. You are told about new versions, but update it the way you installed it."
+        }
+        InstallKind::AppImage(_) => "Install update replaces this AppImage file.",
+        InstallKind::WindowsInstaller(_) => {
+            "Install update downloads the new installer and runs it for you."
+        }
+        InstallKind::Portable(_) => "Install update replaces the files in this folder.",
+        InstallKind::MacOs => "On macOS, download the new version from the release page.",
+    }
+}
+
+pub fn update_install_failed(reason: &str) -> String {
+    format!("Could not install the update: {reason}")
+}
+
+pub fn update_not_started(reason: &str) -> String {
+    format!("the new version could not be started: {reason}")
+}
+
+pub fn update_not_installed(wanted: &str, current: &str) -> String {
+    format!(
+        "The update to version {wanted} did not install, so you still have {current}. Install it by hand from the release page."
+    )
+}
 
 pub fn version(version: &str) -> String {
     format!("v{version}")

@@ -8,6 +8,7 @@ use rwpm_core::profile::ProfileId;
 use rwpm_core::profile::guard::GuardReport;
 use rwpm_core::profile::offline::OfflinePlan;
 use rwpm_core::profile::relocate::MovePlan;
+use rwpm_core::self_update::Staged;
 use rwpm_core::update_check::{Frequency, Release};
 
 use super::modpack::{PickGroup, ShareCover, ShareDraft, ShareTick};
@@ -171,6 +172,14 @@ pub enum Message {
     OpenRelease,
     /// The update banner's "Dismiss": hidden until a newer release comes out.
     DismissUpdate,
+    /// The update banner's "Install update": download the file and check it.
+    InstallUpdate,
+    /// The update file was downloaded and passed its checksum, or why it did not.
+    UpdateDownloaded(Result<Staged, String>),
+    /// The update banner's "Restart now": put the new version in place and start it.
+    RestartForUpdate,
+    /// The new version was started, or why it could not be.
+    UpdateInstalled(Result<(), String>),
 }
 
 /// Views that replace the detail pane, with ‹ Back.

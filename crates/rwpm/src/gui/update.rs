@@ -280,7 +280,11 @@ impl App {
             | Message::UpdateChecked { .. }
             | Message::SetUpdateFrequency(_)
             | Message::OpenRelease
-            | Message::DismissUpdate => return self.updates_update(message),
+            | Message::DismissUpdate
+            | Message::InstallUpdate
+            | Message::UpdateDownloaded(_)
+            | Message::RestartForUpdate
+            | Message::UpdateInstalled(_) => return self.updates_update(message),
             Message::DismissNotice => self.notice = None,
             Message::ModsRead(list) => self.mods = Some(list),
             Message::ModSearch(value) => self.mod_search = value,

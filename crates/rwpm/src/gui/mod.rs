@@ -226,6 +226,10 @@ pub struct App {
     pub update_found: Option<Release>,
     /// A check is on its way; no second one starts.
     pub update_checking: bool,
+    /// How this copy was installed, and how it replaces itself; tests replace it.
+    pub installer: updates::Installer,
+    /// Where Install update has got to.
+    pub install: updates::InstallState,
 }
 
 impl App {
@@ -262,6 +266,8 @@ impl App {
             update_check: updates::UpdateCheck::real(),
             update_found: None,
             update_checking: false,
+            installer: updates::Installer::real(),
+            install: updates::InstallState::Idle,
         };
         app.reload();
         app.load_updates();
@@ -444,6 +450,9 @@ pub fn run_with(open: Option<OpenFile>) -> iced::Result {
     };
     let start = move || {
         let mut app = App::new(ctx.clone());
+        // Leftovers of an earlier update. Not in `App::new`, which tests call in a folder
+        // this must never clean.
+        rwpm_core::self_update::cleanup(&app.installer.kind);
         if let Some(note) = &note {
             app.notice = Some(Notice::Info(note.clone()));
         }
