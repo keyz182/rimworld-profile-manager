@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[features]
+# Lets another crate's tests build a `self_update::Staged` without downloading one.
+test-support = []
+
 [dependencies]
 dirs = "7.0.0"
 flate2 = "1.1.10"

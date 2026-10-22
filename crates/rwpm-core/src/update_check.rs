@@ -16,12 +16,15 @@ use crate::http::{self, HttpError};
 
 pub const FILE_NAME: &str = "updates.toml";
 /// Highest schema this build reads and the one it writes.
-pub const SCHEMA: u32 = 1;
+pub const SCHEMA: u32 = 2;
 /// The newest published release. GitHub leaves out drafts and pre-releases here.
 pub const LATEST_URL: &str =
     "https://api.github.com/repos/keyz182/rimworld-profile-manager/releases/latest";
 /// The only release pages the window opens.
 pub const RELEASES_PREFIX: &str = "https://github.com/keyz182/rimworld-profile-manager/releases/";
+/// The only place an update file is fetched from.
+pub const DOWNLOAD_PREFIX: &str =
+    "https://github.com/keyz182/rimworld-profile-manager/releases/download/";
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_BODY_BYTES: u64 = 256 * 1024;
@@ -69,6 +72,10 @@ pub struct UpdateState {
     /// The release the player hid the banner for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dismissed: Option<String>,
+    /// The version an install was handed over to. Cleared on the next start; if this build is
+    /// still older than it, the install did not happen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<String>,
 }
 
 impl Default for UpdateState {
@@ -79,6 +86,7 @@ impl Default for UpdateState {
             last_checked: None,
             last_attempt: None,
             dismissed: None,
+            pending: None,
         }
     }
 }
@@ -114,10 +122,14 @@ impl UpdateState {
         }
     }
 
-    /// Writes via a temp file + rename.
+    /// Writes via a temp file + rename, always at this build's schema.
     pub fn save(&self, app_dir: &Path) -> Result<(), ProfileError> {
         let path = app_dir.join(FILE_NAME);
-        let text = toml::to_string_pretty(self).map_err(|e| ProfileError::Parse {
+        let current = Self {
+            schema: SCHEMA,
+            ..self.clone()
+        };
+        let text = toml::to_string_pretty(&current).map_err(|e| ProfileError::Parse {
             path: path.clone(),
             message: e.to_string(),
         })?;
@@ -158,6 +170,16 @@ impl UpdateState {
     pub fn shows(&self, release: &Release, current: &str) -> bool {
         release.version.is_newer_than(current)
             && self.dismissed.as_deref() != Some(release.version.to_string().as_str())
+    }
+
+    /// Settles a hand-over recorded by an earlier run. Returns the version that was meant to
+    /// be installed when this build is still older than it; clears `pending` either way.
+    pub fn take_failed_install(&mut self, current: &str) -> Option<String> {
+        let wanted = self.pending.take()?;
+        wanted
+            .parse::<Version>()
+            .is_ok_and(|v| v.is_newer_than(current))
+            .then_some(wanted)
     }
 }
 
@@ -213,6 +235,22 @@ pub struct Release {
     pub version: Version,
     /// The release page. Always starts with [`RELEASES_PREFIX`].
     pub url: String,
+    /// The files attached to the release. Every `url` starts with [`DOWNLOAD_PREFIX`].
+    pub assets: Vec<Asset>,
+}
+
+impl Release {
+    pub fn asset(&self, name: &str) -> Option<&Asset> {
+        self.assets.iter().find(|a| a.name == name)
+    }
+}
+
+/// One file attached to a release.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Asset {
+    pub name: String,
+    #[serde(rename = "browser_download_url")]
+    pub url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -233,6 +271,12 @@ pub enum Error {
 struct Payload {
     tag_name: String,
     html_url: String,
+    #[serde(default)]
+    assets: Vec<Asset>,
+}
+
+fn is_plain_url(url: &str, prefix: &str) -> bool {
+    url.starts_with(prefix) && !url.chars().any(|c| c.is_control() || c.is_whitespace())
 }
 
 /// Asks `url` (normally [`LATEST_URL`]) for the newest release. `https_only` is off only in
@@ -259,17 +303,20 @@ pub fn latest(url: &str, https_only: bool) -> Result<Release, Error> {
 fn parse(body: &[u8]) -> Result<Release, Error> {
     let payload: Payload = serde_json::from_slice(body).map_err(|e| Error::Parse(e.to_string()))?;
     let version = payload.tag_name.parse::<Version>()?;
-    if !payload.html_url.starts_with(RELEASES_PREFIX)
-        || payload
-            .html_url
-            .chars()
-            .any(|c| c.is_control() || c.is_whitespace())
-    {
+    if !is_plain_url(&payload.html_url, RELEASES_PREFIX) {
         return Err(Error::BadUrl(payload.html_url));
+    }
+    if let Some(bad) = payload
+        .assets
+        .iter()
+        .find(|a| !is_plain_url(&a.url, DOWNLOAD_PREFIX))
+    {
+        return Err(Error::BadUrl(bad.url.clone()));
     }
     Ok(Release {
         version,
         url: payload.html_url,
+        assets: payload.assets,
     })
 }
 

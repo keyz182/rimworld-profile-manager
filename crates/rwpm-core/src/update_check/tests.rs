@@ -19,6 +19,7 @@ fn release(tag: &str) -> Release {
     Release {
         version: tag.parse().expect("version"),
         url: format!("{RELEASES_PREFIX}tag/v{tag}"),
+        assets: Vec::new(),
     }
 }
 
@@ -129,6 +130,7 @@ fn the_state_file_round_trips_and_a_missing_one_means_off() {
         last_checked: Some(NOW),
         last_attempt: Some(NOW + 5),
         dismissed: Some("1.15.0".into()),
+        pending: Some("1.16.0".into()),
     };
     s.save(tmp.path()).expect("save");
     let text = std::fs::read_to_string(tmp.path().join(FILE_NAME)).expect("read");
@@ -140,12 +142,12 @@ fn the_state_file_round_trips_and_a_missing_one_means_off() {
 fn a_newer_schema_or_an_unknown_key_is_refused() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let path = tmp.path().join(FILE_NAME);
-    std::fs::write(&path, "schema = 2\nfuture = 1\n").expect("write");
+    std::fs::write(&path, "schema = 3\nfuture = 1\n").expect("write");
     assert!(matches!(
         UpdateState::load(tmp.path()),
-        Err(ProfileError::SchemaTooNew { found: 2, .. })
+        Err(ProfileError::SchemaTooNew { found: 3, .. })
     ));
-    std::fs::write(&path, "schema = 1\nextra = 1\n").expect("write");
+    std::fs::write(&path, "schema = 2\nextra = 1\n").expect("write");
     assert!(matches!(
         UpdateState::load(tmp.path()),
         Err(ProfileError::Parse { .. })
@@ -155,6 +157,86 @@ fn a_newer_schema_or_an_unknown_key_is_refused() {
         UpdateState::load(tmp.path()),
         Err(ProfileError::Parse { .. })
     ));
+}
+
+#[test]
+fn a_schema_1_file_still_loads_and_is_saved_as_the_current_schema() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join(FILE_NAME);
+    std::fs::write(&path, "schema = 1\nfrequency = \"daily\"\n").expect("write");
+    let s = UpdateState::load(tmp.path()).expect("load");
+    assert_eq!(s.frequency, Frequency::Daily);
+    s.save(tmp.path()).expect("save");
+    let text = std::fs::read_to_string(&path).expect("read");
+    assert!(text.contains(&format!("schema = {SCHEMA}")), "{text}");
+}
+
+#[test]
+fn a_hand_over_that_did_not_install_is_reported_once() {
+    let mut s = state(Frequency::Daily);
+    assert_eq!(s.take_failed_install("1.17.0"), None, "nothing pending");
+    s.pending = Some("1.18.0".into());
+    assert_eq!(s.take_failed_install("1.17.0").as_deref(), Some("1.18.0"));
+    assert_eq!(s.pending, None, "cleared");
+    s.pending = Some("1.18.0".into());
+    assert_eq!(s.take_failed_install("1.18.0"), None, "installed");
+    assert_eq!(s.pending, None);
+    s.pending = Some("garbage".into());
+    assert_eq!(
+        s.take_failed_install("1.17.0"),
+        None,
+        "unreadable is dropped"
+    );
+}
+
+fn asset_json(name: &str, url: &str) -> String {
+    format!(r#"{{"name":"{name}","browser_download_url":"{url}","size":1}}"#)
+}
+
+fn payload_with_assets(assets: &[String]) -> Vec<u8> {
+    format!(
+        r#"{{"tag_name":"v1.18.0","html_url":"{RELEASES_PREFIX}tag/v1.18.0","assets":[{}]}}"#,
+        assets.join(",")
+    )
+    .into_bytes()
+}
+
+#[test]
+fn release_assets_are_read_and_found_by_name() {
+    let url = format!("{DOWNLOAD_PREFIX}v1.18.0/SHA256SUMS");
+    let got = parse(&payload_with_assets(&[asset_json("SHA256SUMS", &url)])).expect("parse");
+    assert_eq!(
+        got.asset("SHA256SUMS").map(|a| a.url.as_str()),
+        Some(url.as_str())
+    );
+    assert!(got.asset("other").is_none());
+    assert!(
+        parse(&payload(
+            "v1.18.0",
+            &format!("{RELEASES_PREFIX}tag/v1.18.0")
+        ))
+        .expect("no assets key")
+        .assets
+        .is_empty()
+    );
+}
+
+#[test]
+fn an_asset_outside_this_projects_downloads_is_refused() {
+    for url in [
+        "https://example.com/rwpm.AppImage",
+        "https://github.com/someone-else/rimworld-profile-manager/releases/download/v1/x",
+        &format!("{RELEASES_PREFIX}tag/v1.18.0"),
+        &format!("{DOWNLOAD_PREFIX}v1 /x"),
+    ] {
+        assert!(
+            matches!(
+                parse(&payload_with_assets(&[asset_json("x", url)])),
+                Err(Error::BadUrl(_))
+            ),
+            "{url:?}"
+        );
+    }
 }
 
 fn payload(tag: &str, url: &str) -> Vec<u8> {
