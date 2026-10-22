@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.19.0](https://github.com/keyz182/rimworld-profile-manager/compare/77b643cca2b195bd6ce798fe2853cb980861e240..v1.19.0) - 2026-10-22
+#### Features
+- open files in the window that is already open - ([77b643c](https://github.com/keyz182/rimworld-profile-manager/commit/77b643cca2b195bd6ce798fe2853cb980861e240)) - [@keyz182](https://github.com/keyz182)
+#### Documentation
+- add release, CI and licence badges - ([238378c](https://github.com/keyz182/rimworld-profile-manager/commit/238378caa3793ff8c0004757845bc6f8b5cece1d)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.18.0](https://github.com/keyz182/rimworld-profile-manager/compare/05b8a1c062e75ff1e039a8eb2db32f064dde5e9d..v1.18.0) - 2026-10-22
 #### Features
 - (**core**) download, check and install a newer release - ([78fff44](https://github.com/keyz182/rimworld-profile-manager/commit/78fff44acdd301a41fbc2f904a455f3d570535bc)) - [@keyz182](https://github.com/keyz182)

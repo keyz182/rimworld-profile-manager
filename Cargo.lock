@@ -3169,7 +3169,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "rwpm"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "iced",
  "iced_test",
@@ -3188,7 +3188,7 @@ dependencies = [
 
 [[package]]
 name = "rwpm-core"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "dirs",
  "flate2",
@@ -3212,7 +3212,7 @@ dependencies = [
 
 [[package]]
 name = "rwpm-steam"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "steamworks",
  "tempfile",
