@@ -8,6 +8,12 @@
   Separate RimWorld profiles, each with its own saves, settings and mod list.
 </p>
 
+<p align="center">
+  <a href="https://github.com/keyz182/rimworld-profile-manager/releases/latest"><img src="https://img.shields.io/github/v/release/keyz182/rimworld-profile-manager" alt="Latest release"></a>
+  <a href="https://github.com/keyz182/rimworld-profile-manager/actions/workflows/release.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/keyz182/rimworld-profile-manager/release.yml?branch=main&label=CI" alt="CI status on main"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/keyz182/rimworld-profile-manager" alt="MIT licence"></a>
+</p>
+
 ---
 
 RimWorld Profile Manager keeps more than one RimWorld setup on one computer. Playing one profile never changes another.
