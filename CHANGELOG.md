@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.20.0](https://github.com/keyz182/rimworld-profile-manager/compare/d243f6ecf2fb5c6373888cbfe496d417fa999b12..v1.20.0) - 2026-10-22
+#### Features
+- add creators to modpacks - ([d243f6e](https://github.com/keyz182/rimworld-profile-manager/commit/d243f6ecf2fb5c6373888cbfe496d417fa999b12)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.19.0](https://github.com/keyz182/rimworld-profile-manager/compare/77b643cca2b195bd6ce798fe2853cb980861e240..v1.19.0) - 2026-10-22
 #### Features
 - open files in the window that is already open - ([77b643c](https://github.com/keyz182/rimworld-profile-manager/commit/77b643cca2b195bd6ce798fe2853cb980861e240)) - [@keyz182](https://github.com/keyz182)
