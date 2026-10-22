@@ -17,6 +17,7 @@ mod backups;
 mod builds;
 mod docs;
 mod gating;
+mod handoff;
 mod modpacks;
 mod pack_fetch;
 mod pack_open;

@@ -263,6 +263,7 @@ impl App {
             Message::SyncTick | Message::SyncChecked(..) | Message::DeclineOffline => {
                 return self.sync_update(message);
             }
+            Message::Instance(request) => return self.instance_request(request),
             Message::ResetPack | Message::ResetSaves(_) => return self.reset_update(message),
             Message::OpenPack
             | Message::OpenPackPicked(_)

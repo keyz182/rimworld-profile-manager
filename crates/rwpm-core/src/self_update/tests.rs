@@ -583,3 +583,25 @@ fn cleanup_drops_an_unused_appimage_download() {
     assert!(!sibling(&target, NEW_SUFFIX).exists());
     cleanup(&InstallKind::Managed);
 }
+
+#[cfg(unix)]
+#[test]
+fn the_restarted_app_is_told_it_follows_an_update() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let seen = tmp.path().join("seen");
+    spawn(&Handoff {
+        program: "sh".into(),
+        args: vec![
+            "-c".into(),
+            format!("printf %s \"${AFTER_UPDATE_ENV}\" > '{}'", seen.display()).into(),
+        ],
+    })
+    .expect("spawn");
+    for _ in 0..250 {
+        if fs::read_to_string(&seen).is_ok_and(|s| !s.is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(fs::read_to_string(&seen).expect("seen"), "1");
+}

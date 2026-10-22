@@ -69,7 +69,7 @@ A file that is not plain data is not put in the modpack. A mod that the app cann
 
 ## Open a modpack
 
-1. Under the profile list, choose "Open modpack…". Choose the `.rimpack` file. On Windows (installer) and Linux you can also double-click the file.
+1. Under the profile list, choose "Open modpack…". Choose the `.rimpack` file. On Windows (installer) and Linux you can also double-click the file. If the app is already open, the file opens in that window.
 2. Read the question. Change the name of the new profile if you want.
 3. Choose "Restore".
 

@@ -8,6 +8,7 @@
 
 mod guard;
 mod gui;
+mod instance;
 mod mcp;
 mod restart;
 mod run;
@@ -41,25 +42,22 @@ fn help_text() -> String {
 /// that was opened. Only an existing file counts; any other word is still
 /// an unknown command.
 fn file_arg(args: &[OsString]) -> Option<gui::OpenFile> {
-    let path = Path::new(args.first()?);
-    if !path.is_file() {
-        return None;
-    }
-    let extension = |wanted: &str| {
-        path.extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case(wanted))
-    };
-    if extension("rimrim") {
-        Some(gui::OpenFile::Backup(path.to_path_buf()))
-    } else if extension("rimpack") {
-        Some(gui::OpenFile::Pack(path.to_path_buf()))
-    } else {
-        None
-    }
+    gui::OpenFile::from_path(Path::new(args.first()?))
 }
 
+/// One window per user: with a window already open, it gets the file (or is brought to the
+/// front) and this process ends.
 fn open_window(open: Option<gui::OpenFile>) -> ExitCode {
-    match gui::run_with(open) {
+    let request = open
+        .clone()
+        .map_or(instance::Request::Focus, instance::Request::Open);
+    let after_update = std::env::var_os(instance::AFTER_UPDATE_ENV).is_some();
+    if instance::claim(&request, after_update) == instance::Claim::HandedOver {
+        return ExitCode::SUCCESS;
+    }
+    let result = gui::run_with(open);
+    instance::release();
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("rwpm: {e}");

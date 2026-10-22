@@ -6,6 +6,7 @@ mod builds;
 mod copy;
 mod dialogs;
 mod guide;
+mod handoff;
 mod health;
 mod icon;
 mod jobs;
@@ -423,6 +424,7 @@ impl App {
             iced::Subscription::run(watch::game_running),
             iced::Subscription::run(watch::sync_ticks),
             iced::Subscription::run(watch::update_ticks),
+            iced::Subscription::run(watch::instance_requests),
         ])
     }
 }
@@ -438,6 +440,26 @@ pub enum OpenFile {
     Backup(PathBuf),
     /// A `.rimpack` modpack: the Open modpack dialog.
     Pack(PathBuf),
+}
+
+impl OpenFile {
+    /// An existing `.rimrim` or `.rimpack` file; anything else is not for the window to open.
+    pub fn from_path(path: &std::path::Path) -> Option<Self> {
+        if !path.is_file() {
+            return None;
+        }
+        let extension = |wanted: &str| {
+            path.extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case(wanted))
+        };
+        if extension("rimrim") {
+            Some(Self::Backup(path.to_path_buf()))
+        } else if extension("rimpack") {
+            Some(Self::Pack(path.to_path_buf()))
+        } else {
+            None
+        }
+    }
 }
 
 pub fn run_with(open: Option<OpenFile>) -> iced::Result {

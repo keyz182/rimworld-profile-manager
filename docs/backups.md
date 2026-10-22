@@ -64,7 +64,9 @@ Double-click a `.rimrim` file. The app opens with the question from "Restore bac
 - **Linux, AppImage.** Your AppImage tool (for example AppImageLauncher) sets this up when it adds the app to your menu. Without such a tool, use "Restore backup…".
 - **macOS.** Not supported yet. Use "Restore backup…".
 
-If the app is already open, the file opens in a second window. Close the first window if you want only one. The two windows never restore at the same time.
+If the app is already open, the file opens in that window. The app never opens a second window for a file. On some Linux desktops the window only flashes in the taskbar instead of coming to the front.
+
+If the open window is busy, it keeps its work and shows a notice. It is busy during first-run setup, while a question is open, and while a job runs. Open the file again when the window is free.
 
 ## Limits
 

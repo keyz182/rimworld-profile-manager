@@ -249,10 +249,15 @@ pub fn apply(staged: &Staged) -> Result<Handoff, Error> {
     }
 }
 
+/// Set on what `spawn` starts. The window that is closing still holds the open-file socket,
+/// so the new one must not hand its launch over to it.
+pub const AFTER_UPDATE_ENV: &str = "RWPM_AFTER_UPDATE";
+
 /// Starts `handoff` and lets go of it, so it outlives this process.
 pub fn spawn(handoff: &Handoff) -> io::Result<()> {
     Command::new(&handoff.program)
         .args(&handoff.args)
+        .env(AFTER_UPDATE_ENV, "1")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

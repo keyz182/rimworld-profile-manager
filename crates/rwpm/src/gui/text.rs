@@ -543,6 +543,11 @@ pub fn created_with_settings(name: &str) -> String {
     format!("Created “{name}” with the chosen settings.")
 }
 
+/// A file was opened with rwpm while this window was busy with something else.
+pub fn open_when_busy(file: &str) -> String {
+    format!("Finish what is open, then open {file} again.")
+}
+
 pub fn busy(job: &str) -> String {
     format!("Busy: {}. Other changes wait.", job.to_lowercase())
 }

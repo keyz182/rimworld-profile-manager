@@ -133,6 +133,8 @@ pub enum Message {
     SyncChecked(ProfileId, bool),
     /// "Not now" to taking a synced pack profile offline.
     DeclineOffline,
+    /// A later launch of rwpm asked this window to open a file or come to the front.
+    Instance(crate::instance::Request),
     /// A pack profile's "Reset to pack…".
     ResetPack,
     /// Reset dialog: the box for the pack's saves.

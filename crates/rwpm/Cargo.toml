@@ -10,6 +10,8 @@ authors.workspace = true
 [dependencies]
 # `markdown`: pack descriptions. `image-without-codecs`: pack covers (PNG decoding comes from rwpm-core). Neither fetches anything from the net.
 iced = { version = "0.14.0", features = ["markdown", "image-without-codecs"] }
+# Local socket (Unix socket / Windows named pipe): a second launch hands its file to the open window.
+interprocess = "2.4.6"
 # System folder dialog for finding RimWorld (C: folder picker).
 rfd = "0.17.2"
 rmcp = { version = "3.6.0", features = ["server", "transport-io", "macros"] }

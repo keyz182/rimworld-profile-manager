@@ -47,6 +47,18 @@ pub fn update_ticks() -> impl Stream<Item = Message> {
     rx
 }
 
+/// `Message::Instance` for each request a later launch of rwpm hands to this window.
+pub fn instance_requests() -> impl Stream<Item = Message> {
+    let (tx, rx) = mpsc::unbounded();
+    std::thread::spawn(move || {
+        // False once the window has closed.
+        crate::instance::serve_window(move |request| {
+            tx.unbounded_send(Message::Instance(request)).is_ok()
+        });
+    });
+    rx
+}
+
 /// `Message::SyncTick` every `SYNC_EVERY`.
 pub fn sync_ticks() -> impl Stream<Item = Message> {
     let (tx, rx) = mpsc::unbounded();

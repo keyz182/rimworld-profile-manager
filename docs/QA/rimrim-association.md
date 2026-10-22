@@ -20,7 +20,7 @@ Check that a double-click on a `.rimrim` file opens this app on the Restore ques
 3. Open Registry Editor. Expected: `HKCU\Software\Classes\.rimrim` has the default value `rwpm.backup`. `HKCU\Software\Classes\rwpm.backup\shell\open\command` is `"<install folder>\rwpm.exe" "%1"`.
 4. In Explorer, find the `.rimrim` file. Expected: it shows the app icon and the type "RimWorld Profile Manager backup".
 5. Double-click the file. Expected: the app opens and the "Restore a backup" question shows for that file. No console window opens.
-6. Choose "Cancel". Leave the app open. Double-click the file again. Expected: a second window opens with the same question. Choose "Cancel" and close both.
+6. Choose "Cancel". Leave the app open. Double-click the file again. Expected: the same window shows the question again. No second window opens. Leave the question open and double-click another `.rimrim` file. Expected: the question stays, and a notice tells you to finish what is open and open the file again. Choose "Cancel".
 7. Put the `.rimrim` file in a folder whose name has a space and a `&`. Double-click it. Expected: the question shows (the path is handled as one argument).
 8. On a computer with no profiles yet (first start), double-click the file. Expected: the first-run setup shows. Finish it. Choose "Restore backup…" and pick the file. (The file from the double-click is not kept through setup.)
 9. Uninstall the app from Settings. Expected: both keys are gone. Double-click the file. Expected: Windows asks which app to use.
