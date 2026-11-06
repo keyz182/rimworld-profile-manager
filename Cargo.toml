@@ -17,3 +17,9 @@ all = { level = "deny", priority = -1 }
 
 [profile.release]
 strip = true
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
