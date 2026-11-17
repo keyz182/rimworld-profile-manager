@@ -81,6 +81,21 @@ impl PayloadFiles {
     }
 }
 
+/// Files the release ships beside the app that are not in `install_dir`. Not empty when
+/// the app was moved out of its folder on its own.
+pub fn missing_bundle_files(install_dir: &Path, os: Os) -> Vec<PathBuf> {
+    let files = PayloadFiles::beside(install_dir);
+    let loader = match os {
+        Os::Windows => crate::winhttp::DLL,
+        Os::Linux => LINUX_DOORSTOP_LIB,
+        Os::MacOs => MACOS_DOORSTOP_LIB,
+    };
+    [files.dll, files.hook, files.doorstop_dir.join(loader)]
+        .into_iter()
+        .filter(|p| !p.is_file())
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct LaunchPlan {
     pub program: PathBuf,
@@ -522,6 +537,40 @@ mod tests {
     use crate::profile::{Location, ProfileId};
 
     const GAME: &str = "/steam/steamapps/common/RimWorld";
+
+    #[test]
+    fn bundle_beside_exe_is_complete() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        for rel in [
+            "payload/Rwpm.Payload.dll",
+            "payload/Rwpm.Payload.Hook.dll",
+            "doorstop/winhttp.dll",
+        ] {
+            let p = tmp.path().join(rel);
+            std::fs::create_dir_all(p.parent().expect("parent")).expect("dir");
+            std::fs::write(&p, b"x").expect("file");
+        }
+        assert!(missing_bundle_files(tmp.path(), Os::Windows).is_empty());
+        // The Linux loader is a different file, so the same folder is incomplete there.
+        assert_eq!(
+            missing_bundle_files(tmp.path(), Os::Linux),
+            vec![tmp.path().join("doorstop").join(LINUX_DOORSTOP_LIB)]
+        );
+    }
+
+    #[test]
+    fn exe_moved_alone_misses_every_bundle_file() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let missing = missing_bundle_files(tmp.path(), Os::Windows);
+        assert_eq!(
+            missing,
+            vec![
+                tmp.path().join("payload").join("Rwpm.Payload.dll"),
+                tmp.path().join("payload").join("Rwpm.Payload.Hook.dll"),
+                tmp.path().join("doorstop").join("winhttp.dll"),
+            ]
+        );
+    }
 
     fn stored(mode: Mode) -> Profile {
         Profile {

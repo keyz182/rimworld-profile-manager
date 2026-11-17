@@ -37,7 +37,7 @@ use rwpm_core::paths::Layout;
 use rwpm_core::profile::{LastRun, OsTrash, Profile, ProfileId, ProfileStore};
 use rwpm_core::settings::AppSettings;
 use rwpm_core::update_check::{Release, UpdateState};
-use rwpm_core::{ProfileError, appimage, flatpak, paths};
+use rwpm_core::{ProfileError, appimage, flatpak, launch, paths};
 
 pub use message::Dialog;
 
@@ -100,6 +100,13 @@ impl Ctx {
                     notes.push(text::macos_launcher_failed(&e.to_string()));
                 }
             }
+        }
+        // A dev build runs from target/, which never holds the bundle.
+        if !cfg!(debug_assertions)
+            && let Some(dir) = ctx.exe.parent()
+            && !launch::missing_bundle_files(dir, launch::Os::current()).is_empty()
+        {
+            notes.push(text::bundle_incomplete(dir));
         }
         Ok((ctx, (!notes.is_empty()).then(|| notes.join("\n"))))
     }
