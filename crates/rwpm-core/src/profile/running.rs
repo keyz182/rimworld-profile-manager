@@ -17,16 +17,13 @@ pub struct ProcessProbe;
 
 impl RunningProbe for ProcessProbe {
     fn is_running(&self, save_data_dir: &Path) -> bool {
-        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+        use sysinfo::{ProcessRefreshKind, UpdateKind};
 
         let needle = crate::profile::savedatafolder_arg(save_data_dir);
-        let mut sys = System::new();
-        sys.refresh_processes_specifics(
-            ProcessesToUpdate::All,
-            true,
+        any_process(
             ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always),
-        );
-        sys.processes().values().any(|p| p.cmd().contains(&needle))
+            |p| p.cmd().contains(&needle),
+        )
     }
 
     fn any_game(&self) -> bool {
@@ -46,13 +43,30 @@ pub const GAME_PROCESS_NAMES: [&str; 4] = [
 /// Is any RimWorld process alive (whatever its profile, launched by us or not)?
 /// Profiles share `temporaryCachePath`, so only one game may run at once.
 pub fn any_game_running() -> bool {
-    use sysinfo::{ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
+    use sysinfo::{ProcessRefreshKind, ProcessStatus};
 
-    let mut sys = System::new();
-    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
-    sys.processes().values().any(|p| {
+    any_process(ProcessRefreshKind::nothing(), |p| {
         p.status() != ProcessStatus::Zombie && GAME_PROCESS_NAMES.iter().any(|n| p.name() == *n)
     })
+}
+
+/// Does any live process match? `true` when the process list cannot be read: callers
+/// use this to hold back changes while a program runs, so not knowing must not allow them.
+pub(crate) fn any_process(
+    kind: sysinfo::ProcessRefreshKind,
+    matches: impl Fn(&sysinfo::Process) -> bool,
+) -> bool {
+    use sysinfo::{ProcessesToUpdate, System};
+
+    let sys = System::new().map(|mut sys| {
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        sys
+    });
+    any_in(sys, matches)
+}
+
+fn any_in<E>(sys: Result<sysinfo::System, E>, matches: impl Fn(&sysinfo::Process) -> bool) -> bool {
+    sys.map_or(true, |sys| sys.processes().values().any(matches))
 }
 
 #[cfg(test)]
@@ -112,6 +126,11 @@ mod tests {
         let _ = child.kill();
         let _ = child.wait();
         assert!(seen, "probe did not see a process named RimWorld");
+    }
+
+    #[test]
+    fn an_unreadable_process_list_counts_as_running() {
+        assert!(any_in(Err(sysinfo::Error::Unsupported), |_| false));
     }
 
     #[test]

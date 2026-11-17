@@ -18,12 +18,12 @@ pub fn dir_size(path: &Path) -> u64 {
         .sum()
 }
 
-/// Free bytes on the disk holding `path` (or its nearest existing parent).
+/// Free bytes on the disk holding `path` (or its nearest existing parent). `None` when
+/// unknown, including when the disk list cannot be read.
 pub fn free_space(path: &Path) -> Option<u64> {
     let target = existing_ancestor(path)?.canonicalize().ok()?;
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let disks = sysinfo::Disks::new_with_refreshed_list().ok()?;
     disks
-        .list()
         .iter()
         .filter(|d| target.starts_with(d.mount_point()))
         .max_by_key(|d| d.mount_point().as_os_str().len())
