@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.20.1](https://github.com/keyz182/rimworld-profile-manager/compare/1de3d1e7abb4bed960fdf87876f92c582f15606a..v1.20.1) - 2026-11-17
+#### Bug Fixes
+- (**deps**) bump tokio to 1.54.1 (GHSA-5wjr-9356-4wc8) - ([74a4eff](https://github.com/keyz182/rimworld-profile-manager/commit/74a4eff588209890bc242b286d3a91f5a2ecb88b)) - [@keyz182](https://github.com/keyz182)
+- explain a moved exe instead of a raw missing-file error - ([3cbc83e](https://github.com/keyz182/rimworld-profile-manager/commit/3cbc83e00d8854e4bd5be2cd73b32dc6d125d6d7)) - [@keyz182](https://github.com/keyz182)
+#### Continuous Integration
+- move macOS jobs from retired macos-14 to macos-15 - ([8d568cc](https://github.com/keyz182/rimworld-profile-manager/commit/8d568cc628970d56c048f74723d7169772136986)) - [@keyz182](https://github.com/keyz182)
+#### Miscellaneous Chores
+- trim dev-profile debug info to cut target/ size - ([1de3d1e](https://github.com/keyz182/rimworld-profile-manager/commit/1de3d1e7abb4bed960fdf87876f92c582f15606a)) - [@keyz182](https://github.com/keyz182)
+
+- - -
+
 ## [v1.20.0](https://github.com/keyz182/rimworld-profile-manager/compare/d243f6ecf2fb5c6373888cbfe496d417fa999b12..v1.20.0) - 2026-10-22
 #### Features
 - add creators to modpacks - ([d243f6e](https://github.com/keyz182/rimworld-profile-manager/commit/d243f6ecf2fb5c6373888cbfe496d417fa999b12)) - [@keyz182](https://github.com/keyz182)

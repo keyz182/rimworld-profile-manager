@@ -12,7 +12,7 @@ SOLDIER_SDK="registry.gitlab.steamos.cloud/steamrt/soldier/sdk@sha256:f87b72ad00
 GLIBC_FLOOR="2.28"
 os="${1:?usage: package.sh linux|windows|macos}"
 
-# `sha256sum` is not on every macOS: it arrived with macOS 26, and the macos-14 CI
+# `sha256sum` is not on every macOS: it arrived with macOS 26, and the macos-15 CI
 # runner has no such command (exit 127). `shasum` ships with every macOS and with the
 # Linux runners, and reads the same `<hash>  <path>` format.
 sha256_check() {

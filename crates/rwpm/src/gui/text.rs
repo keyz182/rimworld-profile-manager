@@ -697,6 +697,18 @@ pub fn macos_launcher_failed(reason: &str) -> String {
     )
 }
 
+/// The app was moved out of its folder on its own, so `payload/` and `doorstop/` are
+/// not beside it.
+pub fn bundle_incomplete(dir: &Path) -> String {
+    format!(
+        "The payload and doorstop folders are missing from {}. Was this app moved \
+         out of its folder on its own? Put it back in the folder it came in, or \
+         reinstall it, and use a shortcut to start it. OFFLINE profiles cannot start \
+         until then.",
+        dir.display()
+    )
+}
+
 pub fn other_profiles(other: &Path, used: &Path) -> String {
     format!(
         "Profiles also exist in {}. This app uses {}, the folder that goes with \

@@ -63,7 +63,7 @@ jobs:
   # not just a cross-check like the Windows clippy line.
   test-macos:
     name: Format, lint, test (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

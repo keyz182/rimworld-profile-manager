@@ -52,15 +52,9 @@ pub trait RimSortProbe {
 pub struct ProcessRimSortProbe;
 
 impl RimSortProbe for ProcessRimSortProbe {
+    /// `true` when the process list cannot be read (see `any_process`).
     fn running(&self) -> bool {
-        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
-        let mut sys = System::new();
-        sys.refresh_processes_specifics(
-            ProcessesToUpdate::All,
-            true,
-            ProcessRefreshKind::nothing(),
-        );
-        sys.processes().values().any(|p| {
+        crate::profile::running::any_process(sysinfo::ProcessRefreshKind::nothing(), |p| {
             let name = p.name().to_string_lossy();
             name.eq_ignore_ascii_case("RimSort") || name.eq_ignore_ascii_case("RimSort.exe")
         })

@@ -795,6 +795,10 @@ impl App {
                         .unwrap_or(&ctx.app_dir)
                         .join("doorstop")
                         .join(winhttp::DLL);
+                    if !vendor.is_file() {
+                        let dir = vendor.parent().and_then(|d| d.parent()).unwrap_or(&vendor);
+                        return Err(t::bundle_incomplete(dir));
+                    }
                     winhttp::install(&game.game_dir, &ctx.app_dir, &vendor, &consent)
                         .map_err(|e| e.to_string())?;
                     Ok(if then_play {
